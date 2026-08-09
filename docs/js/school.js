@@ -1,78 +1,93 @@
 /* A school profile.
    ------------------------------------------------------------------
-   Loads one school file and the metric manifest, then renders every value
-   the sources publish for that school, grouped by category.
+   Loads one school file and the metric manifest, then renders what the
+   sources publish for that school, grouped by category and by measure.
 
-   Three rules decide what appears:
+   Four rules decide what appears:
      a value is shown with the year it describes, never on its own;
+     a value on a scale is shown with the maximum of that scale beside it;
      an absence says which kind of absence it is;
      a measure that does not apply to this type of school is not listed as
-     missing, because it was never expected. */
+     missing, because it was never expected.
+
+   Where New York City publishes its own 1 to 5 score against a comparison
+   group, the value carries a colored band. The score is theirs. The banding is
+   ours, and both the number and a written label sit next to the color. */
 
 (function () {
   'use strict';
 
-  var CATEGORY_ORDER = [
-    'demographics', 'attendance', 'state_tests', 'alt_assessments', 'regents',
-    'growth', 'coursework', 'graduation', 'college', 'climate',
-    'student_support', 'other'
-  ];
-
-  var state = { school: null, metrics: null, dbn: null };
-
-  // ---- Small pieces -------------------------------------------------
-
-  function districtLabel(code) {
-    var special = { '75': 'District 75, special education',
-                    '79': 'District 79, alternative programmes',
-                    '84': 'District 84, charter' };
-    var plain = String(parseInt(code, 10));
-    return special[plain] || ('District ' + plain);
-  }
-
-  function latestIndex(series) {
-    // The newest year that actually carries a value. A school that stopped
-    // reporting last year should show the year it last reported, labelled.
-    for (var i = series.y.length - 1; i >= 0; i--) {
-      if (!SF.isBlank(series.v[i])) return i;
-    }
-    return -1;
-  }
-
-  // Report types, spelled out. A school serving grades 6 to 12 files two
-  // quality reports and publishes some measures in both, for different groups
-  // of its own students. Those are two facts, so the profile shows two rows.
   var REPORT_LABEL = {
     EMS: 'elementary and middle grades',
     HS: 'high school grades',
     HST: 'transfer school report',
     EC: 'early childhood report',
     D75: 'District 75 report',
-    YABC: 'Young Adult Borough Centre report'
+    YABC: 'Young Adult Borough Center report'
   };
 
+  var state = { payload: null, metrics: null };
+
+  // ---- Small pieces -------------------------------------------------
+
+  function districtLabel(code) {
+    var special = { '75': 'District 75, special education',
+                    '79': 'District 79, alternative programs',
+                    '84': 'District 84, charter' };
+    var plain = String(parseInt(code, 10));
+    return special[plain] || ('District ' + plain);
+  }
+
+  function latestIndex(series) {
+    for (var i = series.y.length - 1; i >= 0; i--) {
+      if (!SF.isBlank(series.v[i])) return i;
+    }
+    return -1;
+  }
+
+  // One reading of a series: the newest year that carries a value, with
+  // everything published alongside it.
+  function reading(series) {
+    if (!series) return null;
+    var i = latestIndex(series);
+    if (i === -1) {
+      return {
+        absent: true,
+        status: series.st && series.st.length ? series.st[series.st.length - 1] : 'missing'
+      };
+    }
+    return {
+      absent: false,
+      value: series.v[i],
+      year: series.y[i],
+      n: series.n ? series.n[i] : null,
+      comparison: series.c ? series.c[i] : null,
+      score: series.s ? series.s[i] : null,
+      band: series.b ? series.b[i] : null,
+      report: series.rt ? series.rt[i] : null
+    };
+  }
+
+  // A school with middle and high school grades files two quality reports and
+  // publishes some measures in both, for different students. Split them so the
+  // profile shows two labeled readings instead of silently picking one.
   function splitByReport(series) {
-    // Returns one entry per report type. Most metrics have exactly one, in
-    // which case the label is left off entirely.
     if (!series) return [];
-    if (!series.rt) return [{ label: null, series: series }];
+    if (!series.rt) return [{ scope: null, series: series }];
     var groups = {};
+    var keys = ['v', 'st', 'n', 'c', 's', 'b'];
     series.y.forEach(function (year, i) {
       var key = series.rt[i] || '';
-      var g = groups[key] || (groups[key] = { y: [], v: [], st: [], n: [], c: [], s: [] });
+      var g = groups[key];
+      if (!g) {
+        g = groups[key] = { y: [] };
+        keys.forEach(function (k) { if (series[k]) g[k] = []; });
+      }
       g.y.push(year);
-      g.v.push(series.v[i]);
-      g.st.push(series.st[i]);
-      if (series.n) g.n.push(series.n[i]);
-      if (series.c) g.c.push(series.c[i]);
-      if (series.s) g.s.push(series.s[i]);
+      keys.forEach(function (k) { if (series[k]) g[k].push(series[k][i]); });
     });
     return Object.keys(groups).sort().map(function (key) {
-      var g = groups[key];
-      if (!g.n.length) delete g.n;
-      if (!g.c.length) delete g.c;
-      if (!g.s.length) delete g.s;
-      return { label: REPORT_LABEL[key] || key, series: g };
+      return { scope: REPORT_LABEL[key] || key, series: groups[key] };
     });
   }
 
@@ -104,9 +119,7 @@
     host.appendChild(SF.el('h1', { text: school.name || school.dbn }));
 
     var where = [
-      school.dbn,
-      school.boro,
-      districtLabel(school.district),
+      school.dbn, school.boro, districtLabel(school.district),
       school.grades ? 'Grades ' + school.grades : null
     ].filter(Boolean).join(' · ');
     host.appendChild(SF.el('p', { class: 'where mono', text: where }));
@@ -117,7 +130,7 @@
       host.appendChild(SF.el('div', {
         class: 'note-box',
         html: '<p><strong>This school is not in the current directory or the ' +
-              'newest enrolment snapshot.</strong> Its published history is kept ' +
+              'newest enrollment snapshot.</strong> Its published history is kept ' +
               'here in full. Nothing on this page describes a school you can ' +
               'currently apply to.</p>'
       }));
@@ -128,7 +141,7 @@
     var host = document.getElementById('school-facts');
     host.innerHTML = '';
 
-    if (school.enrollment !== null && school.enrollment !== undefined) {
+    if (!SF.isBlank(school.enrollment)) {
       host.appendChild(fact('Students', SF.fmt.count(school.enrollment),
         { big: true, note: school.enrollment_year || null }));
     }
@@ -136,9 +149,9 @@
     if (school.address) {
       // An external map link rather than an embedded map: this version of the
       // site does not load a mapping library.
-      var query = encodeURIComponent(school.address);
       host.appendChild(fact('Address', school.address, {
-        href: 'https://www.openstreetmap.org/search?query=' + query,
+        href: 'https://www.openstreetmap.org/search?query=' +
+              encodeURIComponent(school.address),
         external: true,
         note: school.latitude
           ? (school.coordinate_source === 'source'
@@ -158,7 +171,7 @@
     }
     if (school.accessibility) host.appendChild(fact('Building access', school.accessibility));
     if (school.languages) host.appendChild(fact('Languages taught', school.languages));
-    if (school.neighborhood) host.appendChild(fact('Neighbourhood', school.neighborhood));
+    if (school.neighborhood) host.appendChild(fact('Neighborhood', school.neighborhood));
     // The directories write this as 1 or 0, which means nothing on a page.
     if (school.shared_building === '1' || school.shared_building === 1) {
       host.appendChild(fact('Building', 'Shared with at least one other school'));
@@ -193,56 +206,81 @@
     }));
   }
 
-  // ---- Metrics --------------------------------------------------------
+  // ---- One reading, rendered ------------------------------------------
 
-  function appliesToSchool(metric, school) {
-    var mine = (school.report_types || school.report_type || '').split('|');
-    if (!mine.length || !mine[0]) return true;
-    return (metric.applies_to || []).some(function (r) { return mine.indexOf(r) !== -1; });
+  function valueNode(read, metric) {
+    var wrapper = SF.el('span', { class: 'm-figure' });
+    if (read.absent) {
+      wrapper.appendChild(SF.el('span', {
+        class: 'm-value absent',
+        text: SF.ABSENCE[read.status] || SF.ABSENCE.missing
+      }));
+      return wrapper;
+    }
+    wrapper.appendChild(SF.el('span', {
+      class: 'm-value', text: SF.formatValue(read.value, metric.format)
+    }));
+    var scale = SF.scaleOf(metric.format);
+    if (scale) wrapper.appendChild(SF.el('span', { class: 'm-scale', text: scale }));
+    var band = SF.bandElement(read.band, read.score);
+    if (band) wrapper.appendChild(band);
+    return wrapper;
   }
 
-  function metricRow(metricId, metric, series, reportLabel) {
-    var item = SF.el('li', { class: 'metric' });
-    var label = metric.label || metricId;
-    if (reportLabel) label += ', ' + reportLabel;
-    item.appendChild(SF.el('span', { class: 'm-label', text: label }));
-
-    var index = series ? latestIndex(series) : -1;
-    var value = SF.el('span', { class: 'm-value' });
+  function metaNode(read) {
     var meta = SF.el('span', { class: 'm-meta' });
-
-    if (index >= 0) {
-      value.textContent = SF.formatValue(series.v[index], metric.format);
-      var bits = [series.y[index]];
-      if (series.n && !SF.isBlank(series.n[index])) {
-        bits.push(SF.fmt.count(series.n[index]) + ' students');
-      }
-      if (series.c && !SF.isBlank(series.c[index])) {
-        bits.push('comparison group ' + SF.formatValue(series.c[index], metric.format));
-      }
-      bits.forEach(function (b, i) {
-        if (i) meta.appendChild(SF.el('span', { class: 'sep', text: '·' }));
-        meta.appendChild(SF.el('span', { text: b }));
-      });
-    } else {
-      // No value anywhere in the series. Say which kind of absence it is,
-      // using the source's own status where there is one.
-      var status = series && series.st && series.st.length
-        ? series.st[series.st.length - 1] : 'missing';
-      value.className = 'm-value absent';
-      value.textContent = SF.ABSENCE[status] || SF.ABSENCE.missing;
-      meta.appendChild(SF.el('span', { text: SF.ABSENCE_DETAIL[status] || SF.ABSENCE_DETAIL.missing }));
+    if (read.absent) {
+      meta.appendChild(SF.el('span', {
+        text: SF.ABSENCE_DETAIL[read.status] || SF.ABSENCE_DETAIL.missing
+      }));
+      return meta;
     }
-    item.appendChild(value);
-    item.appendChild(meta);
+    var bits = [read.year];
+    if (!SF.isBlank(read.n)) bits.push(SF.fmt.count(read.n) + ' students');
+    bits.forEach(function (b, i) {
+      if (i) meta.appendChild(SF.el('span', { class: 'sep', text: '·' }));
+      meta.appendChild(SF.el('span', { text: b }));
+    });
+    return meta;
+  }
 
-    item.appendChild(details(metricId, metric, series));
-    return item;
+  // The comparison group average, written out. A second bare number tells a
+  // reader nothing; the distance from it, in the measure's own unit, does.
+  function compareNode(read, metric) {
+    if (read.absent || SF.isBlank(read.comparison)) return null;
+    var difference = read.value - read.comparison;
+    var better = metric.lower_is_better ? difference < 0 : difference > 0;
+    var size = Math.abs(difference);
+
+    var unit, amount;
+    if (metric.format === 'pct_unit') {
+      amount = (size * 100).toFixed(1);
+      unit = amount === '1.0' ? ' point' : ' points';
+    } else {
+      amount = size.toFixed(2);
+      unit = '';
+    }
+
+    var node = SF.el('p', { class: 'm-compare' });
+    if (size < 0.0005) {
+      node.appendChild(document.createTextNode('Level with the '));
+    } else {
+      node.appendChild(SF.el('b', {
+        class: better ? 'up' : 'down',
+        text: amount + unit + (difference > 0 ? ' above' : ' below')
+      }));
+      node.appendChild(document.createTextNode(' the '));
+    }
+    node.appendChild(SF.el('b', { text: SF.formatValue(read.comparison, metric.format) }));
+    node.appendChild(document.createTextNode(
+      ' average of its comparison group, the schools New York City judges this ' +
+      'one against.'));
+    return node;
   }
 
   function details(metricId, metric, series) {
     var wrapper = SF.el('details');
-    wrapper.appendChild(SF.el('summary', { text: 'Definition, source and history' }));
+    wrapper.appendChild(SF.el('summary', { text: 'Definition, source and year by year' }));
     var body = SF.el('div', { class: 'm-detail' });
 
     body.appendChild(SF.el('p', { text: metric.description || metric.label }));
@@ -251,17 +289,13 @@
             (metric.format_source === 'inferred'
               ? ' <span class="muted">(inferred from the published values, not stated by the source)</span>'
               : '') +
-            '. Identifier: <code>' + SF.escapeHtml(metricId) + '</code>.'
-    }));
-    body.appendChild(SF.el('p', {
-      html: 'Source: ' + SF.escapeHtml(metric.source_id) +
-            '. Published for school years ' + SF.escapeHtml(String(metric.first_year)) +
-            ' to ' + SF.escapeHtml(String(metric.last_year)) +
-            '. <a href="method.html">How to read this</a>.'
+            '. Identifier: <code>' + SF.escapeHtml(metricId) + '</code>. ' +
+            'Source: ' + SF.escapeHtml(metric.source_id) + '.'
     }));
     if (metric.comparability_note) {
-      body.appendChild(SF.el('p', { html: '<strong>Comparability:</strong> ' +
-        SF.escapeHtml(metric.comparability_note) }));
+      body.appendChild(SF.el('p', {
+        html: '<strong>Comparability:</strong> ' + SF.escapeHtml(metric.comparability_note)
+      }));
     }
 
     if (series && series.y.length) {
@@ -269,10 +303,11 @@
       series.y.forEach(function (year, i) {
         var chip = SF.el('span', { class: 'h-year' });
         chip.appendChild(document.createTextNode(year + ' '));
-        var shown = SF.isBlank(series.v[i])
-          ? (SF.ABSENCE[series.st[i]] || SF.ABSENCE.missing)
-          : SF.formatValue(series.v[i], metric.format);
-        chip.appendChild(SF.el('b', { text: shown }));
+        chip.appendChild(SF.el('b', {
+          text: SF.isBlank(series.v[i])
+            ? (SF.ABSENCE[series.st[i]] || SF.ABSENCE.missing)
+            : SF.formatValue(series.v[i], metric.format)
+        }));
         strip.appendChild(chip);
       });
       body.appendChild(strip);
@@ -282,62 +317,230 @@
     return wrapper;
   }
 
-  function renderMetrics(payload, metrics) {
-    var host = document.getElementById('school-metrics');
-    host.innerHTML = '';
-    var school = payload.school;
-    var series = payload.series || {};
+  // ---- Groups under a measure ------------------------------------------
 
-    var buckets = {};
-    var notReported = {};
+  function groupRow(member, options) {
+    var o = options || {};
+    var read = member.read;
+    var row = SF.el('li', { class: 'group-row' });
+    row.appendChild(SF.el('span', { class: 'g-name', text: member.metric.subgroup }));
+
+    if (read.absent) {
+      row.appendChild(SF.el('span', {
+        class: 'g-value absent',
+        text: SF.ABSENCE[read.status] || SF.ABSENCE.missing
+      }));
+      return row;
+    }
+
+    row.appendChild(SF.el('span', {
+      class: 'g-value', text: SF.formatValue(read.value, member.metric.format)
+    }));
+    var band = SF.bandElement(read.band, read.score, { scoreOnly: true });
+    if (band) row.appendChild(band);
+
+    var meta = [];
+    // The year is dropped from the rows when every row shares it, and stated
+    // once for the whole card instead.
+    if (!o.sharedYear) meta.push(read.year);
+    // The demographic snapshot reports each share against the school's whole
+    // enrollment, which is already its own row. Repeating it on every line is
+    // noise, not provenance.
+    if (!SF.isBlank(read.n) && member.metric.source_id !== 'demographics') {
+      meta.push(SF.fmt.count(read.n) + ' students');
+    }
+    if (meta.length) row.appendChild(SF.el('span', { class: 'g-meta', text: meta.join(' · ') }));
+    return row;
+  }
+
+  // Themes in a stated order, and alphabetical within a theme. Any other order
+  // inside a race or ethnicity list is a judgment nobody asked for.
+  function groupsNode(members, options) {
+    var o = options || {};
+    var byTheme = {};
+    members.forEach(function (m) {
+      var theme = m.metric.theme || 'other';
+      (byTheme[theme] = byTheme[theme] || []).push(m);
+    });
+
+    var order = SF.display.theme_order && SF.display.theme_order.length
+      ? SF.display.theme_order
+      : ['all', 'race', 'gender', 'groups', 'setting', 'achievement', 'grade'];
+    var themes = Object.keys(byTheme).sort(function (a, b) {
+      var ai = order.indexOf(a), bi = order.indexOf(b);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || a.localeCompare(b);
+    });
+
+    // When every reading in the card is from the same year, say so once at the
+    // top rather than on each line.
+    var years = {};
+    members.forEach(function (m) { if (!m.read.absent) years[m.read.year] = true; });
+    var yearList = Object.keys(years);
+    var sharedYear = yearList.length === 1 ? yearList[0] : null;
+
+    var body = SF.el('div');
+    themes.forEach(function (theme) {
+      var rows = byTheme[theme].sort(function (a, b) {
+        return String(a.metric.subgroup).localeCompare(String(b.metric.subgroup),
+                                                       'en', { numeric: true });
+      });
+      var label = (SF.display.themes && SF.display.themes[theme]) ||
+                  (SF.display.demographic_themes && SF.display.demographic_themes[theme]) ||
+                  theme;
+      if (!o.hideThemeLabel || themes.length > 1) {
+        body.appendChild(SF.el('p', { class: 'group-theme', text: label }));
+      }
+      var list = SF.el('ul', { class: 'group-list' });
+      rows.forEach(function (m) { list.appendChild(groupRow(m, { sharedYear: sharedYear })); });
+      body.appendChild(list);
+    });
+    if (sharedYear) {
+      body.appendChild(SF.el('p', { class: 'm-meta', text: 'All from ' + sharedYear }));
+    }
+    return body;
+  }
+
+  // ---- A measure card ---------------------------------------------------
+
+  function measureCard(base) {
+    var item = SF.el('li', { class: 'measure' });
+
+    if (!base.primaries.length) {
+      // No all-students figure of its own: the card is a themed list, which is
+      // how the demographic figures arrive.
+      item.appendChild(SF.el('p', { class: 'm-label', text: base.label }));
+      item.appendChild(groupsNode(base.groups, { hideThemeLabel: true }));
+      return item;
+    }
+
+    base.primaries.forEach(function (primary) {
+      var head = SF.el('div', { class: 'm-head' });
+      // The scope is only worth saying when the same measure is reported twice,
+      // which happens at a school with both middle and high school grades.
+      var label = base.label;
+      if (base.primaries.length > 1 && primary.scope) label += ', ' + primary.scope;
+      head.appendChild(SF.el('span', { class: 'm-label', text: label }));
+      head.appendChild(valueNode(primary.read, primary.metric));
+      item.appendChild(head);
+      item.appendChild(metaNode(primary.read));
+      var compare = compareNode(primary.read, primary.metric);
+      if (compare) item.appendChild(compare);
+      item.appendChild(details(primary.metricId, primary.metric, primary.series));
+    });
+
+    if (base.groups.length) {
+      var groups = SF.el('details', { class: 'm-groups' });
+      groups.appendChild(SF.el('summary', {
+        text: 'By student group (' + base.groups.length + ')'
+      }));
+      groups.appendChild(groupsNode(base.groups));
+      item.appendChild(groups);
+    }
+    return item;
+  }
+
+  // ---- Assembling the sections ------------------------------------------
+
+  function appliesToSchool(metric, school) {
+    var mine = (school.report_types || school.report_type || '').split('|');
+    if (!mine.length || !mine[0]) return true;
+    return (metric.applies_to || []).some(function (r) { return mine.indexOf(r) !== -1; });
+  }
+
+  function collectBases(payload, metrics) {
+    var series = payload.series || {};
+    var bases = {};
+    var absent = {};
 
     Object.keys(metrics).forEach(function (metricId) {
       var metric = metrics[metricId];
       var parts = splitByReport(series[metricId]);
-      var withValues = parts.filter(function (p) { return latestIndex(p.series) >= 0; });
-      var category = metric.category || 'other';
-      if (withValues.length) {
-        withValues.forEach(function (part) {
-          (buckets[category] = buckets[category] || [])
-            .push([metricId, metric, part.series, part.label]);
-        });
-      } else {
-        if (!appliesToSchool(metric, school)) return;   // never expected here
-        (notReported[category] = notReported[category] || []).push(metric.label || metricId);
+      var withValues = parts
+        .map(function (p) { return { scope: p.scope, series: p.series, read: reading(p.series) }; })
+        .filter(function (p) { return !p.read.absent; });
+
+      if (!withValues.length) {
+        if (appliesToSchool(metric, payload.school)) {
+          (absent[metric.category] = absent[metric.category] || [])
+            .push(metric.label || metricId);
+        }
+        return;
       }
+
+      var key = metric.base_id || (metric.category + ':' + metricId);
+      var base = bases[key] || (bases[key] = {
+        key: key,
+        label: metric.base_label || metric.label,
+        category: metric.category,
+        categoryLabel: metric.category_label,
+        themeRank: metric.theme_rank,
+        headline: false,
+        primaries: [],
+        groups: []
+      });
+      if (metric.headline) base.headline = true;
+      base.themeRank = Math.min(base.themeRank, metric.theme_rank);
+
+      withValues.forEach(function (p) {
+        var entry = {
+          metricId: metricId, metric: metric,
+          series: p.series, read: p.read, scope: p.scope
+        };
+        if (metric.subgroup) base.groups.push(entry);
+        else base.primaries.push(entry);
+      });
     });
 
+    return { bases: bases, absent: absent };
+  }
+
+  function renderMetrics(payload, metrics) {
+    var host = document.getElementById('school-metrics');
+    host.innerHTML = '';
+
+    var collected = collectBases(payload, metrics);
+    var byCategory = {};
+    Object.keys(collected.bases).forEach(function (key) {
+      var base = collected.bases[key];
+      (byCategory[base.category] = byCategory[base.category] || []).push(base);
+    });
+
+    var order = SF.display.category_order && SF.display.category_order.length
+      ? SF.display.category_order
+      : Object.keys(byCategory);
+
     var drew = false;
-    CATEGORY_ORDER.forEach(function (category) {
-      var rows = buckets[category] || [];
-      var absent = notReported[category] || [];
-      if (!rows.length && !absent.length) return;
+    order.forEach(function (category) {
+      var bases = byCategory[category] || [];
+      var missing = collected.absent[category] || [];
+      if (!bases.length && !missing.length) return;
       drew = true;
 
-      var label = rows.length ? rows[0][1].category_label
-                              : (metricsLabelFor(metrics, category) || category);
+      var label = bases.length ? bases[0].categoryLabel : category;
       host.appendChild(SF.el('h2', { class: 'section-label', text: label }));
 
-      if (rows.length) {
-        rows.sort(function (a, b) {
-          return (a[1].headline === b[1].headline)
-            ? (a[1].label || '').localeCompare(b[1].label || '')
-            : (a[1].headline ? -1 : 1);
+      if (bases.length) {
+        bases.sort(function (a, b) {
+          // Demographics arrive already themed, so theme order leads there.
+          // Everywhere else the headline measures come first, then alphabetical.
+          return (a.themeRank - b.themeRank) ||
+                 (a.headline === b.headline ? 0 : a.headline ? -1 : 1) ||
+                 a.label.localeCompare(b.label);
         });
-        var list = SF.el('ul', { class: 'metric-list' });
-        rows.forEach(function (r) { list.appendChild(metricRow(r[0], r[1], r[2], r[3])); });
+        var list = SF.el('ul', { class: 'measure-list' });
+        bases.forEach(function (base) { list.appendChild(measureCard(base)); });
         host.appendChild(list);
       }
 
-      if (absent.length) {
+      if (missing.length) {
         var note = SF.el('details', { class: 'section-note' });
         note.appendChild(SF.el('summary', {
-          text: absent.length + ' further ' +
-                (absent.length === 1 ? 'measure applies' : 'measures apply') +
+          text: missing.length + ' further ' +
+                (missing.length === 1 ? 'measure applies' : 'measures apply') +
                 ' to this type of school but were not published for it'
         }));
         var ul = SF.el('ul');
-        absent.sort().forEach(function (name) { ul.appendChild(SF.el('li', { text: name })); });
+        missing.sort().forEach(function (name) { ul.appendChild(SF.el('li', { text: name })); });
         note.appendChild(ul);
         host.appendChild(note);
       }
@@ -348,22 +551,67 @@
         class: 'note-box',
         html: '<p><strong>No published statistics for this school.</strong> ' +
               'It is in the school directory but has no quality report or ' +
-              'enrolment snapshot yet. This is common for a school that has ' +
+              'enrollment snapshot yet. This is common for a school that has ' +
               'just opened.</p>'
       }));
     }
   }
 
-  function metricsLabelFor(metrics, category) {
-    var found = null;
-    Object.keys(metrics).some(function (id) {
-      if (metrics[id].category === category) { found = metrics[id].category_label; return true; }
-      return false;
-    });
-    return found;
-  }
+  // ---- Programs ----------------------------------------------------------
 
-  // ---- Programmes ------------------------------------------------------
+  function programCard(program) {
+    var item = SF.el('li', { class: 'program' });
+    item.appendChild(SF.el('h3', { text: program.name || program.code || 'Program' }));
+    if (program.code) item.appendChild(SF.el('span', { class: 'p-code', text: program.code }));
+    if (program.method) {
+      item.appendChild(SF.el('span', { class: 'p-method', text: program.method }));
+    }
+
+    var numbers = [
+      ['Seats', program.seats_ge, program.seats_swd],
+      ['Applicants', program.applicants_ge, program.applicants_swd],
+      ['Applicants per seat', program.per_seat_ge, program.per_seat_swd]
+    ].filter(function (row) {
+      return !SF.isBlank(row[1]) || !SF.isBlank(row[2]);
+    });
+
+    if (numbers.length) {
+      var grid = SF.el('dl', { class: 'p-numbers' });
+      numbers.forEach(function (row) {
+        var cell = SF.el('div');
+        cell.appendChild(SF.el('dt', { text: row[0] }));
+        var parts = [];
+        if (!SF.isBlank(row[1])) {
+          parts.push(format(row[1], row[0]) + ' general education');
+        }
+        if (!SF.isBlank(row[2])) {
+          parts.push(format(row[2], row[0]) + ' students with disabilities');
+        }
+        cell.appendChild(SF.el('dd', { text: parts.join(', ') }));
+        grid.appendChild(cell);
+      });
+      item.appendChild(grid);
+    }
+
+    if (program.eligibility) {
+      item.appendChild(SF.el('p', {
+        class: 'p-eligibility',
+        html: '<strong>Eligibility:</strong> ' + SF.escapeHtml(program.eligibility)
+      }));
+    }
+    if (program.priorities && program.priorities.length) {
+      var list = SF.el('ol', { class: 'p-priorities' });
+      program.priorities.forEach(function (p) { list.appendChild(SF.el('li', { text: p })); });
+      item.appendChild(list);
+    }
+    return item;
+
+    function format(value, kind) {
+      return kind === 'Applicants per seat'
+        ? Number(value).toFixed(2)
+        : SF.fmt.count(value);
+    }
+  }
 
   function renderPrograms(payload) {
     var host = document.getElementById('school-programs');
@@ -372,54 +620,18 @@
     if (!programs.length) { host.hidden = true; return; }
     host.hidden = false;
 
-    host.appendChild(SF.el('h2', { class: 'section-label', text: 'Programmes and admissions' }));
+    host.appendChild(SF.el('h2', { class: 'section-label', text: 'Programs and admissions' }));
     host.appendChild(SF.el('p', {
       class: 'section-note',
-      text: 'Admissions are set per programme, not per school. Seats and ' +
+      text: 'Admissions are set per program, not per school, so one school can ' +
+            'run an open program and a screened one side by side. Seats and ' +
             'applicants are from the Fall 2025 directory and describe that ' +
-            'season only. GE means general education seats, SWD means seats ' +
-            'set aside for students with disabilities.'
+            'season only. A numbered list is the order applicants were ranked in.'
     }));
 
-    var rows = programs.map(function (p) {
-      return {
-        name: p.name || p.code,
-        code: p.code,
-        method: p.method,
-        seats: joinPair(p.seats_ge, p.seats_swd),
-        applicants: joinPair(p.applicants_ge, p.applicants_swd),
-        per_seat: joinPair(p.per_seat_ge, p.per_seat_swd, 2),
-        eligibility: p.eligibility,
-        priorities: (p.priorities || []).join(' → ')
-      };
-    });
-
-    SFTable.render(host, {
-      columns: [
-        { key: 'name', label: 'Programme', name: true },
-        { key: 'code', label: 'Code' },
-        { key: 'method', label: 'Admissions method', wrap: true },
-        { key: 'seats', label: 'Seats, GE / SWD', num: true },
-        { key: 'applicants', label: 'Applicants, GE / SWD', num: true },
-        { key: 'per_seat', label: 'Applicants per seat', num: true },
-        { key: 'priorities', label: 'Priority order', wrap: true }
-      ],
-      rows: rows,
-      search: rows.length > 6,
-      searchPlaceholder: 'Filter programmes…',
-      caption: 'Programmes at this school in the Fall 2025 directory. ' +
-               'An empty cell means the directory published no value.'
-    });
-  }
-
-  function joinPair(a, b, places) {
-    var f = function (v) {
-      if (SF.isBlank(v)) return null;
-      return places ? Number(v).toFixed(places) : SF.fmt.count(v);
-    };
-    var left = f(a), right = f(b);
-    if (left === null && right === null) return null;
-    return (left === null ? '—' : left) + ' / ' + (right === null ? '—' : right);
+    var list = SF.el('ul', { class: 'program-list' });
+    programs.forEach(function (p) { list.appendChild(programCard(p)); });
+    host.appendChild(list);
   }
 
   // ---- Comparison basket ------------------------------------------------
@@ -429,6 +641,9 @@
     host.innerHTML = '';
     var basket = SF.store.get('compare', []);
     var inBasket = basket.indexOf(school.dbn) !== -1;
+    var limit = SF.display.max_compare || 12;
+
+    var message = SF.el('span', { class: 'count', role: 'status' });
 
     var button = SF.el('button', {
       class: 'pill', type: 'button',
@@ -439,8 +654,8 @@
       var current = SF.store.get('compare', []);
       var at = current.indexOf(school.dbn);
       if (at === -1) {
-        if (current.length >= 3) {
-          message.textContent = 'A comparison holds three schools. Remove one first.';
+        if (current.length >= limit) {
+          message.textContent = 'A comparison holds ' + limit + ' schools. Remove one first.';
           return;
         }
         current.push(school.dbn);
@@ -456,11 +671,9 @@
       host.appendChild(SF.el('a', {
         class: 'pill',
         href: 'compare.html?schools=' + basket.join(','),
-        text: 'Compare ' + basket.length +
-              (basket.length === 1 ? ' school' : ' schools')
+        text: 'Compare ' + basket.length + (basket.length === 1 ? ' school' : ' schools')
       }));
     }
-    var message = SF.el('span', { class: 'count', role: 'status' });
     host.appendChild(message);
   }
 
@@ -468,7 +681,6 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     var dbn = (SF.param('dbn') || '').toUpperCase();
-    var main = document.getElementById('main');
 
     if (!/^\d{2}[MXKQR]\d{3}$/.test(dbn)) {
       SF.fail(document.getElementById('school-head'),
@@ -480,10 +692,11 @@
 
     Promise.all([
       SF.load('schools/' + dbn + '.json'),
-      SF.load('metrics.json')
-    ]).then(function (both) {
-      var payload = both[0], metrics = both[1];
-      state.school = payload; state.metrics = metrics; state.dbn = dbn;
+      SF.load('metrics.json'),
+      SF.loadDisplay()
+    ]).then(function (loaded) {
+      var payload = loaded[0], metrics = loaded[1];
+      state.payload = payload; state.metrics = metrics;
       renderHead(payload.school);
       renderFacts(payload.school);
       renderOverview(payload.school);

@@ -1,4 +1,4 @@
-/* schoolsfinder.nyc / shared behaviour
+/* schoolsfinder.nyc / shared behavior
    ------------------------------------------------------------------
    Formatting, data loading, page chrome and URL parameters. Every page
    loads this first. No dependencies, no build step.
@@ -55,6 +55,64 @@
     var f = FORMATTERS[format] || fmt.number;
     var out = f(value);
     return out === null ? null : out;
+  }
+
+  // Display constants come from the build rather than being written in here,
+  // so changing a scale maximum in the pipeline reaches the page.
+  var display = {
+    scale_max: 4.5, index_max: 100,
+    score_bands: [], themes: {}, demographic_themes: {},
+    category_order: [], theme_order: [], max_compare: 12
+  };
+
+  function loadDisplay() {
+    return load('status.json').then(function (status) {
+      if (status && status.display) {
+        Object.keys(status.display).forEach(function (k) {
+          display[k] = status.display[k];
+        });
+      }
+      return display;
+    });
+  }
+
+  // What a value is out of. Shown beside the number so a reader never has to
+  // open a definition to learn that 3.35 is on a scale ending at 4.5.
+  function scaleOf(format) {
+    if (format === 'scale') return 'of ' + display.scale_max;
+    if (format === 'index_100') return 'of ' + display.index_max;
+    return null;
+  }
+
+  // How the City's own 1 to 5 score is described in words. The label matters
+  // more than the color: color alone is not an accessible signal, and a band
+  // without an explanation is just a verdict.
+  var BAND_LABEL = {
+    high: 'Among the strongest of its comparison group',
+    above: 'Above the middle of its comparison group',
+    below: 'Below the middle of its comparison group',
+    low: 'Among the weakest of its comparison group'
+  };
+  var BAND_SHORT = {
+    high: 'Strongest', above: 'Above middle',
+    below: 'Below middle', low: 'Weakest'
+  };
+
+  function bandElement(band, score, options) {
+    if (!band) return null;
+    var o = options || {};
+    var node = el('span', {
+      class: 'band band-' + band,
+      title: BAND_LABEL[band] + '. New York City scores this measure from 1 to 5 ' +
+             'against a group of schools it considers similar.'
+    });
+    if (!o.scoreOnly) {
+      node.appendChild(el('span', { text: BAND_SHORT[band] }));
+    }
+    if (score !== null && score !== undefined) {
+      node.appendChild(el('span', { class: 'score', text: Number(score).toFixed(1) + '/5' }));
+    }
+    return node;
   }
 
   // How each kind of absence is written. These strings appear on screen, so
@@ -133,6 +191,7 @@
 
   var PAGES = [
     { href: 'index.html',   nav: 'Find a school' },
+    { href: 'browse.html',  nav: 'Browse' },
     { href: 'compare.html', nav: 'Compare' },
     { href: 'data.html',    nav: 'Data' },
     { href: 'method.html',  nav: 'Method' },
@@ -164,7 +223,7 @@
         '<div class="wrap"><div class="footer-grid">' +
           '<div><h4>Find</h4><ul>' +
             '<li><a href="index.html">Search by name or DBN</a></li>' +
-            '<li><a href="index.html#browse">Browse by borough and district</a></li>' +
+            '<li><a href="browse.html">Browse by borough and district</a></li>' +
             '<li><a href="compare.html">Compare schools</a></li>' +
           '</ul></div>' +
           '<div><h4>Reference</h4><ul>' +
@@ -186,7 +245,6 @@
           '</ul></div>' +
         '</div>' +
         '<p class="colophon">Public data, public method. Built with Python. ' +
-          'No ranking, no score, no recommendation. ' +
           'Not affiliated with New York City Public Schools.</p>' +
         '</div>';
     }
@@ -251,6 +309,8 @@
 
   window.SF = {
     fmt: fmt, formatValue: formatValue, isBlank: isBlank,
+    display: display, loadDisplay: loadDisplay, scaleOf: scaleOf,
+    bandElement: bandElement, BAND_LABEL: BAND_LABEL, BAND_SHORT: BAND_SHORT,
     ABSENCE: ABSENCE, ABSENCE_DETAIL: ABSENCE_DETAIL,
     load: load, fail: fail, escapeHtml: escapeHtml,
     param: param, setParam: setParam, store: store, el: el

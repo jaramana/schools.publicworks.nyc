@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Browse schools — schoolsfinder.nyc</title>
+<meta name="description" content="Browse every New York City public school by borough, district, type and grade. Alphabetical, with no ranking.">
+<link rel="stylesheet" href="css/site.css">
+<script src="js/site.js" defer></script>
+<script src="js/search.js" defer></script>
+<script src="js/browse.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header data-chrome="masthead"></header>
+
+<main id="main">
+  <section class="wrap console">
+    <h1>Browse schools</h1>
+    <p class="console-sub">
+      Narrow the list by borough, district, type or grade. The order is
+      alphabetical and does not change with the filters, so nothing here
+      implies a preference. Every filter is in the address, so a narrowed list
+      is a link you can send.
+    </p>
+    <div class="search-shell" id="browse-search"></div>
+    <p class="statusline mono" data-status></p>
+  </section>
+
+  <section class="wrap">
+    <div class="controls" id="filters" role="group" aria-label="Filter schools"></div>
+    <p class="count" id="school-count" role="status">Loading schools…</p>
+    <ul class="school-grid" id="school-list"></ul>
+    <button class="pill" type="button" id="show-more" hidden>Show more</button>
+  </section>
+</main>
+
+<footer data-chrome="footer"></footer>
+</body>
+</html>

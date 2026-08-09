@@ -205,7 +205,7 @@ Measured from the build on 2026-08-09:
 - 485 measures, spanning school years 2015-16 to 2024-25.
 - 1,634,347 observations, of which 1,319,201 carry a value, 192,410 are marked
   withheld by the source, and 122,736 are rows the source published empty.
-- 4,048 programmes across 1,505 schools, with 18,997 priority rows.
+- 4,048 programs across 1,505 schools, with 18,997 priority rows.
 - 1,500 schools have a coordinate: 447 published by the source and 1,053 matched
   from an address.
 

@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "//": "Attach only, no command. The preview helper has no permission to read files under Desktop on this Mac, so it cannot launch the server itself: start it first with `.venv/bin/python tools/serve.py`, then this entry attaches to it.",
       "name": "schoolsfinder",
-      "runtimeExecutable": "/Users/ashaibani/Desktop/jaramana/schoolsfinder.nyc/.venv/bin/python",
-      "runtimeArgs": ["/Users/ashaibani/Desktop/jaramana/schoolsfinder.nyc/tools/serve.py"],
+      "url": "http://localhost:8787",
       "port": 8787
     }
   ]

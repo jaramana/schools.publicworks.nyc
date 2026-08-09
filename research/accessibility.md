@@ -14,7 +14,7 @@ script cannot see. Both were run on 2026-08-09 against the built site.
 
 It covers:
 
-- Contrast for every colour pair the site actually renders, text at 4.5:1 and
+- Contrast for every color pair the site actually renders, text at 4.5:1 and
   interface boundaries at 3:1.
 - Page structure: one level-one heading, no skipped heading levels, no empty
   headings, `lang`, a title, `main`, `header` and `footer` landmarks, and a skip
@@ -26,7 +26,7 @@ It covers:
   the stale-source warning, and the written-out empty cell.
 - A reduced-motion rule, relative type sizes, and a visible focus style.
 
-All checks pass. Two were failing when first run and were fixed rather than
+All checks pass. Three were failing when first run and were fixed rather than
 waived:
 
 - `--ink-faint` measured 4.24:1 on the sunken panel background, which is where
@@ -34,8 +34,16 @@ waived:
   `#646a75`, giving 4.78:1 there and 5.21:1 on the page background.
 - Form control borders used `--rule-strong`, a hairline meant for table rows,
   which measured 1.7:1 against white. WCAG 1.4.11 asks for 3:1 on the boundary
-  of a control, so inputs and selects now use a separate `--control` token at
-  3.5:1. Row hairlines are unchanged, since they are decorative.
+  of a control, so inputs and selects now use a separate `--control` token.
+  Row hairlines are unchanged, since they are decorative.
+- After the palette changed to a cool paper and a green accent, that control
+  token measured 2.9:1 on the sunken panel. It was darkened again to `#7f868a`,
+  which is 3.2:1 there and 3.7:1 on a card.
+
+The four score bands are checked as color pairs too. They are also the one place
+on the site where color carries meaning, so each band prints the City's score
+inside it and a written label beside it: the color is a shortcut for people who
+can use it, never the only signal.
 
 ## Checks run in a real browser
 
@@ -68,7 +76,7 @@ rather than by reading the source.
 
 ### Motion
 
-The site has no animation beyond two short colour transitions on hover, and a
+The site has no animation beyond two short color transitions on hover, and a
 reduced-motion preference disables them.
 
 ## Built for assistive technology, not yet tested with it
@@ -103,7 +111,7 @@ partly tested, not as verified against AA.
 
 ## When you change something
 
-Run the automated checks before publishing. If you add a colour, add the pair it
+Run the automated checks before publishing. If you add a color, add the pair it
 is used in to `PAIRS` or `UI_PAIRS` in `tools/check_accessibility.py`, otherwise
 it is not being checked at all. If you add a control that is not a native
 element, the manual keyboard pass has to be repeated for it.

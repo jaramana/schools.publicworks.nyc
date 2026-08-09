@@ -1,36 +1,58 @@
-/* Side-by-side comparison of two or three schools.
+/* Side-by-side comparison of a shortlist of schools.
    ------------------------------------------------------------------
-   Factual only. Every compared value uses the same metric and the same
-   reporting period, and no column is ever marked better. Where the schools
-   last reported in different years, the row says so rather than lining up
-   values that describe different times. */
+   Schools are rows and measures are columns. Twelve schools across the top of
+   a table is unreadable, and a row per school is the shape a real shortlist
+   has anyway.
+
+   Factual only. Every column is one published measure, each cell states the
+   year it comes from when the schools disagree, and no row is ever marked as
+   better than another. Where New York City publishes its own score against a
+   comparison group, the cell carries that band, which is the City's reading
+   and not this site's. */
 
 (function () {
   'use strict';
 
-  var MAX = 3;
-  var CATEGORY_ORDER = [
-    'demographics', 'attendance', 'state_tests', 'alt_assessments', 'regents',
-    'growth', 'coursework', 'graduation', 'college', 'climate',
-    'student_support', 'other'
-  ];
-
   var chosen = [];
   var loaded = {};
   var metrics = null;
+  var picked = [];          // metric ids shown as columns
+  var maxSchools = 12;
 
-  function readParam() {
+  // What to show before anyone chooses. One measure from each part of a
+  // profile, so the first view is useful rather than empty.
+  var DEFAULT_MEASURES = [
+    'demo_enrollment_total',
+    'demo_economic_need_index',
+    'attendance_k8_all', 'attendance_hs_all',
+    'chronic_absent_ems_all', 'chronic_absent_hs_all',
+    'prof_pct_ela_all', 'prof_pct_mth_all',
+    'grad_pct_4_all', 'ccr_4yr_all'
+  ];
+
+  // ---- State in the address bar -----------------------------------------
+
+  function readParams() {
     var raw = SF.param('schools');
-    if (!raw) return SF.store.get('compare', []).slice(0, MAX);
-    return raw.split(',').map(function (s) { return s.trim().toUpperCase(); })
+    var list = raw
+      ? raw.split(',')
+      : SF.store.get('compare', []);
+    chosen = list.map(function (s) { return String(s).trim().toUpperCase(); })
       .filter(function (s) { return /^\d{2}[MXKQR]\d{3}$/.test(s); })
-      .slice(0, MAX);
+      .filter(function (s, i, a) { return a.indexOf(s) === i; })
+      .slice(0, maxSchools);
+
+    var measures = SF.param('measures');
+    picked = measures ? measures.split(',').filter(function (m) { return metrics[m]; }) : [];
   }
 
   function syncUrl() {
     SF.setParam('schools', chosen.join(','), true);
+    SF.setParam('measures', picked.join(','), true);
     SF.store.set('compare', chosen);
   }
+
+  // ---- Chosen schools ----------------------------------------------------
 
   function renderChosen() {
     var host = document.getElementById('chosen');
@@ -54,36 +76,137 @@
     });
 
     var note = document.getElementById('picker-note');
-    note.textContent = chosen.length >= MAX
-      ? 'Three schools is the limit. Remove one to add another.'
-      : 'Add up to ' + MAX + ' schools. Currently ' + chosen.length + '.';
+    note.textContent = chosen.length >= maxSchools
+      ? maxSchools + ' schools is the limit. Remove one to add another.'
+      : chosen.length + ' of up to ' + maxSchools + ' schools.';
   }
 
   function add(dbn) {
-    if (chosen.indexOf(dbn) !== -1 || chosen.length >= MAX) return;
+    if (chosen.indexOf(dbn) !== -1 || chosen.length >= maxSchools) return;
     chosen.push(dbn);
     syncUrl();
-    draw();
+    // Load before drawing. Drawing first was why a newly added school only
+    // appeared after a reload: its profile had not arrived yet.
+    renderChosen();
+    loadAll().then(draw);
   }
 
+  // ---- Which measures are columns ----------------------------------------
+
+  function availableMeasures() {
+    // Only measures at least one chosen school actually reports, so the picker
+    // never offers a column that would come back entirely empty.
+    var seen = {};
+    chosen.forEach(function (dbn) {
+      var payload = loaded[dbn];
+      if (!payload) return;
+      Object.keys(payload.series || {}).forEach(function (id) {
+        if (metrics[id] && latestPoint(payload.series[id], payload.school.report_type)) {
+          seen[id] = true;
+        }
+      });
+    });
+    return Object.keys(seen);
+  }
+
+  function defaultMeasures(available) {
+    var picks = DEFAULT_MEASURES.filter(function (m) { return available.indexOf(m) !== -1; });
+    if (picks.length) return picks.slice(0, 8);
+    // Nothing from the default set applies to these schools, which happens for
+    // District 75 and transfer schools. Fall back to whatever they do report.
+    return available.slice(0, 6);
+  }
+
+  function renderPicker() {
+    var host = document.getElementById('measure-picker');
+    host.innerHTML = '';
+    var available = availableMeasures();
+    if (!available.length) { host.hidden = true; return; }
+    host.hidden = false;
+
+    var byCategory = {};
+    available.forEach(function (id) {
+      var m = metrics[id];
+      (byCategory[m.category] = byCategory[m.category] || []).push(id);
+    });
+    var order = (SF.display.category_order || []).filter(function (c) { return byCategory[c]; });
+    Object.keys(byCategory).forEach(function (c) {
+      if (order.indexOf(c) === -1) order.push(c);
+    });
+
+    var control = SF.el('div', { class: 'control' });
+    control.appendChild(SF.el('label', { for: 'add-measure', text: 'Add a measure' }));
+    var select = SF.el('select', { id: 'add-measure' });
+    select.appendChild(SF.el('option', { value: '', text: 'Choose a measure to add…' }));
+    order.forEach(function (category) {
+      var group = SF.el('optgroup', { label: metrics[byCategory[category][0]].category_label });
+      byCategory[category]
+        .filter(function (id) { return picked.indexOf(id) === -1; })
+        .sort(function (a, b) { return metrics[a].label.localeCompare(metrics[b].label); })
+        .forEach(function (id) {
+          group.appendChild(SF.el('option', { value: id, text: metrics[id].label }));
+        });
+      if (group.children.length) select.appendChild(group);
+    });
+    select.addEventListener('change', function () {
+      if (!select.value) return;
+      picked.push(select.value);
+      syncUrl();
+      draw();
+    });
+    control.appendChild(select);
+    host.appendChild(control);
+
+    var chips = SF.el('ul', { class: 'picked-measures' });
+    picked.forEach(function (id) {
+      var chip = SF.el('li');
+      var button = SF.el('button', {
+        class: 'pill', type: 'button',
+        'aria-label': 'Remove the ' + metrics[id].label + ' column',
+        text: metrics[id].label + ' ×'
+      });
+      button.addEventListener('click', function () {
+        picked = picked.filter(function (m) { return m !== id; });
+        syncUrl();
+        draw();
+      });
+      chip.appendChild(button);
+      chips.appendChild(chip);
+    });
+    var reset = SF.el('li');
+    var resetButton = SF.el('button', { class: 'pill', type: 'button', text: 'Reset columns' });
+    resetButton.addEventListener('click', function () {
+      picked = defaultMeasures(availableMeasures());
+      syncUrl();
+      draw();
+    });
+    reset.appendChild(resetButton);
+    chips.appendChild(reset);
+    host.appendChild(chips);
+  }
+
+  // ---- Reading a value ---------------------------------------------------
+
   // A value and the year it describes travel together. Comparing a 2024-25
-  // figure against a 2019-20 one without saying so is the single easiest way
-  // to mislead with this data.
+  // figure against a 2019-20 one without saying so is the easiest way to
+  // mislead with this data.
   function latestPoint(series, reportType) {
     if (!series) return null;
     for (var i = series.y.length - 1; i >= 0; i--) {
-      // Where a school files two quality reports, take the value from the one
-      // that matches the school's current report type rather than whichever
-      // row happens to sort last.
       if (series.rt && reportType && series.rt[i] !== reportType) continue;
       if (!SF.isBlank(series.v[i])) {
-        return { year: series.y[i], value: series.v[i], n: series.n ? series.n[i] : null,
-                 report: series.rt ? series.rt[i] : null };
+        return {
+          year: series.y[i], value: series.v[i],
+          n: series.n ? series.n[i] : null,
+          score: series.s ? series.s[i] : null,
+          band: series.b ? series.b[i] : null
+        };
       }
     }
-    return { year: series.y[series.y.length - 1], value: null,
-             status: series.st[series.st.length - 1] };
+    return null;
   }
+
+  // ---- Drawing -----------------------------------------------------------
 
   function draw() {
     renderChosen();
@@ -91,6 +214,7 @@
     host.innerHTML = '';
 
     if (chosen.length < 2) {
+      document.getElementById('measure-picker').hidden = true;
       host.appendChild(SF.el('div', {
         class: 'note-box',
         html: '<p>Choose at least two schools to compare. Search above, or open ' +
@@ -99,147 +223,128 @@
       return;
     }
 
-    var payloads = chosen.map(function (d) { return loaded[d]; });
-    if (payloads.some(function (p) { return !p; })) return;
+    var payloads = chosen.map(function (d) { return loaded[d]; }).filter(Boolean);
+    if (payloads.length < 2) return;
 
-    // Identity block first: what kind of schools these are. Comparing an
-    // elementary school with a high school is allowed, but the reader should
-    // see that is what they are doing.
-    var kinds = payloads.map(function (p) { return p.school.school_type || 'unknown'; });
-    if (new Set(kinds).size > 1) {
+    var available = availableMeasures();
+    picked = picked.filter(function (id) { return available.indexOf(id) !== -1; });
+    if (!picked.length) picked = defaultMeasures(available);
+    renderPicker();
+
+    var kinds = {};
+    payloads.forEach(function (p) { kinds[p.school.school_type || 'unknown'] = true; });
+    if (Object.keys(kinds).length > 1) {
       host.appendChild(SF.el('div', {
         class: 'note-box caution',
         html: '<p><strong>These schools are different types.</strong> ' +
-              SF.escapeHtml(kinds.join(', ')) + '. They report different ' +
-              'measures, so most rows below will be published for some of them ' +
-              'and not for others. That is a difference in reporting, not in ' +
-              'quality.</p>'
+              SF.escapeHtml(Object.keys(kinds).join(', ')) + '. They report ' +
+              'different measures, so some cells will be empty for some of them. ' +
+              'That is a difference in reporting, not in quality.</p>'
       }));
     }
 
     host.appendChild(identityTable(payloads));
-
-    var byCategory = {};
-    Object.keys(metrics).forEach(function (metricId) {
-      var metric = metrics[metricId];
-      var points = payloads.map(function (p) {
-        return latestPoint((p.series || {})[metricId], p.school.report_type);
-      });
-      var anyValue = points.some(function (pt) { return pt && !SF.isBlank(pt.value); });
-      if (!anyValue) return;
-      (byCategory[metric.category] = byCategory[metric.category] || [])
-        .push({ id: metricId, metric: metric, points: points });
-    });
-
-    CATEGORY_ORDER.forEach(function (category) {
-      var rows = byCategory[category];
-      if (!rows || !rows.length) return;
-      host.appendChild(SF.el('h2', {
-        class: 'section-label', text: rows[0].metric.category_label
-      }));
-      host.appendChild(metricTable(rows, payloads));
-    });
-
-    if (!Object.keys(byCategory).length) {
-      host.appendChild(SF.el('div', {
-        class: 'note-box',
-        html: '<p>These schools have no published measure in common.</p>'
-      }));
-    }
+    host.appendChild(SF.el('h2', { class: 'section-label', text: 'Published measures' }));
+    host.appendChild(measureTable(payloads));
+    host.appendChild(SF.el('p', {
+      class: 'section-note',
+      text: 'A colored cell carries the score New York City publishes for that ' +
+            'measure against a group of schools it considers similar, out of 5. ' +
+            'Where the City publishes no score, the value is shown plain. Sorting ' +
+            'a column reorders the list by one published measure and nothing else.'
+    }));
   }
 
   function identityTable(payloads) {
-    var fields = [
-      ['DBN', function (s) { return s.dbn; }],
-      ['Borough', function (s) { return s.boro; }],
-      ['District', function (s) { return s.district; }],
-      ['Type', function (s) { return s.school_type; }],
-      ['Grades', function (s) { return s.grades; }],
-      ['Students', function (s) {
-        return SF.isBlank(s.enrollment) ? null
-          : SF.fmt.count(s.enrollment) + ' (' + (s.enrollment_year || '') + ')';
-      }],
-      ['Address', function (s) { return s.address; }],
-      ['Status', function (s) { return s.status === 'open' ? 'Open' : 'Closed or former'; }]
+    var columns = [
+      { key: 'name', label: 'School', rowHeader: true, name: true,
+        render: function (v, r) {
+          return '<a href="school.html?dbn=' + r.dbn + '">' + SF.escapeHtml(v) + '</a>';
+        } },
+      { key: 'dbn', label: 'DBN' },
+      { key: 'boro', label: 'Borough' },
+      { key: 'district', label: 'District' },
+      { key: 'type', label: 'Type' },
+      { key: 'grades', label: 'Grades' },
+      { key: 'enrollment', label: 'Students', num: true,
+        render: function (v, r) {
+          return SF.isBlank(v) ? '—' : SF.fmt.count(v) +
+            '<span class="period">' + SF.escapeHtml(r.enrollment_year || '') + '</span>';
+        } },
+      { key: 'status', label: 'Status' }
     ];
-    return buildTable(
-      payloads,
-      fields.map(function (f) {
-        return {
-          label: f[0],
-          cells: payloads.map(function (p) { return f[1](p.school); }),
-          note: null
-        };
-      }),
-      'School details'
-    );
-  }
-
-  function metricTable(rows, payloads) {
-    return buildTable(
-      payloads,
-      rows.map(function (row) {
-        var years = row.points.map(function (pt) { return pt ? pt.year : null; });
-        var distinct = new Set(years.filter(Boolean));
-        return {
-          label: row.metric.label,
-          cells: row.points.map(function (pt) {
-            if (!pt) return null;
-            if (SF.isBlank(pt.value)) return SF.ABSENCE[pt.status] || SF.ABSENCE.missing;
-            return SF.formatValue(pt.value, row.metric.format);
-          }),
-          note: distinct.size === 1
-            ? Array.from(distinct)[0]
-            : 'different years: ' + years.map(function (y) { return y || 'none'; }).join(', ')
-        };
-      }),
-      'Comparison of published measures'
-    );
-  }
-
-  function buildTable(payloads, rows, caption) {
-    var wrap = SF.el('div', { class: 'table-wrap', role: 'region', tabindex: '0',
-                              'aria-label': caption });
-    var table = SF.el('table', { class: 'compare-table' });
-    table.appendChild(SF.el('caption', { class: 'sr-only', text: caption }));
-
-    var thead = SF.el('thead');
-    var head = SF.el('tr');
-    head.appendChild(SF.el('th', { scope: 'col', text: 'Measure' }));
-    payloads.forEach(function (p) {
-      var th = SF.el('th', { class: 'school', scope: 'col' });
-      th.appendChild(SF.el('a', {
-        href: 'school.html?dbn=' + p.school.dbn,
-        text: p.school.name || p.school.dbn
-      }));
-      head.appendChild(th);
+    var rows = payloads.map(function (p) {
+      var s = p.school;
+      return {
+        name: s.name || s.dbn, dbn: s.dbn, boro: s.boro, district: s.district,
+        type: s.school_type, grades: s.grades, enrollment: s.enrollment,
+        enrollment_year: s.enrollment_year,
+        status: s.status === 'open' ? 'Open' : 'Closed or former'
+      };
     });
-    head.appendChild(SF.el('th', { scope: 'col', text: 'Period' }));
-    thead.appendChild(head);
-    table.appendChild(thead);
+    var host = SF.el('div');
+    SFTable.render(host, {
+      columns: columns, rows: rows, search: false, sortKey: 'name', sortDir: 'asc',
+      caption: 'The schools being compared. Sorting reorders the list; it does ' +
+               'not rank the schools.',
+      tableClass: 'compare-table'
+    });
+    return host;
+  }
 
-    var body = SF.el('tbody');
-    rows.forEach(function (row) {
-      var tr = SF.el('tr');
-      tr.appendChild(SF.el('th', { scope: 'row', class: 'name', text: row.label }));
-      row.cells.forEach(function (cell) {
-        var td = SF.el('td', { class: 'value num' });
-        if (cell === null || cell === undefined || cell === '') {
-          td.textContent = '—';
-          td.className = 'value num muted';
-        } else {
-          td.textContent = cell;
+  function measureTable(payloads) {
+    // Every column states its own reporting period when the schools disagree,
+    // so a mixed-year row can never read as a like-for-like comparison.
+    var columns = [{
+      key: 'name', label: 'School', rowHeader: true, name: true,
+      render: function (v, r) {
+        return '<a href="school.html?dbn=' + r.dbn + '">' + SF.escapeHtml(v) + '</a>';
+      }
+    }];
+
+    picked.forEach(function (id) {
+      var metric = metrics[id];
+      var scale = SF.scaleOf(metric.format);
+      columns.push({
+        key: id,
+        label: metric.label + (scale ? ' (' + scale.replace('of ', 'out of ') + ')' : ''),
+        num: true,
+        render: function (v, row) {
+          var point = row['_' + id];
+          if (!point) return '<span class="muted">—</span>';
+          var text = SF.formatValue(point.value, metric.format);
+          var cell = point.band
+            ? '<span class="cell-band band-' + point.band + '" title="' +
+              SF.escapeHtml(SF.BAND_LABEL[point.band]) + ', scored ' +
+              Number(point.score).toFixed(1) + ' out of 5 by New York City">' +
+              SF.escapeHtml(text) + '</span>'
+            : SF.escapeHtml(text);
+          return cell + '<span class="period">' + SF.escapeHtml(point.year) + '</span>';
         }
-        tr.appendChild(td);
       });
-      var note = SF.el('td', { class: 'muted', text: row.note || '' });
-      tr.appendChild(note);
-      body.appendChild(tr);
     });
-    table.appendChild(body);
-    wrap.appendChild(table);
-    return wrap;
+
+    var rows = payloads.map(function (p) {
+      var row = { name: p.school.name || p.school.dbn, dbn: p.school.dbn };
+      picked.forEach(function (id) {
+        var point = latestPoint((p.series || {})[id], p.school.report_type);
+        row['_' + id] = point;
+        row[id] = point ? point.value : null;   // the sortable value
+      });
+      return row;
+    });
+
+    var host = SF.el('div');
+    SFTable.render(host, {
+      columns: columns, rows: rows, search: false, sortKey: 'name', sortDir: 'asc',
+      caption: 'Published measures for the schools being compared. Each cell ' +
+               'shows the value and the school year it describes.',
+      tableClass: 'compare-table'
+    });
+    return host;
   }
+
+  // ---- Loading ------------------------------------------------------------
 
   function loadAll() {
     return Promise.all(chosen.map(function (dbn) {
@@ -248,8 +353,8 @@
         loaded[dbn] = p;
         return p;
       }).catch(function () {
-        // A DBN in the address that has no profile is dropped rather than
-        // failing the whole page.
+        // A DBN in the address with no profile is dropped rather than failing
+        // the whole page.
         chosen = chosen.filter(function (d) { return d !== dbn; });
         return null;
       });
@@ -257,16 +362,18 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    chosen = readParam();
+    Promise.all([SF.load('metrics.json'), SF.loadDisplay()]).then(function (loadedBits) {
+      metrics = loadedBits[0];
+      maxSchools = SF.display.max_compare || 12;
 
-    SFSearch.mount('#compare-search', {
-      placeholder: 'Add a school by name or DBN…',
-      label: 'Add a school to the comparison',
-      onPick: function (row) { add(row.dbn); }
-    });
+      readParams();
 
-    SF.load('metrics.json').then(function (m) {
-      metrics = m;
+      SFSearch.mount('#compare-search', {
+        placeholder: 'Add a school by name or DBN…',
+        label: 'Add a school to the comparison',
+        onPick: function (row) { add(row.dbn); }
+      });
+
       return loadAll();
     }).then(function () {
       syncUrl();

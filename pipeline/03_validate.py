@@ -108,7 +108,7 @@ def check_references(tables, report):
     orphan_programs = set(tables["programs"]["dbn"]) - schools
     if orphan_programs:
         report.warn("ref.program_school",
-                    f"{len(orphan_programs):,} programme DBNs are not in the school "
+                    f"{len(orphan_programs):,} program DBNs are not in the school "
                     f"universe and will not be published, for example "
                     f"{sorted(orphan_programs)[:3]}")
 
@@ -118,7 +118,7 @@ def check_references(tables, report):
     orphan_priorities = priority_keys - program_keys
     if orphan_priorities:
         report.fail("ref.priority_program",
-                    f"{len(orphan_priorities):,} priority rows point at no programme")
+                    f"{len(orphan_priorities):,} priority rows point at no program")
 
 
 def check_missing_data_rules(tables, report):

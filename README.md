@@ -17,6 +17,7 @@ does not support one.
 | `pipeline/` | Four Python stages that build everything |
 | `run.py` | Runs the stages in order |
 | `docs/` | The published site, served by GitHub Pages |
+| `docs/js/` | One file per page, plus shared search, table and formatting |
 | `docs/data/` | Generated JSON the pages read |
 | `docs/downloads/` | The public Excel workbook and CSV archive |
 | `research/` | Source manifest and the inventory of the original workbook |
@@ -77,8 +78,8 @@ with an HTML error page and HTTP 200.
 | `schools` | DBN |
 | `metrics` | metric identifier |
 | `observations` | DBN, school year, metric, and report type |
-| `programs` | DBN and programme |
-| `program_priorities` | DBN, programme, and priority rank |
+| `programs` | DBN and program |
+| `program_priorities` | DBN, program, and priority rank |
 
 **`pipeline/03_validate.py`** tests the grains rather than trusting them, checks
 referential integrity in both directions, and compares the build against what is
@@ -91,6 +92,28 @@ type that publishes very little, a school with no address.
 **`pipeline/04_export.py`** writes the site JSON and the two downloads into
 `build/staging/`, then moves them into place in one step. It refuses to run at
 all if validation did not pass, so a bad build leaves the live files untouched.
+
+## Reading a value on the site
+
+Three things travel with every number, because a number alone is not usable.
+
+**Its reporting period.** Nothing is displayed without the school year it
+describes.
+
+**Its scale.** A value on a scale is written as "3.24 of 4.5" rather than
+"3.24", so nobody has to open a definition to learn what it is out of.
+
+**Where it stands, when the City says so.** For many measures New York City
+publishes both a comparison group average and its own score from 1 to 5 against
+that group. The site writes the comparison out as a sentence and bands the score
+into four colors. The score itself is always printed inside the band, and every
+band carries a written label as well as a color. The banding thresholds are in
+`SCORE_BANDS` in the config; the score is the City's. Where the City publishes
+no score, nothing is colored.
+
+Measures are grouped: a card leads with the all-students figure and holds the
+breakdowns by student group under it, in a stated theme order, alphabetical
+within each theme. Group names are the Department of Education's own wording.
 
 ## Rules the pipeline keeps
 
@@ -124,7 +147,7 @@ That is two observations, not a duplicate.
 | --- | --- | --- |
 | [School Quality Reports](https://data.cityofnewyork.us/d/dnpx-dfnc) (`dnpx-dfnc`) | DBN, school year, metric | 2024-25 |
 | [Demographic Snapshot](https://infohub.nyced.org/reports/school-quality/information-and-data-overview) | DBN, school year | 2024-25 |
-| [Directory data](https://infohub.nyced.org/reports/admissions-and-enrollment/directory-data), three workbooks | school, and school by programme | Fall 2025 |
+| [Directory data](https://infohub.nyced.org/reports/admissions-and-enrollment/directory-data), three workbooks | school, and school by program | Fall 2025 |
 | [GeoSearch](https://geosearch.planninglabs.nyc/) | address | continuous |
 
 `research/source-manifest.md` records what was checked, what was rejected and

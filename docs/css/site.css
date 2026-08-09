@@ -11,28 +11,43 @@
 /* ---- Tokens ---------------------------------------------------- */
 
 :root {
-  --paper:        #fbfaf7;   /* warm ivory, not clinical white */
+  /* The palette is the main thing separating this site from thepaygap.nyc,
+     which is warm ivory and civic blue. Here the paper is cool and the accent
+     is a deep institutional green: same restraint, different room. */
+  --paper:        #f7f8f8;
   --paper-raised: #ffffff;
-  --paper-sunken: #f2f0eb;
-  --ink:          #16181d;
-  --ink-soft:     #4a4f5a;
-  /* Darkened from #6b7280, which measured 4.24:1 against --paper-sunken and so
-     failed AA for the small text used on history chips and sunken panels. This
-     is 4.78:1 there and 5.21:1 on --paper. */
-  --ink-faint:    #646a75;
-  --rule:         #e0ddd6;
-  --rule-strong:  #c9c5bb;
+  --paper-sunken: #eceeee;
+  --ink:          #15181b;
+  --ink-soft:     #474d52;
+  /* Darkened from #6b7280, which measured 4.24:1 against the sunken panel and
+     so failed AA for the small text used there. This is 4.8:1 on the sunken
+     panel and 5.2:1 on the page. */
+  --ink-faint:    #626970;
+  --rule:         #dcdfe0;
+  --rule-strong:  #c2c7c9;
   /* Hairlines between rows can be faint, but the edge of a control carries
      meaning and WCAG asks for 3:1. --rule-strong measured 1.7:1 on white, so
      inputs and selects use their own darker border. */
-  --control:      #8f8879;
+  --control:      #7f868a;
 
-  --accent:       #1f4ed8;   /* civic blue */
+  --accent:       #14634a;   /* deep green, 6.8:1 on the paper */
   --on-accent:    #ffffff;
-  --accent-soft:  #e8edfb;
-  --accent-ink:   #163ba6;
-  --warn:         #b4520a;
-  --warn-soft:    #fdf0e4;
+  --accent-soft:  #e3efea;
+  --accent-ink:   #0d4b38;
+  --warn:         #9c3d16;
+  --warn-soft:    #fbe9e0;
+
+  /* Bands for the City's own 1 to 5 score. Deliberately quiet: a tint behind a
+     value, never a traffic light. Color never carries the meaning on its own,
+     because the score and a written label sit beside it. */
+  --band-high-tint:  #e7f2ea;
+  --band-high-ink:   #12603f;
+  --band-above-tint: #eef5ec;
+  --band-above-ink:  #1d6b45;
+  --band-below-tint: #fdf1e3;
+  --band-below-ink:  #8a5210;
+  --band-low-tint:   #fbe9e0;
+  --band-low-ink:    #9c3d16;
 
   --shadow: 0 1px 2px rgba(20,22,28,.05), 0 8px 24px -12px rgba(20,22,28,.18);
 
@@ -245,50 +260,125 @@ button.pill[aria-pressed="true"] {
 .fact dd.big { font-size: clamp(1.4rem, 2.6vw, 1.8rem); letter-spacing: -.03em; }
 .fact dd .note { display: block; font-size: .8rem; color: var(--ink-faint); font-weight: 400; }
 
-/* Metric rows. The value, the year it describes, and the definition all belong
-   together, so they are one block rather than a table row that scrolls away
-   from its own header on a phone. */
-.metric-list { list-style: none; padding: 0; margin: 0; }
-.metric {
+/* Measures.
+   ------------------------------------------------------------------
+   One card per measure, not a table. A school profile is a long list of
+   single numbers, and a table of two useful columns forces a reader to
+   track a header row that has scrolled away. The card puts the value, its
+   scale, its period and its standing against similar schools in one place
+   at one glance, and never scrolls sideways. */
+
+.measure-list { list-style: none; padding: 0; margin: 0; }
+.measure {
   border-top: 1px solid var(--rule);
-  padding: .8rem 0;
-  display: grid; gap: .15rem 1.25rem;
-  grid-template-columns: 1fr auto;
-  align-items: baseline;
+  padding: .85rem 0;
 }
-.metric:first-child { border-top: 0; }
-.metric .m-label { font-weight: 500; }
-.metric .m-value {
-  font-size: 1.15rem; font-weight: 700; letter-spacing: -.02em;
-  white-space: nowrap; text-align: right;
+.measure:first-child { border-top: 0; }
+
+.m-head {
+  display: flex; flex-wrap: wrap; gap: .2rem 1rem;
+  align-items: baseline; justify-content: space-between;
 }
-.metric .m-value.absent { font-size: .9rem; font-weight: 500; color: var(--ink-faint); }
-.metric .m-meta {
-  grid-column: 1 / -1; font-size: .82rem; color: var(--ink-faint);
-  display: flex; flex-wrap: wrap; gap: .15rem .75rem;
+.m-label { font-weight: 600; flex: 1 1 14rem; min-width: 0; }
+.m-figure { display: flex; align-items: baseline; gap: .45rem; white-space: nowrap; }
+.m-value { font-size: 1.3rem; font-weight: 700; letter-spacing: -.025em; }
+/* The maximum of the scale, printed next to the value, so "3.35" reads as
+   "3.35 of 4.5" without anyone opening a definition. */
+.m-scale { font-size: .9rem; color: var(--ink-faint); font-weight: 500; }
+.m-value.absent { font-size: .95rem; font-weight: 600; color: var(--ink-faint); }
+
+/* The standing band. A tint, the City's own score, and a written label: the
+   color is a shortcut, never the only carrier of the meaning. */
+.band {
+  display: inline-flex; align-items: baseline; gap: .4rem;
+  border-radius: 6px; padding: .12rem .45rem;
+  font-size: .8rem; font-weight: 600; white-space: nowrap;
 }
-.metric .m-meta .sep { color: var(--rule-strong); }
-.metric details { grid-column: 1 / -1; margin-top: .3rem; }
-.metric summary {
+.band .score { font-family: var(--mono); font-weight: 700; }
+.band-high  { background: var(--band-high-tint);  color: var(--band-high-ink); }
+.band-above { background: var(--band-above-tint); color: var(--band-above-ink); }
+.band-below { background: var(--band-below-tint); color: var(--band-below-ink); }
+.band-low   { background: var(--band-low-tint);   color: var(--band-low-ink); }
+
+.m-meta {
+  font-size: .84rem; color: var(--ink-faint);
+  display: flex; flex-wrap: wrap; gap: .1rem .7rem; margin-top: .25rem;
+}
+.m-meta .sep { color: var(--rule-strong); }
+
+/* The comparison, written as a sentence rather than a bare second number.
+   "5.4 points above the 89.2% average of its comparison group" is a fact a
+   reader can use; "89.2" on its own is not. */
+.m-compare { font-size: .86rem; color: var(--ink-soft); margin-top: .3rem; }
+.m-compare b { font-weight: 600; color: var(--ink); }
+.m-compare .up { color: var(--band-high-ink); }
+.m-compare .down { color: var(--band-low-ink); }
+
+.measure details { margin-top: .45rem; }
+.measure summary {
   font-size: .82rem; color: var(--accent); cursor: pointer; width: max-content;
 }
-.metric .m-detail {
-  font-size: .86rem; color: var(--ink-soft); margin: .4rem 0 .2rem;
-  padding-left: .9rem; border-left: 2px solid var(--rule);
-  max-width: 44rem;
+.m-detail {
+  font-size: .86rem; color: var(--ink-soft); margin: .5rem 0 .2rem;
+  padding-left: .9rem; border-left: 2px solid var(--rule); max-width: 46rem;
 }
-.metric .m-detail p { margin: 0 0 .4rem; max-width: none; }
-.metric .m-detail p:last-child { margin-bottom: 0; }
+.m-detail p { margin: 0 0 .45rem; max-width: none; }
+.m-detail p:last-child { margin-bottom: 0; }
+
+/* Group breakdowns, under the all-students figure they belong to. */
+.m-groups { margin-top: .5rem; }
+.m-groups > summary { font-size: .82rem; }
+.group-theme {
+  font-size: .72rem; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--ink-faint);
+  margin: .7rem 0 .2rem;
+}
+.group-list { list-style: none; padding: 0; margin: 0; }
+.group-row {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .7rem;
+  padding: .28rem 0; border-top: 1px dotted var(--rule);
+  font-size: .9rem;
+}
+.group-row .g-name { flex: 1 1 11rem; min-width: 0; }
+.group-row .g-value { font-weight: 600; white-space: nowrap; }
+.group-row .g-value.absent { font-weight: 500; color: var(--ink-faint); font-size: .85rem; }
+.group-row .g-meta { color: var(--ink-faint); font-size: .8rem; white-space: nowrap; }
 
 /* A compact history strip. Values only, no drawn chart: the point is to show
    that a series exists and where it moved, not to invite a reading of slope. */
-.history { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .35rem; }
+.history { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .45rem; }
 .history .h-year {
   font-family: var(--mono); font-size: .74rem; color: var(--ink-faint);
   background: var(--paper-sunken); border: 1px solid var(--rule);
   border-radius: 5px; padding: .1rem .4rem; white-space: nowrap;
 }
 .history .h-year b { color: var(--ink); font-weight: 600; }
+
+/* Programs. Cards, not a wide table: each program is six short facts and a
+   priority list, which a table turns into a sideways scroll for no gain. */
+.program-list { list-style: none; padding: 0; margin: 0; display: grid; gap: .9rem; }
+.program {
+  background: var(--paper-raised); border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent-soft);
+  border-radius: 0 9px 9px 0; padding: .95rem 1.1rem;
+}
+.program h3 { margin: 0 0 .15rem; font-size: 1rem; }
+.program .p-code { font-family: var(--mono); font-size: .78rem; color: var(--ink-faint); }
+.program .p-method {
+  display: inline-block; margin-top: .35rem;
+  background: var(--accent-soft); color: var(--accent-ink);
+  border-radius: 6px; padding: .1rem .5rem; font-size: .82rem; font-weight: 600;
+}
+.p-numbers {
+  display: grid; gap: .1rem 1.2rem; margin: .7rem 0 0;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+}
+.p-numbers div { font-size: .88rem; }
+.p-numbers dt { font-size: .74rem; color: var(--ink-faint); }
+.p-numbers dd { margin: 0; font-weight: 600; }
+.p-priorities { margin: .7rem 0 0; padding-left: 1.1rem; font-size: .87rem; color: var(--ink-soft); }
+.p-priorities li { margin-bottom: .1rem; }
+.p-eligibility { font-size: .87rem; color: var(--ink-soft); margin: .55rem 0 0; max-width: none; }
 
 .section-note { font-size: .88rem; color: var(--ink-faint); margin: .2rem 0 1rem; max-width: 46rem; }
 
@@ -345,11 +435,18 @@ code {
 
 /* ---- Comparison --------------------------------------------------- */
 
-/* Columns, not rows of winners. Every compared value uses the same metric and
-   the same reporting period, and no column is ever marked as better. */
+/* Schools are rows and measures are columns. With a dozen schools the other way
+   round is unreadable, and a row per school is the shape a shortlist actually
+   has. No row is ever marked as better than another. */
 .compare-table td.value { font-variant-numeric: tabular-nums; }
 .compare-table th.school { min-width: 12rem; white-space: normal; }
+.compare-table th[scope="row"] { white-space: normal; min-width: 13rem; font-weight: 600; }
+.compare-table td.value .cell-band {
+  display: inline-block; border-radius: 5px; padding: .05rem .4rem; font-weight: 600;
+}
+.compare-table .period { font-size: .76rem; color: var(--ink-faint); display: block; }
 .compare-picker { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+.picked-measures { display: flex; flex-wrap: wrap; gap: .4rem; margin: .6rem 0 0; padding: 0; list-style: none; }
 .chosen { display: flex; flex-wrap: wrap; gap: .5rem; margin: .75rem 0 0; padding: 0; list-style: none; }
 .chosen li {
   display: flex; align-items: center; gap: .5rem;
@@ -375,6 +472,25 @@ code {
 .download h3 { margin: 0 0 .3rem; font-size: 1.02rem; }
 .download p { margin: 0; font-size: .89rem; color: var(--ink-soft); max-width: none; }
 .download .size { font-family: var(--mono); font-size: .78rem; color: var(--ink-faint); }
+
+/* ---- Home entry points -------------------------------------------- */
+/* The landing page is a search box and a way in. It carries no citywide
+   statistics: a number about all of New York answers a question nobody came
+   here with, and it would be the one figure on the site with no school
+   attached to it. */
+
+.entry-grid {
+  display: grid; gap: .6rem; padding: 0; margin: .75rem 0 0; list-style: none;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+}
+.entry {
+  display: block; text-decoration: none; color: inherit;
+  background: var(--paper-raised); border: 1px solid var(--rule);
+  border-radius: 9px; padding: .7rem .9rem;
+}
+.entry:hover { border-color: var(--accent); }
+.entry .e-name { display: block; font-weight: 600; }
+.entry .e-count { display: block; font-size: .8rem; color: var(--ink-faint); }
 
 .chapters { display: grid; gap: 1rem; margin: 2rem 0; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); padding: 0; list-style: none; }
 .chapters a {

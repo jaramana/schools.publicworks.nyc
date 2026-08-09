@@ -66,6 +66,7 @@
     wrap.setAttribute('aria-label', cfg.caption || 'Data table');
 
     var table = document.createElement('table');
+    if (cfg.tableClass) table.className = cfg.tableClass;
     if (cfg.caption) {
       var caption = document.createElement('caption');
       caption.className = 'sr-only';

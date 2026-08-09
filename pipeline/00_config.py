@@ -92,14 +92,14 @@ SOURCES = {
         "page": "https://infohub.nyced.org/reports/admissions-and-enrollment/directory-data",
         "retrieval": "InfoHub Excel workbook",
         "cadence": "Annual, before each admissions season",
-        "grain": "One row per school and entry point. Includes early childhood centres.",
+        "grain": "One row per school and entry point. Includes early childhood centers.",
         "cache": "directory_es.xlsx",
         "sheet": "Sheet1",
         "dbn_column": "schooldbn",
         "min_rows": 3_000,
         "programs": 7,
         "limitations": (
-            "Includes 3-K and Pre-K early childhood centres whose location codes are not "
+            "Includes 3-K and Pre-K early childhood centers whose location codes are not "
             "school DBNs. A school can appear more than once, once per entry point."
         ),
     },
@@ -191,7 +191,7 @@ REPORT_TYPES = {
     "HST": "High school transfer schools",
     "EC": "Early childhood schools, kindergarten through grade 1, 2, or 3",
     "D75": "District 75 schools, which serve students with significant disabilities",
-    "YABC": "Young Adult Borough Centres",
+    "YABC": "Young Adult Borough Centers",
 }
 
 # Districts that are citywide rather than geographic.
@@ -226,7 +226,7 @@ METRIC_CATEGORIES = [
     (r"^(ccr|nocat_cri|cri6|pct_cri|pct_cer|pct_clg|pct_college|pct_cpci|persist3|college|postsec|cuny|mean_score_sat|mean_score_act|mean_score_cat|cohort_pct)", "college", "College and career readiness"),
     (r"^(survey|framework|env_|rigorous|collab|leader|family|trust|safety|supportive)", "climate", "School climate and surveys"),
     (r"^(lre|nyseslat|move_to|ell|swd|iep)", "student_support", "Student support"),
-    (r"^(enroll|demo_)", "demographics", "Enrolment and demographics"),
+    (r"^(enroll|demo_)", "demographics", "Enrollment and demographics"),
 ]
 METRIC_CATEGORY_FALLBACK = ("other", "Other published measures")
 
@@ -315,10 +315,86 @@ COMPARABILITY_BREAKS = {
 # crosses them.
 DISRUPTED_YEARS = ["2019", "2020"]
 DISRUPTION_NOTE = (
-    "State testing was cancelled in the 2019-20 school year and participation was "
+    "State testing was canceled in the 2019-20 school year and participation was "
     "unusually low in 2020-21. Values around those years are not comparable with the "
     "rest of the series."
 )
+
+
+# ---- Student groups --------------------------------------------------------
+# The source writes a student group at the end of a measure's display name,
+# after a dash: "Percentage of Students at Level 3 or 4, ELA - Asian". Reading
+# the group off the label is more reliable than decoding the variable name, and
+# it keeps the Department of Education's own wording rather than substituting
+# our own.
+#
+# Groups are themed so a profile can present them in a stated order instead of
+# an arbitrary one. Within a theme the site sorts alphabetically: any other
+# order within a race or ethnicity list is a judgment nobody asked for.
+
+SUBGROUP_THEMES = [
+    # (theme key, theme label, [group names exactly as the source writes them])
+    ("all", "All students", [
+        "All Students",
+    ]),
+    ("race", "Race and ethnicity", [
+        "Asian", "Asian and Pacific Islander", "Black", "Hispanic",
+        "Hispanic or Latinx", "Multiracial", "Multi-Racial",
+        "Native American", "Native American or American Indian",
+        "Native Hawaiian or Pacific Islander", "Native Hawiian or Pacific Islander",
+        "White",
+    ]),
+    ("gender", "Gender", [
+        "Female", "Male", "Neither Female nor Male",
+    ]),
+    ("groups", "Student groups", [
+        "English Language Learners", "Students with Disabilities",
+        "Students with Disabilites",     # the source's own spelling in some labels
+    ]),
+    ("setting", "Service setting", [
+        "Integrated Co-Teaching", "Integrated Co-Teaching and SETSS",
+        "Self-Contained", "SETSS",
+    ]),
+    ("achievement", "Prior achievement", [
+        "Black or Hispanic Males in Lowest Third Citywide",
+        "Lowest Third Citywide", "School's Lowest Third",
+    ]),
+    # Grades are read off a comma rather than a dash, so this theme has no
+    # names to match. It is here so the label exists for the page.
+    ("grade", "By grade", []),
+]
+
+# The order themes appear under a measure.
+SUBGROUP_THEME_ORDER = ["all", "race", "gender", "groups", "setting", "achievement", "grade"]
+
+
+# ---- Reading a value -------------------------------------------------------
+
+# The published maximum of the state proficiency scale. Shown next to a value so
+# "3.35" reads as "3.35 of 4.5" without anyone having to open a definition.
+# 03_validate.py fails the build if a published value exceeds it.
+SCALE_MAX = 4.5
+INDEX_MAX = 100
+
+# The City scores some measures from 1 to 5 against a comparison group of
+# schools it considers similar. Where it does, the site bands that score for
+# color. The bands are this project's grouping of the City's number, and the
+# number itself is always shown next to the band so the reader can see what it
+# was derived from. Where the City publishes no score, nothing is colored.
+SCORE_BANDS = [
+    (4.0, "high", "Among the strongest of its comparison group"),
+    (3.0, "above", "Above the middle of its comparison group"),
+    (2.0, "below", "Below the middle of its comparison group"),
+    (0.0, "low", "Among the weakest of its comparison group"),
+]
+
+# A handful of measures count something you want less of, so a value above the
+# comparison group average is not the better outcome. Checked before any
+# direction is shown.
+LOWER_IS_BETTER = [
+    r"^nysaa_(ela|mth)_1",     # alternate assessment, percent at the lowest level
+    r"^nysaa_(ela|mth)_2",
+]
 
 
 # ---- Demographic metrics ---------------------------------------------------
@@ -326,23 +402,45 @@ DISRUPTION_NOTE = (
 # metric and observation model the quality reports use, so the site has one
 # way to display a number and one way to describe it.
 
+# Labels are the Department of Education's own wording, taken from the column
+# headings of the snapshot. Rewording them would mean substituting this
+# project's judgment for the source's, and the terms are the ones a reader will
+# meet again in every other City document.
+#
+# Each row is (metric_id, source column, label, format, theme). The theme
+# decides the order on a profile: themes in the order below, then alphabetical
+# within a theme.
 DEMOGRAPHIC_METRICS = [
-    # (metric_id, source column, label, format, category)
-    ("demo_enrollment_total", "Total Enrollment", "Total enrolment", "count", "demographics"),
-    ("demo_pct_female", "% Female", "Female students", "pct_unit", "demographics"),
-    ("demo_pct_male", "% Male", "Male students", "pct_unit", "demographics"),
-    ("demo_pct_other_sex", "% Neither Female nor Male", "Students who are neither female nor male", "pct_unit", "demographics"),
-    ("demo_pct_asian", "% Asian and Pacific Islander", "Asian and Pacific Islander students", "pct_unit", "demographics"),
-    ("demo_pct_black", "% Black", "Black students", "pct_unit", "demographics"),
-    ("demo_pct_hispanic", "% Hispanic", "Hispanic students", "pct_unit", "demographics"),
-    ("demo_pct_multiracial", "% Multi-Racial", "Multi-racial students", "pct_unit", "demographics"),
-    ("demo_pct_native_american", "% Native American", "Native American students", "pct_unit", "demographics"),
-    ("demo_pct_white", "% White", "White students", "pct_unit", "demographics"),
-    ("demo_pct_race_missing", "% Missing Race/Ethnicity Data", "Students with no race or ethnicity recorded", "pct_unit", "demographics"),
-    ("demo_pct_swd", "% Students with Disabilities", "Students with disabilities", "pct_unit", "demographics"),
-    ("demo_pct_ell", "% English Language Learners", "English language learners", "pct_unit", "demographics"),
-    ("demo_pct_poverty", "% Poverty", "Students in poverty", "pct_unit", "demographics"),
-    ("demo_economic_need_index", "Economic Need Index", "Economic Need Index", "pct_unit", "demographics"),
+    ("demo_enrollment_total", "Total Enrollment", "Total Enrollment", "count", "enrollment"),
+
+    ("demo_pct_asian", "% Asian and Pacific Islander", "Asian and Pacific Islander", "pct_unit", "race"),
+    ("demo_pct_black", "% Black", "Black", "pct_unit", "race"),
+    ("demo_pct_hispanic", "% Hispanic", "Hispanic", "pct_unit", "race"),
+    ("demo_pct_race_missing", "% Missing Race/Ethnicity Data", "Missing Race/Ethnicity Data", "pct_unit", "race"),
+    ("demo_pct_multiracial", "% Multi-Racial", "Multi-Racial", "pct_unit", "race"),
+    ("demo_pct_native_american", "% Native American", "Native American", "pct_unit", "race"),
+    ("demo_pct_white", "% White", "White", "pct_unit", "race"),
+
+    ("demo_pct_female", "% Female", "Female", "pct_unit", "gender"),
+    ("demo_pct_male", "% Male", "Male", "pct_unit", "gender"),
+    ("demo_pct_other_sex", "% Neither Female nor Male", "Neither Female nor Male", "pct_unit", "gender"),
+
+    ("demo_economic_need_index", "Economic Need Index", "Economic Need Index", "pct_unit", "economic"),
+    ("demo_pct_poverty", "% Poverty", "Poverty", "pct_unit", "economic"),
+
+    ("demo_pct_ell", "% English Language Learners", "English Language Learners", "pct_unit", "english"),
+
+    ("demo_pct_swd", "% Students with Disabilities", "Students with Disabilities", "pct_unit", "disability"),
+]
+
+# The order those themes appear, and what each is called on screen.
+DEMOGRAPHIC_THEMES = [
+    ("enrollment", "Enrollment"),
+    ("race", "Race and ethnicity"),
+    ("gender", "Gender"),
+    ("economic", "Economic need"),
+    ("english", "English language learners"),
+    ("disability", "Students with disabilities"),
 ]
 
 # Grade columns in the snapshot, in the order a school serves them.
@@ -430,13 +528,13 @@ DIRECTORY_PROGRAMS = {
 }
 
 # A DBN is two district digits, a borough letter, and three school digits. The
-# elementary directory mixes in early childhood centre codes that do not match.
+# elementary directory mixes in early childhood center codes that do not match.
 DBN_PATTERN = r"^\d{2}[MXKQR]\d{3}$"
 
 # A school enters the site's universe by appearing in a source the Department of
 # Education publishes about schools it runs. The directories are used to enrich
 # a school that is already in the universe, never to admit one, because they
-# list early childhood centres and season-specific programmes as well.
+# list early childhood centers and season-specific programs as well.
 UNIVERSE_SOURCES = ["sqr", "demographics"]
 
 
@@ -502,7 +600,10 @@ SITE = {
         "xlsx": "schoolsfinder-data.xlsx",
         "zip": "schoolsfinder-csv.zip",
     },
-    "max_compare": 3,
+    # A shortlist, not a pair. Twelve is where a family's real list tends to
+    # land, and the comparison view is built as rows of schools so it stays
+    # readable at that size.
+    "max_compare": 12,
     # A profile file carries values and suppression markers. A row the source
     # published blank with no group size adds nothing a reader can use, and the
     # site already knows from the metric manifest which metrics a school type

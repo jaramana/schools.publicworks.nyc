@@ -179,7 +179,7 @@ def build_schools(sqr, demo, directories):
                                      .apply(lambda s: "|".join(sorted(set(s)))))
     schools = schools.merge(latest_sqr.reset_index(), on="dbn", how="left")
 
-    # Identity from the demographic snapshot: the most recent name, enrolment,
+    # Identity from the demographic snapshot: the most recent name, enrollment,
     # and the grades the school actually served.
     demo_sorted = demo.sort_values("school_year")
     latest_demo = demo_sorted.groupby("dbn").last()
@@ -282,7 +282,7 @@ def build_schools(sqr, demo, directories):
 
 
 def grades_served(row):
-    """Read the grade span off the enrolment counts, low grade to high grade."""
+    """Read the grade span off the enrollment counts, low grade to high grade."""
     present = []
     for label, column in cfg.GRADE_COLUMNS:
         value = to_number(row.get(column))
@@ -475,12 +475,87 @@ def build_metrics(sqr):
     metrics["unit"] = metrics["format"].map(lambda f: cfg.FORMATS[f]["unit"])
 
     metrics["source_label"] = metrics["label"]
+
+    # Split each measure into a base name and the student group it describes,
+    # so a profile can lead with the all-students figure and keep the group
+    # breakdowns under it in a stated order.
+    split = [split_subgroup(label) for label in metrics["label"]]
+    metrics["base_label"] = [s[0] for s in split]
+    metrics["subgroup"] = [s[1] for s in split]
+    metrics["subgroup_theme"] = [s[2] for s in split]
+    metrics["theme_rank"] = [
+        cfg.SUBGROUP_THEME_ORDER.index(t) if t in cfg.SUBGROUP_THEME_ORDER else 99
+        for t in metrics["subgroup_theme"]
+    ]
+
+    # Measures that share a base name within a category belong together on
+    # screen: one card for "Percentage of Students at Level 3 or 4, ELA" holding
+    # the all-students figure and every group breakdown of it.
+    #
+    # The report scope is deliberately not part of the key. The all-students
+    # variant is often published for a wider set of report types than its own
+    # breakdowns are, and keying on scope would separate a measure from its own
+    # subgroups. Where one base does hold two scopes, as elementary and high
+    # school attendance do, the site labels the rows rather than splitting them.
+    metrics["base_id"] = [
+        f"{cat}:{base}" for cat, base in zip(
+            metrics["metric_id"].map(lambda m: categorize(m)[0]), metrics["base_label"])
+    ]
+
     metrics["label"] = disambiguate_labels(metrics)
+    metrics["lower_is_better"] = [
+        any(re.search(p, m) for p in cfg.LOWER_IS_BETTER) for m in metrics["metric_id"]
+    ]
     metrics["source_id"] = "sqr"
     metrics["headline"] = metrics["metric_id"].isin(cfg.HEADLINE_METRICS)
     metrics["comparability_note"] = metrics["metric_id"].map(cfg.COMPARABILITY_BREAKS)
     metrics["description"] = metrics.apply(describe_metric, axis=1)
     return metrics
+
+
+# Group name to theme, built once from the configuration. Matching is done on a
+# lowercase, whitespace-collapsed key so the source's own spelling variants
+# ("Multiracial" and "Multi-Racial", "Disabilites") all land in one place.
+SUBGROUP_LOOKUP = {}
+for _key, _label, _names in cfg.SUBGROUP_THEMES:
+    for _name in _names:
+        SUBGROUP_LOOKUP[" ".join(_name.lower().split())] = (_key, _name)
+
+GRADE_SUFFIX = re.compile(r",\s*(Grade\s+\d+)\s*$", re.IGNORECASE)
+
+
+def split_subgroup(label):
+    """Separate a measure's base name from the student group it describes.
+
+    Returns (base label, group name or None, theme key). The source writes the
+    group after a dash, and a grade after a comma. Anything that is not a known
+    group is left alone: "Average Student Attendance - Remote days" is a
+    different measure, not a different group of students.
+    """
+    if not isinstance(label, str):
+        return label, None, None
+
+    grade = GRADE_SUFFIX.search(label)
+    if grade:
+        return label[:grade.start()].strip(), grade.group(1).title(), "grade"
+
+    if " - " in label:
+        base, tail = label.rsplit(" - ", 1)
+        hit = SUBGROUP_LOOKUP.get(" ".join(tail.lower().split()))
+        if hit:
+            theme, canonical = hit
+            return base.strip(), canonical, theme
+
+    # A few labels run the dash straight against the group, as in
+    # "10+ Credits in 1st Year -Multiracial".
+    if " -" in label:
+        base, tail = label.rsplit(" -", 1)
+        hit = SUBGROUP_LOOKUP.get(" ".join(tail.lower().split()))
+        if hit:
+            theme, canonical = hit
+            return base.strip(), canonical, theme
+
+    return label, None, None
 
 
 def disambiguate_labels(metrics):
@@ -527,24 +602,33 @@ def describe_metric(row):
 
 def demographic_metrics_frame():
     """The snapshot's columns described in the same shape as the other metrics."""
+    theme_order = [key for key, _ in cfg.DEMOGRAPHIC_THEMES]
+    theme_labels = dict(cfg.DEMOGRAPHIC_THEMES)
     rows = []
-    for metric_id, column, label, fmt, category in cfg.DEMOGRAPHIC_METRICS:
-        _, category_label = categorize(metric_id) if category != "demographics" else (
-            "demographics", "Enrolment and demographics")
+    for metric_id, column, label, fmt, theme in cfg.DEMOGRAPHIC_METRICS:
         rows.append({
             "metric_id": metric_id,
             "label": label,
             "source_label": label,
+            # Each demographic figure stands on its own rather than being a
+            # group breakdown of something else, so the group is the theme and
+            # the base name is the label.
+            "base_label": theme_labels.get(theme, theme),
+            "base_id": f"demographics:{theme}",
+            "subgroup": label,
+            "subgroup_theme": theme,
+            "theme_rank": theme_order.index(theme) if theme in theme_order else 99,
             "source_column": column,
             "format": fmt,
             "format_source": "declared",
             "unit": cfg.FORMATS[fmt]["unit"],
             "category": "demographics",
-            "category_label": "Enrolment and demographics",
+            "category_label": "Enrollment and demographics",
             "source_id": "demographics",
             "applies_to": "|".join(sorted(cfg.REPORT_TYPES)),
             "school_types": "",
             "with_comparison": 0,
+            "lower_is_better": False,
             "headline": metric_id in cfg.HEADLINE_METRICS,
             "comparability_note": None,
         })
@@ -624,7 +708,7 @@ def build_programs(directories):
     """Flatten each directory's wide program block into rows.
 
     Admissions data is program-level, not school-level: one school can run an
-    open programme and a screened one side by side, and collapsing them would
+    open program and a screened one side by side, and collapsing them would
     invent a school-wide admissions method that does not exist.
     """
     log("building programs")
@@ -675,8 +759,8 @@ def build_programs(directories):
                         })
 
     programs = pd.DataFrame(programs)
-    # A school listed at more than one entry point repeats the same programme.
-    # The programme is one thing, so keep one row for it.
+    # A school listed at more than one entry point repeats the same program.
+    # The program is one thing, so keep one row for it.
     if not programs.empty:
         programs = programs.drop_duplicates(subset=["dbn", "program_id"], keep="first")
     priorities = pd.DataFrame(priorities).drop_duplicates(

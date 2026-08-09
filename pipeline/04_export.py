@@ -60,6 +60,22 @@ def load_tables():
 
 # ---- Site JSON -------------------------------------------------------------
 
+def score_band(score):
+    """Band the City's own 1 to 5 score.
+
+    The score is published by New York City Public Schools against a comparison
+    group of schools it considers similar. The banding is this project's, the
+    number is theirs, and both are shown together on the page so a reader can
+    see what the color was derived from.
+    """
+    if score is None or pd.isna(score):
+        return None
+    for floor, band, _meaning in cfg.SCORE_BANDS:
+        if score >= floor:
+            return band
+    return None
+
+
 def school_record(row):
     """The identity block shown at the top of a profile."""
     fields = [
@@ -107,6 +123,13 @@ def build_metrics_json(metrics, staging):
             "description": clean(metric.get("description")),
             "category": clean(metric["category"]),
             "category_label": clean(metric["category_label"]),
+            # The base measure and the student group it describes, so a profile
+            # can lead with the all-students figure and order the breakdowns.
+            "base_id": clean(metric.get("base_id")),
+            "base_label": clean(metric.get("base_label")),
+            "subgroup": clean(metric.get("subgroup")),
+            "theme": clean(metric.get("subgroup_theme")),
+            "theme_rank": int(float(metric.get("theme_rank") or 99)),
             "format": clean(metric["format"]),
             "format_source": clean(metric["format_source"]),
             "unit": clean(metric["unit"]),
@@ -114,6 +137,7 @@ def build_metrics_json(metrics, staging):
             "first_year": clean(metric.get("first_year")),
             "last_year": clean(metric.get("last_year")),
             "headline": str(metric.get("headline")).lower() == "true",
+            "lower_is_better": str(metric.get("lower_is_better")).lower() == "true",
             "comparability_note": clean(metric.get("comparability_note")),
             "source_id": clean(metric["source_id"]),
         }
@@ -161,6 +185,9 @@ def build_school_files(schools, observations, programs, priorities, staging):
                     series["c"] = [clean(v) for v in rows["comparison"]]
                 if rows["source_score"].notna().any():
                     series["s"] = [clean(v) for v in rows["source_score"]]
+                    # The band is banded here rather than in the browser, so
+                    # the thresholds live with the rest of the configuration.
+                    series["b"] = [score_band(v) for v in rows["source_score"]]
                 payload["series"][metric_id] = series
 
         school_programs = programs_by_school.get(dbn)
@@ -244,6 +271,21 @@ def build_status_json(tables, sources_payload, staging, validation):
         },
         "metric_ids": sorted(tables["metrics"]["metric_id"]),
         "stale_sources": stale,
+        # Display constants the browser needs but should not hard-code, so a
+        # change in 00_config.py reaches the page without a code edit.
+        "display": {
+            "scale_max": cfg.SCALE_MAX,
+            "index_max": cfg.INDEX_MAX,
+            "score_bands": [
+                {"from": floor, "band": band, "meaning": meaning}
+                for floor, band, meaning in cfg.SCORE_BANDS
+            ],
+            "themes": {key: label for key, label, _ in cfg.SUBGROUP_THEMES},
+            "demographic_themes": dict(cfg.DEMOGRAPHIC_THEMES),
+            "category_order": cfg.CATEGORY_ORDER,
+            "theme_order": cfg.SUBGROUP_THEME_ORDER,
+            "max_compare": cfg.SITE["max_compare"],
+        },
         "validation": {
             "passed": validation.get("passed"),
             "warnings": len(validation.get("warnings", [])),
@@ -270,7 +312,7 @@ def data_dictionary(tables):
         ("district", "Administrative district, read from the first two characters of the DBN.", "text", "All schools"),
         ("school_type", "School type as the School Quality Reports classify it.", "text", "Schools with a quality report"),
         ("report_type", "Which quality report the school files. Decides which metrics apply.", "text", "Schools with a quality report"),
-        ("grades", "Grades served. From the directory where available, otherwise read from the enrolment counts.", "text", "All schools"),
+        ("grades", "Grades served. From the directory where available, otherwise read from the enrollment counts.", "text", "All schools"),
         ("status", "open when the school is in the newest snapshot or a current directory, otherwise former.", "text", "All schools"),
         ("enrollment", "Total students in the most recent demographic snapshot.", "count", "Schools in the snapshot"),
         ("address", "Street address from the current directory.", "text", "Schools in a directory"),
@@ -378,8 +420,8 @@ Files
 schools.csv              One row per DBN. Identity, location, and current attributes.
 observations.csv         One row per DBN, school year, and metric. Every published value.
 metrics.csv              One row per metric. Definitions, units, and which schools they apply to.
-programs.csv             One row per DBN and programme, where a directory publishes one.
-program_priorities.csv   One row per DBN, programme, and priority rank.
+programs.csv             One row per DBN and program, where a directory publishes one.
+program_priorities.csv   One row per DBN, program, and priority rank.
 sources.csv              Every source, with its period, coverage, and limitations.
 data-dictionary.csv      Every field in every file above.
 

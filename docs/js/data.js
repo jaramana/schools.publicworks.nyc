@@ -24,7 +24,7 @@
       ['Measures', SF.fmt.count(c.metrics), 'each with a definition and a period'],
       ['Published values', SF.fmt.count(c.observations_reported),
        'out of ' + SF.fmt.count(c.observations) + ' rows'],
-      ['Programmes', SF.fmt.count(c.programs), 'from the Fall 2025 directories']
+      ['Programs', SF.fmt.count(c.programs), 'from the Fall 2025 directories']
     ].forEach(function (row) {
       var block = SF.el('div', { class: 'fact' });
       block.appendChild(SF.el('dt', { text: row[0] }));
@@ -43,7 +43,7 @@
         href: 'downloads/' + status.downloads.xlsx,
         title: 'Excel workbook',
         text: 'Five sheets: schools, headline measures across every year, ' +
-              'programmes and admissions, the data dictionary, and the sources ' +
+              'programs and admissions, the data dictionary, and the sources ' +
               'with their coverage.'
       },
       {

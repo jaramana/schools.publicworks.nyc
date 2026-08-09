@@ -21,22 +21,30 @@ DOCS = ROOT / "docs"
 
 # The palette, taken from docs/css/site.css. Kept here as plain values so the
 # check does not depend on parsing the stylesheet.
-COLOURS = {
-    "paper": "#fbfaf7",
+COLORS = {
+    "paper": "#f7f8f8",
     "paper-raised": "#ffffff",
-    "paper-sunken": "#f2f0eb",
-    "ink": "#16181d",
-    "ink-soft": "#4a4f5a",
-    "ink-faint": "#646a75",
-    "rule": "#e0ddd6",
-    "rule-strong": "#c9c5bb",
-    "control": "#8f8879",
-    "accent": "#1f4ed8",
+    "paper-sunken": "#eceeee",
+    "ink": "#15181b",
+    "ink-soft": "#474d52",
+    "ink-faint": "#626970",
+    "rule": "#dcdfe0",
+    "rule-strong": "#c2c7c9",
+    "control": "#7f868a",
+    "accent": "#14634a",
     "on-accent": "#ffffff",
-    "accent-soft": "#e8edfb",
-    "accent-ink": "#163ba6",
-    "warn": "#b4520a",
-    "warn-soft": "#fdf0e4",
+    "accent-soft": "#e3efea",
+    "accent-ink": "#0d4b38",
+    "warn": "#9c3d16",
+    "warn-soft": "#fbe9e0",
+    "band-high-tint": "#e7f2ea",
+    "band-high-ink": "#12603f",
+    "band-above-tint": "#eef5ec",
+    "band-above-ink": "#1d6b45",
+    "band-below-tint": "#fdf1e3",
+    "band-below-ink": "#8a5210",
+    "band-low-tint": "#fbe9e0",
+    "band-low-ink": "#9c3d16",
 }
 
 # Pairs the site actually renders, with the smallest size each is used at.
@@ -57,6 +65,11 @@ PAIRS = [
     ("caution heading", "ink", "warn-soft", "normal"),
     ("table head", "ink-soft", "paper-sunken", "normal"),
     ("body text on a sunken panel", "ink", "paper-sunken", "normal"),
+    ("score band, strongest", "band-high-ink", "band-high-tint", "normal"),
+    ("score band, above middle", "band-above-ink", "band-above-tint", "normal"),
+    ("score band, below middle", "band-below-ink", "band-below-tint", "normal"),
+    ("score band, weakest", "band-low-ink", "band-low-tint", "normal"),
+    ("program admissions method", "accent-ink", "accent-soft", "normal"),
 ]
 
 # Non-text contrast, which WCAG requires at 3:1 for anything that carries
@@ -79,7 +92,7 @@ def luminance(hex_colour):
 
 
 def contrast(a, b):
-    la, lb = luminance(COLOURS[a]), luminance(COLOURS[b])
+    la, lb = luminance(COLORS[a]), luminance(COLORS[b])
     lighter, darker = max(la, lb), min(la, lb)
     return (lighter + 0.05) / (darker + 0.05)
 
@@ -202,12 +215,12 @@ def check_pages(failures):
             if attrs.get("type") == "hidden":
                 continue
             identifier = attrs.get("id")
-            labelled = (
+            labeled = (
                 (identifier and identifier in parser.labels_for)
                 or "aria-label" in attrs
                 or "aria-labelledby" in attrs
             )
-            if not labelled:
+            if not labeled:
                 problems.append(f"a <{tag}> has no label")
                 break
 
@@ -248,7 +261,8 @@ def check_scripts(failures):
         ("js/table.js", "scope", "table headers declare their scope"),
         ("js/table.js", "Not published", "an empty cell says so rather than reading as zero"),
         ("js/site.js", "role: 'status'", "the stale-source warning is announced"),
-        ("index.html", 'id="school-count" role="status"', "the filtered school count is announced"),
+        ("browse.html", 'id="school-count" role="status"', "the filtered school count is announced"),
+        ("index.html", 'data-status', "the landing page reports what the data covers"),
     ]
     for filename, needle, description in checks:
         text = (DOCS / filename).read_text(encoding="utf-8")

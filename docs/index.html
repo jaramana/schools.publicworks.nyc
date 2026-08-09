@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>schoolsfinder.nyc — New York City public school statistics</title>
-<meta name="description" content="Published statistics for every New York City public school, in one place. Search by name or DBN, or browse by borough, district and grade. No ranking, no score.">
+<meta name="description" content="Published statistics for every New York City public school, in one place. Search by name or DBN, or browse by borough, district and grade.">
 <link rel="stylesheet" href="css/site.css">
 <script src="js/site.js" defer></script>
 <script src="js/search.js" defer></script>
@@ -16,63 +16,20 @@
 
 <main id="main">
   <section class="wrap console">
-    <h1>New York City public school statistics, in one place</h1>
+    <h1>Every New York City public school, one page each</h1>
     <p class="console-sub">
-      The figures New York City publishes about its schools are spread across a
-      quality report, an enrolment snapshot and three admissions directories.
-      This site puts them on one page per school, with the definition, the
-      reporting period and the source next to every number.
+      The figures the City publishes about its schools are spread across a
+      quality report, an enrollment snapshot and three admissions directories.
+      Here they are on one page per school, each number with its definition,
+      its reporting period and its source.
     </p>
 
     <div class="search-shell" id="finder-search"></div>
 
+    <h2 class="section-label">Or start from a borough</h2>
+    <ul class="entry-grid" id="boroughs"></ul>
+
     <p class="statusline mono" data-status>Loading…</p>
-  </section>
-
-  <section class="wrap">
-    <div class="note-box">
-      <p>
-        <strong>This site does not rank schools.</strong> There is no overall
-        score, no weighting and no best-school ordering, because the published
-        data does not support one and a family's needs are not a formula. What
-        is here is every reliable statistic, labelled well enough to read for
-        yourself. <a href="method.html">How to read these numbers</a>.
-      </p>
-    </div>
-  </section>
-
-  <section class="wrap" id="browse">
-    <h2 class="section-label">Browse every school</h2>
-    <p class="hint">
-      Filters narrow the list. The order is alphabetical and never changes with
-      the filters, so nothing here implies a preference.
-    </p>
-
-    <div class="controls" id="filters" role="group" aria-label="Filter schools"></div>
-    <p class="count" id="school-count" role="status">Loading schools…</p>
-    <ul class="school-grid" id="school-list"></ul>
-    <button class="pill" type="button" id="show-more" hidden>Show more</button>
-  </section>
-
-  <section class="wrap">
-    <h2 class="section-label">Also here</h2>
-    <ul class="chapters">
-      <li><a href="compare.html">
-        <h3>Compare schools</h3>
-        <p>Two or three schools side by side, using the same measure and the
-           same reporting period in every row. No winner is declared.</p>
-      </a></li>
-      <li><a href="data.html">
-        <h3>Download the data</h3>
-        <p>The whole compilation as an Excel workbook or a CSV archive, built
-           from the same tables this site reads.</p>
-      </a></li>
-      <li><a href="method.html">
-        <h3>Method and limits</h3>
-        <p>Where each number comes from, what it counts, and when two of them
-           should not be compared.</p>
-      </a></li>
-    </ul>
   </section>
 </main>
 
