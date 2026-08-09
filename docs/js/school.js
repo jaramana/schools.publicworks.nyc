@@ -274,8 +274,10 @@
       // Read aloud as "out of", since a slash is spoken as "slash".
       wrapper.setAttribute('aria-label', SF.scaleSpoken(shown, metric.format));
     }
-    var band = SF.bandElement(read.band, read.score);
-    if (band) wrapper.appendChild(band);
+    // Deliberately nothing else here. A band and a score beside the number
+    // asked a reader to interpret two scales at once while scanning a column
+    // of measures. Where the school stands is in the panel below, where it can
+    // be read rather than decoded.
     return wrapper;
   }
 
@@ -302,40 +304,30 @@
     return meta;
   }
 
-  // The comparison group average, written out. A second bare number tells a
-  // reader nothing; the distance from it, in the measure's own unit, does.
-  // This lives inside the detail panel: beside the value it interrupted the
-  // scan down a column of measures.
-  function compareSentence(read, metric) {
+  // How this school sits against the group the City compares it with, as two
+  // short pieces rather than a sentence: the gap, and what it is a gap from.
+  function comparisonParts(read, metric) {
     if (read.absent || SF.isBlank(read.comparison)) return null;
     var difference = read.value - read.comparison;
     var better = metric.lower_is_better ? difference < 0 : difference > 0;
     var size = Math.abs(difference);
 
-    var unit, amount;
-    if (metric.format === 'pct_unit') {
-      amount = (size * 100).toFixed(1);
-      unit = amount === '1.0' ? ' point' : ' points';
+    var gap;
+    if (size < 0.0005) {
+      gap = 'level with';
+    } else if (metric.format === 'pct_unit') {
+      var points = (size * 100).toFixed(1);
+      gap = points + (points === '1.0' ? ' point ' : ' points ') +
+            (difference > 0 ? 'above' : 'below');
     } else {
-      amount = size.toFixed(2);
-      unit = '';
+      gap = size.toFixed(2) + ' ' + (difference > 0 ? 'above' : 'below');
     }
 
-    var node = SF.el('p', { class: 'm-compare' });
-    if (size < 0.0005) {
-      node.appendChild(document.createTextNode('Level with the '));
-    } else {
-      node.appendChild(SF.el('b', {
-        class: better ? 'up' : 'down',
-        text: amount + unit + (difference > 0 ? ' above' : ' below')
-      }));
-      node.appendChild(document.createTextNode(' the '));
-    }
-    node.appendChild(SF.el('b', { text: SF.formatValue(read.comparison, metric.format) }));
-    node.appendChild(document.createTextNode(
-      ' average of its comparison group, the schools New York City judges this ' +
-      'one against.'));
-    return node;
+    return {
+      gap: gap,
+      better: size < 0.0005 ? null : better,
+      average: SF.formatValue(read.comparison, metric.format)
+    };
   }
 
   // The panel under a measure is built the first time it is opened, not on
@@ -344,7 +336,7 @@
   // between asking for a school and seeing one.
   function details(metricId, metric, series, read) {
     var wrapper = SF.el('details');
-    var summary = SF.el('summary', { text: 'Definition, source and year by year' });
+    var summary = SF.el('summary', { text: 'What this measures, and how it compares' });
     wrapper.appendChild(summary);
 
     var built = false;
@@ -367,38 +359,68 @@
     return wrapper;
   }
 
+  // The panel is a short table of labelled facts, not paragraphs. The content
+  // is the same as before; the change is that a reader can find the one line
+  // they came for instead of reading four sentences to reach it.
   function detailBody(metricId, metric, series, read) {
     var body = SF.el('div', { class: 'm-detail' });
+    var rows = SF.el('dl', { class: 'm-facts' });
 
-    // The comparison lives here rather than beside the value. Next to the
-    // number it broke the scan down a column of measures; here it is a
-    // sentence someone has chosen to read.
-    var comparison = compareSentence(read, metric);
-    if (comparison) body.appendChild(comparison);
-
-    body.appendChild(SF.el('p', { text: metric.description || describe(metric) }));
-    body.appendChild(SF.el('p', {
-      html: 'Unit: ' + SF.escapeHtml(metric.unit) +
-            (metric.format_source === 'inferred'
-              ? ' <span class="muted">(inferred from the published values, not stated by the source)</span>'
-              : '') +
-            '. Identifier: <code>' + SF.escapeHtml(metricId) + '</code>. ' +
-            'Source: ' + SF.escapeHtml(metric.source_id) + '.'
-    }));
-    if (metric.comparability_note) {
-      body.appendChild(SF.el('p', {
-        html: '<strong>Comparability:</strong> ' + SF.escapeHtml(metric.comparability_note)
-      }));
+    function row(term, value, options) {
+      var o = options || {};
+      var wrap = SF.el('div', { class: o.class || '' });
+      wrap.appendChild(SF.el('dt', { text: term }));
+      var dd = SF.el('dd');
+      if (value instanceof Node) dd.appendChild(value);
+      else if (o.html) dd.innerHTML = value;
+      else dd.textContent = value;
+      wrap.appendChild(dd);
+      rows.appendChild(wrap);
     }
 
+    // Standing first, because it is the reason most people open this.
+    var compare = comparisonParts(read, metric);
+    if (read.band || compare) {
+      var standing = SF.el('span', { class: 'standing' });
+      if (read.band) {
+        var chip = SF.el('span', { class: 'band band-' + read.band });
+        chip.appendChild(SF.el('span', { text: SF.BAND_SHORT[read.band] }));
+        chip.appendChild(SF.el('span', {
+          class: 'score', text: Number(read.score).toFixed(1) + '/5'
+        }));
+        standing.appendChild(chip);
+      }
+      if (compare) {
+        standing.appendChild(SF.el('span', {
+          class: compare.better === null ? '' : (compare.better ? 'up' : 'down'),
+          text: compare.gap + ' ' + compare.average
+        }));
+      }
+      row('Similar schools', standing);
+    }
+
+    row('Measures', metric.source_label || metric.label);
+    row('Published for', reportCoverage(metric));
+    row('Years', (metric.first_year || '') + ' to ' + (metric.last_year || ''));
+    row('Unit', metric.unit + (metric.format_source === 'inferred'
+      ? ' (inferred from the values, not stated by the source)' : ''));
+    row('Source', metric.source_id + ' · ' + metricId, { class: 'mono-row' });
+
+    if (metric.comparability_note) {
+      row('Careful', metric.comparability_note, { class: 'careful' });
+    }
+    body.appendChild(rows);
+
     if (series && series.y.length) {
+      body.appendChild(SF.el('p', { class: 'm-facts-label', text: 'Year by year' }));
       var strip = SF.el('div', { class: 'history' });
       series.y.forEach(function (year, i) {
         var chip = SF.el('span', { class: 'h-year' });
         chip.appendChild(document.createTextNode(year + ' '));
         chip.appendChild(SF.el('b', {
           text: SF.isBlank(series.v[i])
-            ? (SF.ABSENCE[series.st ? series.st[i] : 'missing'] || SF.ABSENCE.missing)
+            ? (series.bd && series.bd[i] ? series.bd[i]
+               : (SF.ABSENCE[series.st ? series.st[i] : 'missing'] || SF.ABSENCE.missing))
             : SF.formatValue(series.v[i], metric.format)
         }));
         strip.appendChild(chip);
@@ -407,6 +429,11 @@
     }
 
     return body;
+  }
+
+  function reportCoverage(metric) {
+    return (metric.applies_to || [])
+      .map(function (r) { return REPORT_COVERS[r] || r; }).join(', ');
   }
 
   // ---- Groups under a measure ------------------------------------------
@@ -431,8 +458,6 @@
     row.appendChild(SF.el('span', {
       class: 'g-value', text: SF.formatValue(read.value, member.metric.format)
     }));
-    var band = SF.bandElement(read.band, read.score, { scoreOnly: true });
-    if (band) row.appendChild(band);
 
     var meta = [];
     // The year is dropped from the rows when every row shares it, and stated

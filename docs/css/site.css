@@ -358,6 +358,34 @@ button.pill[aria-pressed="true"] {
 .m-detail p { margin: 0 0 .45rem; max-width: none; }
 .m-detail p:last-child { margin-bottom: 0; }
 
+/* The panel is a short table of labelled facts. Prose here made a reader
+   consume four sentences to reach the one line they opened it for; a label
+   column lets them jump straight to it. */
+.m-facts { margin: 0; display: grid; gap: .1rem 0; }
+.m-facts > div {
+  display: grid; grid-template-columns: 8.5rem 1fr; gap: .2rem .9rem;
+  padding: .22rem 0; align-items: baseline;
+}
+.m-facts dt {
+  font-size: .74rem; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.m-facts dd { margin: 0; color: var(--ink); }
+.m-facts .mono-row dd { font-family: var(--mono); font-size: .82rem; color: var(--ink-soft); }
+.m-facts .careful dd { color: var(--band-below-ink); }
+
+/* Standing sits in the first row, where the band has room to carry its own
+   label instead of floating next to a number it does not belong to. */
+.standing { display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .6rem; }
+.standing .up { color: var(--band-high-ink); font-weight: 600; }
+.standing .down { color: var(--band-low-ink); font-weight: 600; }
+
+.m-facts-label {
+  font-size: .74rem; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--ink-faint);
+  margin: .8rem 0 0;
+}
+
 /* Group breakdowns, under the all-students figure they belong to. */
 .m-groups { margin-top: .5rem; }
 .m-groups > summary { font-size: .82rem; }
@@ -473,7 +501,42 @@ code {
    has. No row is ever marked as better than another. */
 .compare-table td.value { font-variant-numeric: tabular-nums; }
 .compare-table th.school { min-width: 12rem; white-space: normal; }
-.compare-table th[scope="row"] { white-space: normal; min-width: 13rem; font-weight: 600; }
+
+/* Long measure names are the hard part of this table. Three things together,
+   rather than truncating and hiding the name:
+     a fixed narrow column, so headers cannot each choose their own width;
+     the qualifier and unit on a quieter second line;
+     bottom alignment, so however many lines a header takes, every header ends
+     on the same baseline and the row reads as one band instead of a ragged
+     edge. Wrapping is unavoidable at this length. Made deliberate, it stops
+     looking like an accident. */
+.compare-table thead th.num {
+  width: 9.5rem; min-width: 9.5rem; max-width: 9.5rem;
+  white-space: normal; vertical-align: bottom;
+  font-size: .76rem; line-height: 1.25; hyphens: auto;
+  padding-top: .7rem;
+}
+.compare-table .th-main { display: block; }
+.compare-table .th-sub {
+  display: block; margin-top: .15rem;
+  font-weight: 500; font-size: .72rem; color: var(--ink-faint);
+  text-transform: none; letter-spacing: 0;
+}
+
+/* The school name stays put while the measures scroll under it. Without this,
+   scrolling right leaves a grid of numbers with nothing to attach them to. */
+.compare-table th[scope="row"] {
+  white-space: normal; min-width: 13rem; font-weight: 600;
+  position: sticky; left: 0; z-index: 1;
+  background: var(--paper-raised);
+  box-shadow: 1px 0 0 var(--rule);
+}
+.compare-table tbody tr:hover th[scope="row"] { background: var(--paper-sunken); }
+.compare-table thead th:first-child {
+  position: sticky; left: 0; z-index: 3;
+  background: var(--paper-sunken);
+  box-shadow: 1px 0 0 var(--rule-strong);
+}
 .compare-table td.value .cell-band {
   display: inline-block; border-radius: 5px; padding: .05rem .4rem; font-weight: 600;
 }

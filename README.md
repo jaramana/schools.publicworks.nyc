@@ -106,9 +106,11 @@ since a slash is spoken as "slash".
 
 **Where it stands, when the City says so.** For many measures New York City
 publishes both a comparison group average and its own score from 1 to 5 against
-that group. The score becomes a colored band beside the value; the comparison is
-written out as a sentence inside the measure's detail panel, where it does not
-interrupt the scan down a column of numbers. The score itself is always printed inside the band, and every
+that group. Both live inside the measure's panel, in a row labelled Similar
+schools, and nothing but the value and its scale sits on the measure line
+itself. A band and a score beside the number asked a reader to interpret two
+scales at once while scanning a column of measures. In the comparison table the
+band stays on the cell, because there standing across schools is the point. The score itself is always printed inside the band, and every
 band carries a written label as well as a color. The banding thresholds are in
 `SCORE_BANDS` in the config; the score is the City's. Where the City publishes
 no score, nothing is colored.

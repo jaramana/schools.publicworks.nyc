@@ -254,8 +254,12 @@
             '<li><a href="https://github.com/jaramana/schoolsfinder.nyc/issues">Report an error</a></li>' +
           '</ul></div>' +
         '</div>' +
-        '<p class="colophon">Public data, public method. Built with Python. ' +
-          'Not affiliated with New York City Public Schools.</p>' +
+        '<p class="colophon"><strong>An experimental project.</strong> ' +
+          'Independent, unofficial, and not affiliated with New York City ' +
+          'Public Schools. For anything that decides something, including ' +
+          'eligibility, applications and deadlines, use ' +
+          '<a href="https://www.myschools.nyc/">MySchools</a> and the school ' +
+          'itself. Public data, public method, built with Python.</p>' +
         '</div>';
     }
   }

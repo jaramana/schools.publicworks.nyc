@@ -312,9 +312,28 @@
     picked.forEach(function (id) {
       var metric = metrics[id];
       var scale = SF.scaleOf(metric.format);
+
+      // Measure names run long: "Percentage of Students with 90%+ Attendance
+      // (EMS)" is most of a column on its own. The name is not rewritten. It is
+      // split: the qualifier the pipeline appended, and the unit, drop to a
+      // quieter second line, which takes about a third off the header height
+      // and leaves one thing to read on the first line.
+      var main = metric.label;
+      var sub = [];
+      var qualifier = main.match(/\s*\(([^)]+)\)\s*$/);
+      if (qualifier) {
+        main = main.slice(0, qualifier.index).trim();
+        sub.push(qualifier[1]);
+      }
+      if (scale) sub.push('out of ' + scale.replace('/ ', ''));
+
       columns.push({
         key: id,
-        label: metric.label + (scale ? ' (out of ' + scale.replace('/ ', '') + ')' : ''),
+        label: metric.label,
+        title: metric.label,
+        labelHtml: '<span class="th-main">' + SF.escapeHtml(main) + '</span>' +
+          (sub.length ? '<span class="th-sub">' + SF.escapeHtml(sub.join(' · ')) +
+           '</span>' : ''),
         num: true,
         render: function (v, row) {
           var point = row['_' + id];

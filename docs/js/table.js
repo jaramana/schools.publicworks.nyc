@@ -79,7 +79,12 @@
     columns.forEach(function (c) {
       var th = document.createElement('th');
       th.scope = 'col';
-      th.textContent = c.label;
+      // A column may supply structured markup for its heading, so a long
+      // measure name can put its qualifier on a second, quieter line without
+      // the label itself being rewritten.
+      if (c.labelHtml) th.innerHTML = c.labelHtml;
+      else th.textContent = c.label;
+      if (c.title) th.title = c.title;
       if (c.num) th.className = 'num';
       if (c.sortable !== false) {
         th.classList.add('sortable');
