@@ -1,0 +1,16 @@
+# Cached downloads. Rebuilt by pipeline/01_fetch.py, and large.
+data-raw/
+
+# Intermediate tables, staging output and reports.
+build/
+
+# Local environment.
+.venv/
+__pycache__/
+*.pyc
+
+# The original personal workbook. It is a research prototype and holds a home
+# address, personal weights and a personal ranking. It is never published.
+School Ranking.xlsx
+
+.DS_Store

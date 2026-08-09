@@ -1,0 +1,91 @@
+name: Refresh data
+
+# Daily, plus a button in the Actions tab. GitHub disables a scheduled workflow
+# after sixty days without repository activity, so the manual trigger is not a
+# convenience: it is the recovery path when the schedule has been switched off.
+on:
+  schedule:
+    - cron: "20 9 * * *"      # 09:20 UTC, after the New York overnight
+  workflow_dispatch:
+
+# Only one refresh at a time. Two runs publishing at once would race on the
+# same generated files.
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pandas requests openpyxl XlsxWriter
+
+      # The geocoder answers per address and the results never change for an
+      # address that has not moved, so the cache is worth carrying between runs.
+      # It is keyed by month so it is rebuilt occasionally rather than forever.
+      - name: Restore the geocode cache
+        uses: actions/cache@v4
+        with:
+          path: data-raw/geocode.json
+          key: geocode-${{ github.run_id }}
+          restore-keys: geocode-
+
+      - name: Build
+        run: python run.py
+
+      # The validation report is kept whether the build passed or failed. When a
+      # source changes shape, this file says which check caught it.
+      - name: Keep the validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation
+          path: |
+            build/validation.json
+            build/fetch-manifest.json
+          retention-days: 30
+
+      - name: Publish if the public files changed
+        run: |
+          git config user.name "schoolsfinder bot"
+          git config user.email "actions@github.com"
+          git add docs/data docs/downloads
+
+          # status.json carries the build date, which changes on every run even
+          # when no figure did. Committing on that alone would add a commit a day
+          # to a dataset that moves once a year, so it does not count as a change
+          # on its own.
+          changed=$(git diff --cached --name-only | grep -v '^docs/data/status.json$' || true)
+          if [ -z "$changed" ]; then
+            echo "No change to the published data. Nothing to commit."
+            git reset
+            exit 0
+          fi
+
+          echo "Changed files:"
+          echo "$changed" | head -20
+          git add docs/data/status.json
+          git commit -m "Refresh published data
+
+          $(python - <<'PY'
+import json
+status = json.load(open("docs/data/status.json"))
+periods = ", ".join(f"{k} {v}" for k, v in sorted(status["periods"].items()))
+counts = status["counts"]
+print(f"{counts['schools']} schools, {counts['observations']} observations.")
+print(f"Periods: {periods}.")
+PY
+)"
+          git push

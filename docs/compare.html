@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compare schools — schoolsfinder.nyc</title>
+<meta name="description" content="Put two or three New York City public schools side by side, using the same measure and the same reporting period in every row.">
+<link rel="stylesheet" href="css/site.css">
+<script src="js/site.js" defer></script>
+<script src="js/search.js" defer></script>
+<script src="js/compare.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header data-chrome="masthead"></header>
+
+<main id="main">
+  <section class="wrap console">
+    <h1>Compare schools</h1>
+    <p class="console-sub">
+      Two or three schools, side by side. Every row uses one measure and states
+      the reporting period it comes from. Nothing is added up and no column is
+      marked as better.
+    </p>
+
+    <div class="search-shell" id="compare-search"></div>
+    <ul class="chosen" id="chosen"></ul>
+    <p class="hint" id="picker-note" role="status"></p>
+    <p class="statusline mono" data-status></p>
+  </section>
+
+  <section class="wrap">
+    <div id="comparison"></div>
+  </section>
+
+  <section class="wrap">
+    <div class="note-box">
+      <p>
+        <strong>Where a comparison breaks down.</strong> Two schools often last
+        reported a measure in different years, and the period column says so
+        when they did. Schools of different types report different things, so
+        most rows will be blank for one of them. A blank is a gap in reporting,
+        not a low value.
+        <a href="method.html#comparing">More on comparability</a>.
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer data-chrome="footer"></footer>
+</body>
+</html>

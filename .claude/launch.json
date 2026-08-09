@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "schoolsfinder",
+      "runtimeExecutable": "/Users/ashaibani/Desktop/jaramana/schoolsfinder.nyc/.venv/bin/python",
+      "runtimeArgs": ["/Users/ashaibani/Desktop/jaramana/schoolsfinder.nyc/tools/serve.py"],
+      "port": 8787
+    }
+  ]
+}

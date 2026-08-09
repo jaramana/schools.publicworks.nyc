@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Method and limits — schoolsfinder.nyc</title>
+<meta name="description" content="Where each figure comes from, what it counts, how missing and withheld values are handled, and when two numbers should not be compared.">
+<link rel="stylesheet" href="css/site.css">
+<script src="js/site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header data-chrome="masthead"></header>
+
+<main id="main">
+  <section class="wrap console">
+    <h1>Method and limits</h1>
+    <p class="console-sub">
+      What this site does with the published data, and what it deliberately
+      does not do. The limits below are not footnotes. They are the part most
+      likely to change how you read a number.
+    </p>
+    <p class="statusline mono" data-status></p>
+  </section>
+
+  <section class="wrap prose">
+    <h2>What this site is</h2>
+    <p>
+      New York City publishes a great deal about its schools, in several places
+      that do not join up. A school's test results sit in one dataset, its
+      enrolment in a workbook, its address and admissions in a third file
+      released once a year for one admissions season. This site puts them
+      together on one page per school and states, for every value, what it
+      measures, which year it describes, and where it came from.
+    </p>
+    <p>
+      It is a reference, not a recommender. There is no overall score, no
+      ranking and no weighting. Those require deciding what matters, and that is
+      not a decision a website should make for a family.
+    </p>
+
+    <h2>Which schools are included</h2>
+    <p>
+      A school appears here if New York City Public Schools publishes data about
+      it: a quality report, an enrolment snapshot, or both. That is every
+      district school, including District 75 special education schools,
+      District 79 alternative programmes, transfer schools and Young Adult
+      Borough Centres.
+    </p>
+    <p>
+      The admissions directories are used to describe a school, never to admit
+      one to the list. They also contain early childhood centres whose codes are
+      not school numbers, and they cover one admissions season rather than every
+      school that exists.
+    </p>
+    <p>
+      A school is marked <strong>open</strong> when it appears in the newest
+      enrolment snapshot or in a current directory. Everything else is marked
+      <strong>closed or former</strong> and keeps its full history. Neither
+      label comes from an official status field, because none of the sources
+      publishes one. It is this site's reading of the evidence, and it can be
+      wrong for a school that has just opened.
+    </p>
+
+    <h2>Joining the sources</h2>
+    <p>
+      Everything joins on the DBN, the district, borough and school number that
+      identifies a school across every city system. Nothing joins on a school
+      name. Names are spelled differently in every file, and matching on them
+      quietly attaches one school's results to another.
+    </p>
+    <p>
+      Borough and district are read from the DBN itself rather than from a
+      lookup file, so they cannot go stale.
+    </p>
+
+    <h2>Missing, withheld, and not applicable</h2>
+    <p>These are three different facts and the site keeps them apart.</p>
+    <ul>
+      <li>
+        <strong>Not reported</strong> means the source published no value for
+        that school and year.
+      </li>
+      <li>
+        <strong>Withheld</strong> means the source deliberately suppressed the
+        value because too few students were in the group. The measure exists.
+        The value is protected. It is not a zero and not a low score.
+      </li>
+      <li>
+        <strong>Does not apply</strong> means the measure is not published for
+        that type of school. A graduation rate is not missing from an elementary
+        school. It was never expected. Those measures are left out of a profile
+        rather than listed as gaps.
+      </li>
+    </ul>
+    <p>
+      No value on this site is ever filled in, estimated or defaulted to zero. A
+      figure that could not be read from a source is absent.
+    </p>
+
+    <h2 id="comparing">When two numbers should not be compared</h2>
+    <p>
+      <strong>Different years.</strong> Schools do not all report in the same
+      year. A comparison row states the period, and says explicitly when the two
+      schools' most recent values come from different years.
+    </p>
+    <p>
+      <strong>Across 2019-20 and 2020-21.</strong> State testing was cancelled
+      in spring 2020 and participation was unusually low the following year.
+      Attendance in those years counts remote days. A trend line through that
+      period is measuring the pandemic, not the school.
+    </p>
+    <p>
+      <strong>Renamed measures.</strong> A few measures were redefined between
+      the 2017-18 and 2018-19 school years and given new identifiers. They are
+      published here as separate series with a note, rather than stitched into
+      one line that would imply continuity.
+    </p>
+    <p>
+      <strong>Different school types.</strong> A school serving grades 6 to 12
+      files two quality reports, one for its middle grades and one for its high
+      school grades, and publishes some measures in both for different students.
+      Those appear as two labelled rows, not one.
+    </p>
+    <p>
+      <strong>Different group sizes.</strong> A percentage over 12 students and
+      a percentage over 900 are not equally stable. Where the source publishes
+      the group size, it is shown next to the value.
+    </p>
+
+    <h2>Comparison group averages and scores</h2>
+    <p>
+      Some measures arrive with a comparison group average or a score attached.
+      Both are published by New York City Public Schools, calculated against
+      their own comparison groups. This site displays them, labelled, and does
+      not compute anything of the kind itself.
+    </p>
+
+    <h2>Units</h2>
+    <p>
+      Most percentages arrive as proportions between 0 and 1 and are shown as
+      percentages. Proficiency values are a scale of roughly 1.0 to 4.5, not a
+      percentage. Where a source does not state a unit, this site infers it from
+      the range of published values and says so in the data dictionary and on
+      the measure itself. An inferred unit is a judgement, not a fact from the
+      source.
+    </p>
+
+    <h2>Addresses and coordinates</h2>
+    <p>
+      Addresses come from the current admissions directories. High school
+      coordinates are published alongside the address by the source. For every
+      other school the coordinate is matched from the address using the New York
+      City Department of City Planning geocoder, which makes it a derived value.
+      Each school records which of the two it has. An address that does not
+      match produces no coordinate rather than an approximate one.
+    </p>
+    <p>
+      About four hundred open schools have no published address, because they do
+      not appear in an admissions directory. Their profiles show no address
+      section rather than a placeholder.
+    </p>
+    <p>
+      This version of the site does not embed a map or load a mapping library.
+      An address links out to a map instead.
+    </p>
+
+    <h2>Programmes and admissions</h2>
+    <p>
+      Admissions happen at the programme level, not the school level. One school
+      can run an open programme and a screened one at the same time. Seats,
+      applicants and priority order are shown per programme and describe the
+      Fall 2025 admissions season only. They are a record of one season, not a
+      prediction about the next.
+    </p>
+
+    <h2>Freshness</h2>
+    <p>
+      Every reporting period on this site is read from inside the data. It is
+      never the date the build ran, and never the date a source page says it was
+      updated. Several New York City open data pages report a recent update when
+      only the description changed; at least two datasets that describe
+      themselves as annually updated last received rows in 2011 and 2013, and
+      they are not used here.
+    </p>
+    <p>
+      When a source passes its expected refresh window the site shows a warning
+      on every page. Silent staleness would be worse than a missing figure.
+    </p>
+
+    <h2>What is not here</h2>
+    <ul>
+      <li>No overall score, rank, or recommendation.</li>
+      <li>No commute or travel time.</li>
+      <li>No address entry, zoning lookup or interactive map.</li>
+      <li>No survey results yet. Those live in workbooks not used in this version.</li>
+      <li>
+        No SHSAT or specialized high school admissions figures. The high school
+        directory carries them in a separate set of columns whose grain is not
+        documented clearly enough to publish safely.
+      </li>
+      <li>No charter schools beyond what the city's own reporting covers.</li>
+    </ul>
+
+    <h2>Errors</h2>
+    <p>
+      If a figure looks wrong, it is worth checking against the source linked on
+      the measure. If the error is here rather than there,
+      <a href="https://github.com/jaramana/schoolsfinder.nyc/issues">report it</a>.
+    </p>
+  </section>
+</main>
+
+<footer data-chrome="footer"></footer>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About — schoolsfinder.nyc</title>
+<meta name="description" content="Why this site exists, who made it, what it is built from, and its independence from New York City Public Schools.">
+<link rel="stylesheet" href="css/site.css">
+<script src="js/site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header data-chrome="masthead"></header>
+
+<main id="main">
+  <section class="wrap console">
+    <h1>About</h1>
+    <p class="console-sub">
+      A public reference for New York City school statistics, built from the
+      city's own published data.
+    </p>
+    <p class="statusline mono" data-status></p>
+  </section>
+
+  <section class="wrap prose">
+    <h2>Why</h2>
+    <p>
+      The figures exist. They are public, and they are thorough. The difficulty
+      is that they are split across a quality report dataset, an enrolment
+      workbook, three admissions directories and a set of files whose locations
+      change each year, in formats that assume you already know what a DBN is
+      and which report type a school files.
+    </p>
+    <p>
+      This site does the joining once, in the open, and shows the definition and
+      the reporting period next to every value. It answers what a school
+      publishes about itself. It does not answer which school is best, and it
+      does not try to.
+    </p>
+
+    <h2>What it is built from</h2>
+    <p>
+      Static HTML, CSS and vanilla JavaScript, served from GitHub Pages. There
+      is no framework, no build step for the site, no database and no backend.
+      Python generates the data files; the browser only reads them.
+    </p>
+    <p>
+      The whole pipeline and every page are in the
+      <a href="https://github.com/jaramana/schoolsfinder.nyc">repository</a>.
+      The data is refreshed by a scheduled workflow that runs the same pipeline
+      and publishes only after validation passes.
+    </p>
+
+    <h2>Independence</h2>
+    <p>
+      This site is not affiliated with, endorsed by, or connected to New York
+      City Public Schools, the New York City Department of Education, or the
+      City of New York. It is an independent compilation of their published
+      data. Where a value here disagrees with an official source, the official
+      source is correct and the error is worth reporting.
+    </p>
+    <p>
+      For applying to a school, use
+      <a href="https://www.myschools.nyc/">MySchools</a>, the city's own
+      admissions system. Nothing here is an application, an offer, or advice
+      about eligibility.
+    </p>
+
+    <h2>Credits</h2>
+    <p>
+      Data published by New York City Public Schools and NYC OpenData.
+      Coordinates matched with the Department of City Planning geocoder. Built
+      with Python and pandas. Written with help from Claude.
+    </p>
+    <p>
+      Part of <a href="https://github.com/jaramana">jaramana</a>, alongside
+      <a href="https://www.thepaygap.nyc">thepaygap.nyc</a>, whose layout and
+      conventions this site follows.
+    </p>
+
+    <h2>Reuse</h2>
+    <p>
+      The compiled data and the code are free to reuse with attribution. The
+      underlying data belongs to the agencies that publish it and carries their
+      terms. If you republish a figure, carry its reporting period with it.
+    </p>
+
+    <h2>Contact</h2>
+    <p>
+      Corrections and questions:
+      <a href="https://github.com/jaramana/schoolsfinder.nyc/issues">open an issue</a>.
+    </p>
+  </section>
+</main>
+
+<footer data-chrome="footer"></footer>
+</body>
+</html>
