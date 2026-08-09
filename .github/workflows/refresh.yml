@@ -77,15 +77,10 @@ jobs:
           echo "Changed files:"
           echo "$changed" | head -20
           git add docs/data/status.json
-          git commit -m "Refresh published data
 
-          $(python - <<'PY'
-import json
-status = json.load(open("docs/data/status.json"))
-periods = ", ".join(f"{k} {v}" for k, v in sorted(status["periods"].items()))
-counts = status["counts"]
-print(f"{counts['schools']} schools, {counts['observations']} observations.")
-print(f"Periods: {periods}.")
-PY
-)"
+          # The message is written to a file rather than built inline, so the
+          # shell never has to nest a heredoc inside a quoted argument.
+          python tools/commit_message.py > /tmp/commit-message.txt
+          cat /tmp/commit-message.txt
+          git commit -F /tmp/commit-message.txt
           git push
