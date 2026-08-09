@@ -142,6 +142,22 @@ def check_missing_data_rules(tables, report):
         report.fail("status.value_without_ok",
                     f"{lying_missing:,} rows carry a value but are not marked reported")
 
+    # A censored row is a published bound. It must carry the bound text and no
+    # number, or it is not censored, it is broken.
+    if "bound" in obs.columns:
+        censored = obs["status"] == cfg.STATUS_CENSORED
+        has_bound = obs["bound"].notna() & (obs["bound"] != "")
+        if (censored & ~has_bound).sum():
+            report.fail("status.censored_without_bound",
+                        f"{int((censored & ~has_bound).sum()):,} censored rows have no bound text")
+        if (censored & has_value).sum():
+            report.fail("status.censored_with_value",
+                        f"{int((censored & has_value).sum()):,} censored rows also carry a number")
+        if (~censored & has_bound).sum():
+            report.fail("status.bound_without_censored",
+                        f"{int((~censored & has_bound).sum()):,} rows carry a bound but are not censored")
+        report.fact("observations_censored", int(censored.sum()))
+
     report.fact("observations", int(len(obs)))
     report.fact("observations_reported", int(reported.sum()))
     report.fact("observations_suppressed",

@@ -49,7 +49,15 @@
 
   <section class="wrap">
     <h2 class="section-label">Look up another school</h2>
-    <div class="search-shell" id="profile-search"></div>
+    <div class="search-shell" id="profile-search">
+      <!-- A real input, so the box works before the search index has loaded.
+           Touching it mounts the full search and hands focus over. -->
+      <div class="search-row">
+        <label class="sr-only" for="profile-search-stub">Search for a school by name or DBN</label>
+        <input id="profile-search-stub" type="search" autocomplete="off"
+               placeholder="Search by name or DBN…">
+      </div>
+    </div>
   </section>
 </main>
 

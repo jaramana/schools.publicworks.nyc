@@ -79,8 +79,16 @@
   // What a value is out of. Shown beside the number so a reader never has to
   // open a definition to learn that 3.35 is on a scale ending at 4.5.
   function scaleOf(format) {
-    if (format === 'scale') return 'of ' + display.scale_max;
-    if (format === 'index_100') return 'of ' + display.index_max;
+    if (format === 'scale') return '/ ' + display.scale_max;
+    if (format === 'index_100') return '/ ' + display.index_max;
+    return null;
+  }
+
+  // A slash scans faster than the word, but a screen reader says "slash", so
+  // the spoken version is spelled out on the figure instead.
+  function scaleSpoken(value, format) {
+    if (format === 'scale') return value + ' out of ' + display.scale_max;
+    if (format === 'index_100') return value + ' out of ' + display.index_max;
     return null;
   }
 
@@ -121,6 +129,7 @@
   var ABSENCE = {
     missing: 'Not reported',
     suppressed: 'Withheld',
+    censored: 'Above or below a bound',   // replaced by the source's own text
     not_applicable: 'Does not apply',
     unknown: 'Not reported'
   };
@@ -128,6 +137,7 @@
   var ABSENCE_DETAIL = {
     missing: 'The source published no value for this school and year.',
     suppressed: 'The source withheld this value because too few students are in the group. It is not a zero.',
+    censored: 'The source published a bound rather than an exact figure, to avoid identifying students at the extremes.',
     not_applicable: 'This measure is not published for this type of school.'
   };
 
@@ -310,6 +320,7 @@
   window.SF = {
     fmt: fmt, formatValue: formatValue, isBlank: isBlank,
     display: display, loadDisplay: loadDisplay, scaleOf: scaleOf,
+    scaleSpoken: scaleSpoken,
     bandElement: bandElement, BAND_LABEL: BAND_LABEL, BAND_SHORT: BAND_SHORT,
     ABSENCE: ABSENCE, ABSENCE_DETAIL: ABSENCE_DETAIL,
     load: load, fail: fail, escapeHtml: escapeHtml,

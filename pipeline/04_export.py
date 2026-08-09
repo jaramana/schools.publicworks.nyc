@@ -20,16 +20,27 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 cfg = importlib.import_module("00_config")
 
 
+FLOAT_PLACES = 4
+
+
 def log(message):
     print(f"[export] {message}", flush=True)
 
 
 def clean(value):
-    """JSON-safe scalar: pandas nulls become null, numbers stay numbers."""
+    """JSON-safe scalar: pandas nulls become null, numbers stay numbers.
+
+    Floats are rounded. The sources publish proportions at float64 precision,
+    so a value arrives as 0.4670855700969696 when four decimals is already finer
+    than the measurement. Carrying the rest cost about a tenth of the published
+    bytes and told a reader nothing.
+    """
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return None
     if isinstance(value, (pd.Timestamp, datetime)):
         return value.isoformat()
+    if isinstance(value, float):
+        return round(value, FLOAT_PLACES)
     return value
 
 
@@ -120,7 +131,10 @@ def build_metrics_json(metrics, staging):
     for _, metric in metrics.iterrows():
         payload[metric["metric_id"]] = {
             "label": clean(metric["label"]),
-            "description": clean(metric.get("description")),
+            # No pre-composed description here: it was a third of this file for
+            # a sentence the browser assembles from the fields below. The full
+            # text is still in the data dictionary and the downloads.
+            "source_label": clean(metric.get("source_label")),
             "category": clean(metric["category"]),
             "category_label": clean(metric["category_label"]),
             # The base measure and the student group it describes, so a profile
@@ -167,11 +181,16 @@ def build_school_files(schools, observations, programs, priorities, staging):
         if subset is not None:
             for metric_id, rows in subset.groupby("metric_id"):
                 rows = rows.sort_values(["school_year", "report_type"])
+                statuses = list(rows["status"])
                 series = {
                     "y": list(rows["school_year"]),
                     "v": [clean(v) for v in rows["value"]],
-                    "st": list(rows["status"]),
                 }
+                # Only carry the status array when something in it is not a
+                # plain reported value. The client assumes reported when the
+                # array is absent, which is most series.
+                if any(s != cfg.STATUS_OK for s in statuses):
+                    series["st"] = statuses
                 # A school with middle and high school grades reports the same
                 # metric twice in a year, once per report. Carry the report type
                 # so the profile can label the two rather than pick one.
@@ -181,6 +200,11 @@ def build_school_files(schools, observations, programs, priorities, staging):
                 # published them, so an empty array never implies a zero.
                 if rows["n"].notna().any():
                     series["n"] = [clean(v) for v in rows["n"]]
+                # The source's own bound, where it published one instead of a
+                # number. Carried so the page can print "Above 95%" rather than
+                # claiming the figure was never reported.
+                if "bound" in rows.columns and rows["bound"].notna().any():
+                    series["bd"] = [clean(v) for v in rows["bound"]]
                 if rows["comparison"].notna().any():
                     series["c"] = [clean(v) for v in rows["comparison"]]
                 if rows["source_score"].notna().any():
@@ -333,7 +357,8 @@ def data_dictionary(tables):
         ("n", "Number of students the value is calculated over.", "count"),
         ("comparison", "The source's own comparison group average, where it publishes one.", "varies"),
         ("source_score", "The source's own score for this metric, where it publishes one.", "varies"),
-        ("status", "reported, suppressed, or missing. Suppressed means withheld to protect a small group.", "text"),
+        ("status", "reported, suppressed, censored, or missing. Suppressed means withheld to protect a small group. Censored means the source published a bound instead of a number.", "text"),
+        ("bound", "The bound the source published in place of a number, such as \"Above 95%\". Present only where status is censored.", "text"),
         ("source_id", "Which source the row came from.", "text"),
     ]
     for field, description, unit in observation_fields:

@@ -30,6 +30,26 @@
 
   // ---- Small pieces -------------------------------------------------
 
+  // metrics.json used to carry a written description per measure, which was a
+  // third of that file for a string the browser can compose. Built here instead.
+  var REPORT_COVERS = {
+    EMS: 'elementary, middle, and K-8 schools',
+    HS: 'high schools',
+    HST: 'high school transfer schools',
+    EC: 'early childhood schools',
+    D75: 'District 75 schools',
+    YABC: 'Young Adult Borough Centers'
+  };
+
+  function describe(metric) {
+    var covers = (metric.applies_to || [])
+      .map(function (r) { return REPORT_COVERS[r] || r; }).join(', ');
+    return (metric.source_label || metric.label) +
+      (covers ? '. Published for ' + covers : '') +
+      (metric.first_year ? '. School years ' + metric.first_year +
+                           ' to ' + metric.last_year + '.' : '.');
+  }
+
   function districtLabel(code) {
     var special = { '75': 'District 75, special education',
                     '79': 'District 79, alternative programs',
@@ -38,9 +58,13 @@
     return special[plain] || ('District ' + plain);
   }
 
+  // The newest entry the source actually said something about. A published
+  // bound counts: a school whose poverty figure is "Above 95%" in 2024-25 must
+  // not fall back to a 2021-22 number just because that one was numeric.
   function latestIndex(series) {
     for (var i = series.y.length - 1; i >= 0; i--) {
       if (!SF.isBlank(series.v[i])) return i;
+      if (series.bd && series.bd[i]) return i;
     }
     return -1;
   }
@@ -51,11 +75,28 @@
     if (!series) return null;
     var i = latestIndex(series);
     if (i === -1) {
+      var last = series.y.length - 1;
       return {
         absent: true,
-        status: series.st && series.st.length ? series.st[series.st.length - 1] : 'missing'
+        status: series.st && series.st.length ? series.st[last] : 'missing',
+        bound: null,
+        year: series.y[last]
       };
     }
+    // A bound is not a number, so it cannot be formatted or compared, but the
+    // source did publish it and the page shows it in place of the value.
+    if (SF.isBlank(series.v[i])) {
+      return {
+        absent: true,
+        stated: true,
+        status: series.st ? series.st[i] : 'censored',
+        bound: series.bd ? series.bd[i] : null,
+        year: series.y[i],
+        n: series.n ? series.n[i] : null
+      };
+    }
+    // A series with no status array carries nothing but reported values; the
+    // build omits the array in that case, which is most of them.
     return {
       absent: false,
       value: series.v[i],
@@ -75,7 +116,7 @@
     if (!series) return [];
     if (!series.rt) return [{ scope: null, series: series }];
     var groups = {};
-    var keys = ['v', 'st', 'n', 'c', 's', 'b'];
+    var keys = ['v', 'st', 'n', 'c', 's', 'b', 'bd'];
     series.y.forEach(function (year, i) {
       var key = series.rt[i] || '';
       var g = groups[key];
@@ -118,11 +159,18 @@
     host.appendChild(SF.el('p', { class: 'kind', text: kind }));
     host.appendChild(SF.el('h1', { text: school.name || school.dbn }));
 
-    var where = [
-      school.dbn, school.boro, districtLabel(school.district),
+    var rest = [
+      school.boro, districtLabel(school.district),
       school.grades ? 'Grades ' + school.grades : null
     ].filter(Boolean).join(' · ');
-    host.appendChild(SF.el('p', { class: 'where mono', text: where }));
+    // The DBN carries its expansion, since it is the first piece of jargon
+    // anyone meets here and it is never explained on the page otherwise.
+    host.appendChild(SF.el('p', {
+      class: 'where mono',
+      html: '<abbr title="District, borough, and school number: the identifier ' +
+            'New York City uses for this school">' + SF.escapeHtml(school.dbn) +
+            '</abbr>' + (rest ? ' · ' + SF.escapeHtml(rest) : '')
+    }));
 
     document.title = (school.name || school.dbn) + ' — schoolsfinder.nyc';
 
@@ -211,17 +259,21 @@
   function valueNode(read, metric) {
     var wrapper = SF.el('span', { class: 'm-figure' });
     if (read.absent) {
+      // A published bound reads as the figure it is, not as an absence.
       wrapper.appendChild(SF.el('span', {
-        class: 'm-value absent',
-        text: SF.ABSENCE[read.status] || SF.ABSENCE.missing
+        class: read.bound ? 'm-value' : 'm-value absent',
+        text: read.bound || SF.ABSENCE[read.status] || SF.ABSENCE.missing
       }));
       return wrapper;
     }
-    wrapper.appendChild(SF.el('span', {
-      class: 'm-value', text: SF.formatValue(read.value, metric.format)
-    }));
+    var shown = SF.formatValue(read.value, metric.format);
+    wrapper.appendChild(SF.el('span', { class: 'm-value', text: shown }));
     var scale = SF.scaleOf(metric.format);
-    if (scale) wrapper.appendChild(SF.el('span', { class: 'm-scale', text: scale }));
+    if (scale) {
+      wrapper.appendChild(SF.el('span', { class: 'm-scale', text: scale }));
+      // Read aloud as "out of", since a slash is spoken as "slash".
+      wrapper.setAttribute('aria-label', SF.scaleSpoken(shown, metric.format));
+    }
     var band = SF.bandElement(read.band, read.score);
     if (band) wrapper.appendChild(band);
     return wrapper;
@@ -229,6 +281,12 @@
 
   function metaNode(read) {
     var meta = SF.el('span', { class: 'm-meta' });
+    if (read.absent && read.bound) {
+      meta.appendChild(SF.el('span', { text: read.year }));
+      meta.appendChild(SF.el('span', { class: 'sep', text: '·' }));
+      meta.appendChild(SF.el('span', { text: SF.ABSENCE_DETAIL.censored }));
+      return meta;
+    }
     if (read.absent) {
       meta.appendChild(SF.el('span', {
         text: SF.ABSENCE_DETAIL[read.status] || SF.ABSENCE_DETAIL.missing
@@ -246,7 +304,9 @@
 
   // The comparison group average, written out. A second bare number tells a
   // reader nothing; the distance from it, in the measure's own unit, does.
-  function compareNode(read, metric) {
+  // This lives inside the detail panel: beside the value it interrupted the
+  // scan down a column of measures.
+  function compareSentence(read, metric) {
     if (read.absent || SF.isBlank(read.comparison)) return null;
     var difference = read.value - read.comparison;
     var better = metric.lower_is_better ? difference < 0 : difference > 0;
@@ -278,12 +338,45 @@
     return node;
   }
 
-  function details(metricId, metric, series) {
+  // The panel under a measure is built the first time it is opened, not on
+  // load. A large profile has around two hundred of these and a thousand year
+  // chips between them, and building all of that up front was most of the time
+  // between asking for a school and seeing one.
+  function details(metricId, metric, series, read) {
     var wrapper = SF.el('details');
-    wrapper.appendChild(SF.el('summary', { text: 'Definition, source and year by year' }));
+    var summary = SF.el('summary', { text: 'Definition, source and year by year' });
+    wrapper.appendChild(summary);
+
+    var built = false;
+    var build = function () {
+      if (built) return;
+      built = true;
+      wrapper.appendChild(detailBody(metricId, metric, series, read));
+    };
+
+    // Two triggers on purpose. `toggle` is the correct event and covers opening
+    // by keyboard or by script; the click on the summary covers it where
+    // `toggle` does not fire, which some engines still get wrong. Building
+    // twice is prevented by the flag, and an empty panel would be a silent
+    // failure with nothing on screen to explain it.
+    wrapper.addEventListener('toggle', function () { if (wrapper.open) build(); });
+    summary.addEventListener('click', build);
+    summary.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') build();
+    });
+    return wrapper;
+  }
+
+  function detailBody(metricId, metric, series, read) {
     var body = SF.el('div', { class: 'm-detail' });
 
-    body.appendChild(SF.el('p', { text: metric.description || metric.label }));
+    // The comparison lives here rather than beside the value. Next to the
+    // number it broke the scan down a column of measures; here it is a
+    // sentence someone has chosen to read.
+    var comparison = compareSentence(read, metric);
+    if (comparison) body.appendChild(comparison);
+
+    body.appendChild(SF.el('p', { text: metric.description || describe(metric) }));
     body.appendChild(SF.el('p', {
       html: 'Unit: ' + SF.escapeHtml(metric.unit) +
             (metric.format_source === 'inferred'
@@ -305,7 +398,7 @@
         chip.appendChild(document.createTextNode(year + ' '));
         chip.appendChild(SF.el('b', {
           text: SF.isBlank(series.v[i])
-            ? (SF.ABSENCE[series.st[i]] || SF.ABSENCE.missing)
+            ? (SF.ABSENCE[series.st ? series.st[i] : 'missing'] || SF.ABSENCE.missing)
             : SF.formatValue(series.v[i], metric.format)
         }));
         strip.appendChild(chip);
@@ -313,8 +406,7 @@
       body.appendChild(strip);
     }
 
-    wrapper.appendChild(body);
-    return wrapper;
+    return body;
   }
 
   // ---- Groups under a measure ------------------------------------------
@@ -327,9 +419,12 @@
 
     if (read.absent) {
       row.appendChild(SF.el('span', {
-        class: 'g-value absent',
-        text: SF.ABSENCE[read.status] || SF.ABSENCE.missing
+        class: read.bound ? 'g-value' : 'g-value absent',
+        text: read.bound || SF.ABSENCE[read.status] || SF.ABSENCE.missing
       }));
+      if (read.bound && !o.sharedYear) {
+        row.appendChild(SF.el('span', { class: 'g-meta', text: read.year }));
+      }
       return row;
     }
 
@@ -423,9 +518,8 @@
       head.appendChild(valueNode(primary.read, primary.metric));
       item.appendChild(head);
       item.appendChild(metaNode(primary.read));
-      var compare = compareNode(primary.read, primary.metric);
-      if (compare) item.appendChild(compare);
-      item.appendChild(details(primary.metricId, primary.metric, primary.series));
+      item.appendChild(details(primary.metricId, primary.metric,
+                               primary.series, primary.read));
     });
 
     if (base.groups.length) {
@@ -457,7 +551,7 @@
       var parts = splitByReport(series[metricId]);
       var withValues = parts
         .map(function (p) { return { scope: p.scope, series: p.series, read: reading(p.series) }; })
-        .filter(function (p) { return !p.read.absent; });
+        .filter(function (p) { return !p.read.absent || p.read.stated; });
 
       if (!withValues.length) {
         if (appliesToSchool(metric, payload.school)) {
@@ -494,6 +588,64 @@
     return { bases: bases, absent: absent };
   }
 
+  // The measures worth showing before anything else. A profile can run to a
+  // hundred and eighty cards, and opening at full length with no way in was the
+  // single biggest complaint in the design review. This summarizes nothing and
+  // scores nothing: it is the same cards, shown first.
+  function renderGlance(bases, host) {
+    var headline = [];
+    Object.keys(bases).forEach(function (key) {
+      var base = bases[key];
+      if (base.headline && base.primaries.length) headline.push(base);
+    });
+    if (headline.length < 2) return null;
+
+    headline.sort(function (a, b) {
+      return (a.themeRank - b.themeRank) || a.label.localeCompare(b.label);
+    });
+
+    var section = SF.el('section');
+    section.appendChild(SF.el('h2', { class: 'section-label', text: 'At a glance' }));
+    section.appendChild(SF.el('p', {
+      class: 'section-note',
+      text: 'The measures most often asked about, pulled out of the sections ' +
+            'below. Nothing here is added up, and the full detail is unchanged ' +
+            'further down the page.'
+    }));
+
+    var list = SF.el('ul', { class: 'glance-grid' });
+    headline.slice(0, 8).forEach(function (base) {
+      var primary = base.primaries[0];
+      var card = SF.el('li', { class: 'glance' });
+      card.appendChild(SF.el('span', { class: 'g-label', text: base.label }));
+      card.appendChild(valueNode(primary.read, primary.metric));
+      var meta = [primary.read.year];
+      if (!SF.isBlank(primary.read.n) && primary.metric.source_id !== 'demographics') {
+        meta.push(SF.fmt.count(primary.read.n) + ' students');
+      }
+      card.appendChild(SF.el('span', { class: 'g-year', text: meta.join(' · ') }));
+      list.appendChild(card);
+    });
+    section.appendChild(list);
+    host.appendChild(section);
+    return true;
+  }
+
+  // Said once per profile, beside the first band, rather than only on the
+  // method page. Three of the four reviewers asked what the comparison group
+  // was and none of them found out without leaving the page.
+  function bandExplainer() {
+    return SF.el('p', {
+      class: 'section-note',
+      html: 'A colored band carries the score New York City gives that measure, ' +
+            'out of 5, against a comparison group of schools the City considers ' +
+            'similar to this one. The City chooses the group and publishes the ' +
+            'score; this site groups the score into four bands and shows the ' +
+            'number inside each one. <a href="method.html#bands">How to read a ' +
+            'band</a>.'
+    });
+  }
+
   function renderMetrics(payload, metrics) {
     var host = document.getElementById('school-metrics');
     host.innerHTML = '';
@@ -509,6 +661,23 @@
       ? SF.display.category_order
       : Object.keys(byCategory);
 
+    var glanced = renderGlance(collected.bases, host);
+
+    // A jump list, so a long profile can be navigated rather than scrolled.
+    var present = order.filter(function (c) {
+      return (byCategory[c] || []).length || (collected.absent[c] || []).length;
+    });
+    if (present.length > 2) {
+      var nav = SF.el('nav', { class: 'section-jump', 'aria-label': 'Sections of this profile' });
+      present.forEach(function (category) {
+        var label = (byCategory[category] || []).length
+          ? byCategory[category][0].categoryLabel : category;
+        nav.appendChild(SF.el('a', { href: '#section-' + category, text: label }));
+      });
+      host.appendChild(nav);
+    }
+
+    var explained = false;
     var drew = false;
     order.forEach(function (category) {
       var bases = byCategory[category] || [];
@@ -517,7 +686,19 @@
       drew = true;
 
       var label = bases.length ? bases[0].categoryLabel : category;
-      host.appendChild(SF.el('h2', { class: 'section-label', text: label }));
+      host.appendChild(SF.el('h2', {
+        class: 'section-label', id: 'section-' + category, text: label
+      }));
+
+      // Explain the bands once, at the first section that has one, rather than
+      // repeating it or leaving it only on the method page.
+      if (!explained && bases.some(function (b) {
+        return b.primaries.some(function (p) { return p.read.band; }) ||
+               b.groups.some(function (g) { return g.read.band; });
+      })) {
+        explained = true;
+        host.appendChild(bandExplainer());
+      }
 
       if (bases.length) {
         bases.sort(function (a, b) {
@@ -688,7 +869,21 @@
       return;
     }
 
-    SFSearch.mount('#profile-search');
+    // The search index is the largest shared file, and a profile only needs it
+    // if the reader actually reaches for the box at the foot of the page.
+    // Mounting on first focus keeps it off the critical path.
+    var profileSearch = document.getElementById('profile-search');
+    var mounted = false;
+    var mount = function () {
+      if (mounted) return;
+      mounted = true;
+      var typed = (profileSearch.querySelector('input') || {}).value || '';
+      var box = SFSearch.mount(profileSearch, {});
+      if (box) { box.focus(); if (typed) box.setValue(typed); }
+    };
+    profileSearch.addEventListener('focusin', mount);
+    profileSearch.addEventListener('click', mount);
+
 
     Promise.all([
       SF.load('schools/' + dbn + '.json'),

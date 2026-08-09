@@ -100,13 +100,15 @@ Three things travel with every number, because a number alone is not usable.
 **Its reporting period.** Nothing is displayed without the school year it
 describes.
 
-**Its scale.** A value on a scale is written as "3.24 of 4.5" rather than
-"3.24", so nobody has to open a definition to learn what it is out of.
+**Its scale.** A value on a scale is written as "3.24 / 4.5", so nobody has to
+open a definition to learn what it is out of. Screen readers get "out of",
+since a slash is spoken as "slash".
 
 **Where it stands, when the City says so.** For many measures New York City
 publishes both a comparison group average and its own score from 1 to 5 against
-that group. The site writes the comparison out as a sentence and bands the score
-into four colors. The score itself is always printed inside the band, and every
+that group. The score becomes a colored band beside the value; the comparison is
+written out as a sentence inside the measure's detail panel, where it does not
+interrupt the scan down a column of numbers. The score itself is always printed inside the band, and every
 band carries a written label as well as a color. The banding thresholds are in
 `SCORE_BANDS` in the config; the score is the City's. Where the City publishes
 no score, nothing is colored.
@@ -114,6 +116,22 @@ no score, nothing is colored.
 Measures are grouped: a card leads with the all-students figure and holds the
 breakdowns by student group under it, in a stated theme order, alphabetical
 within each theme. Group names are the Department of Education's own wording.
+
+## Performance
+
+The published files are small once compressed, which is what matters: a school
+profile is about 15 KB on the wire and the metric manifest 14 KB. Three things
+keep a page quick, and all three are easy to undo by accident.
+
+- **Detail panels are built when opened, not on load.** A large profile has 182
+  measures; building every panel and every year chip up front put 6,500 nodes on
+  the page before anything was readable. It is now about 3,400.
+- **The search index is not loaded on a profile** until someone reaches for the
+  search box, because it is the largest shared file and the profile does not
+  need it.
+- **`tools/serve.py` gzips**, because GitHub Pages does. Without that, local
+  browsing is six times heavier than the real site and you optimize the wrong
+  thing.
 
 ## Rules the pipeline keeps
 
@@ -136,6 +154,12 @@ data pages report a recent update when only the description changed. Two
 datasets named in the original project plan describe themselves as annually
 updated and last received rows in 2011 and 2013; they are not used. When a
 source passes its window the site shows a warning on every page.
+
+**A bound is not a missing value.** The demographic snapshot publishes "Above
+95%" or "Below 5%" for poverty and economic need at the extremes, to avoid
+identifying students. That is 2,108 rows across 510 schools. Recording them as
+missing would blank the figure precisely at the highest-need schools, so the
+bound is carried through to the page and the downloads with a `censored` status.
 
 **The report type is part of the grain.** A school serving grades 6 to 12 files
 two quality reports and publishes some measures in both, for different students.

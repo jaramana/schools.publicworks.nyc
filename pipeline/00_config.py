@@ -545,13 +545,27 @@ UNIVERSE_SOURCES = ["sqr", "demographics"]
 STATUS_OK = "ok"
 STATUS_MISSING = "missing"            # the school should report this and did not
 STATUS_SUPPRESSED = "suppressed"      # withheld to protect a small group
+STATUS_CENSORED = "censored"          # published as a bound, such as "Above 95%"
 STATUS_NOT_APPLICABLE = "not_applicable"   # the metric does not apply to this school type
 
 STATUS_LABELS = {
     STATUS_OK: "Reported",
     STATUS_MISSING: "Not reported",
     STATUS_SUPPRESSED: "Withheld, too few students",
+    STATUS_CENSORED: "Published as a bound, not an exact figure",
     STATUS_NOT_APPLICABLE: "Does not apply to this school",
+}
+
+# Values the source publishes as a bound rather than a number. The demographic
+# snapshot replaces poverty and economic need with "Above 95%" or "Below 5%" to
+# protect privacy at the extremes, which affects 1,174 and 934 rows.
+#
+# Treating those as missing would be wrong twice over: the fact is known, and it
+# is known precisely at the highest-need schools, so losing it would blank the
+# figure exactly where it matters most.
+CENSORED_VALUES = {
+    "above 95%": "Above 95%",
+    "below 5%": "Below 5%",
 }
 
 # A source value that arrives as one of these is a marker, never a number.
@@ -609,5 +623,5 @@ SITE = {
     # site already knows from the metric manifest which metrics a school type
     # should report, so it can say "not reported" without being told. The
     # downloads still carry every row.
-    "site_statuses": [STATUS_OK, STATUS_SUPPRESSED],
+    "site_statuses": [STATUS_OK, STATUS_SUPPRESSED, STATUS_CENSORED],
 }

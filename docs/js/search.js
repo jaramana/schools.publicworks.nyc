@@ -230,7 +230,13 @@
 
     return {
       focus: function () { input.focus(); },
-      clear: function () { input.value = ''; render([]); }
+      clear: function () { input.value = ''; render([]); },
+      // Used when a page swaps a placeholder box for the real one and needs to
+      // carry across whatever had already been typed.
+      setValue: function (value) {
+        input.value = value;
+        if (value) run();
+      }
     };
   }
 

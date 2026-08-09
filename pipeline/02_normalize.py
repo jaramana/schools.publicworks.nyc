@@ -62,6 +62,19 @@ def to_number(value):
         return None
 
 
+def censored_bound(value):
+    """Return the source's own bound text, if the cell holds one instead of a number.
+
+    The demographic snapshot writes "Above 95%" or "Below 5%" where an exact
+    figure would risk identifying students. That is a published fact about the
+    school, so it is kept rather than flattened into a missing value.
+    """
+    text = clean_text(value)
+    if text is None:
+        return None
+    return cfg.CENSORED_VALUES.get(text.lower())
+
+
 def school_year_label(start):
     """Turn the source's 2024 into the 2024-25 that people actually use."""
     start = int(start)
@@ -664,6 +677,7 @@ def build_observations(sqr, demo):
         "n": sqr["n"],
         "comparison": sqr["comparison"],
         "source_score": sqr["source_score"],
+        "bound": None,
         "source_id": "sqr",
     })
     quality["status"] = [status_for(v, n) for v, n in zip(quality["value"], quality["n"])]
@@ -673,7 +687,12 @@ def build_observations(sqr, demo):
         if column not in demo.columns:
             log(f"  demographic column missing from the source: {column}")
             continue
-        values = demo[column].map(to_number)
+        raw = demo[column]
+        values = raw.map(to_number)
+        # The snapshot publishes poverty and economic need as "Above 95%" or
+        # "Below 5%" at the extremes, to protect privacy. That is a published
+        # fact, not an absence, so the bound is carried through.
+        bounds = raw.map(censored_bound)
         long_rows.append(pd.DataFrame({
             "dbn": demo["dbn"].values,
             "school_year": demo["school_year"].values,
@@ -688,13 +707,19 @@ def build_observations(sqr, demo):
             # without pandas guessing at an all-empty column.
             "comparison": pd.Series([float("nan")] * len(demo), dtype="float64").values,
             "source_score": pd.Series([float("nan")] * len(demo), dtype="float64").values,
+            "bound": bounds.values,
             "source_id": "demographics",
         }))
     demographics = pd.concat(long_rows, ignore_index=True)
     demographics["status"] = [
-        cfg.STATUS_OK if v is not None and not pd.isna(v) else cfg.STATUS_MISSING
-        for v in demographics["value"]
+        cfg.STATUS_OK if v is not None and not pd.isna(v)
+        else cfg.STATUS_CENSORED if b
+        else cfg.STATUS_MISSING
+        for v, b in zip(demographics["value"], demographics["bound"])
     ]
+    censored = int((demographics["status"] == cfg.STATUS_CENSORED).sum())
+    if censored:
+        log(f"  {censored:,} demographic values published as a bound, not a number")
 
     observations = pd.concat([quality, demographics], ignore_index=True)
     log(f"  {len(observations):,} observations, "

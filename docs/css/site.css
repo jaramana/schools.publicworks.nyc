@@ -260,6 +260,39 @@ button.pill[aria-pressed="true"] {
 .fact dd.big { font-size: clamp(1.4rem, 2.6vw, 1.8rem); letter-spacing: -.03em; }
 .fact dd .note { display: block; font-size: .8rem; color: var(--ink-faint); font-weight: 400; }
 
+/* At a glance, and the jump list.
+   ------------------------------------------------------------------
+   A profile can run to a hundred and eighty measures. These two blocks are
+   the way in: the handful of measures people actually ask for, then a list
+   of the sections. Neither summarizes anything. */
+
+.glance-grid {
+  display: grid; gap: 0; margin: .75rem 0 1rem; padding: 0; list-style: none;
+  background: var(--paper-raised); border: 1px solid var(--rule);
+  border-radius: 10px; overflow: hidden;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+.glance {
+  padding: .9rem 1.1rem; box-shadow: 1px 0 0 var(--rule), 0 1px 0 var(--rule);
+  display: flex; flex-direction: column; gap: .2rem;
+}
+.glance .g-label { font-size: .8rem; color: var(--ink-faint); font-weight: 600; line-height: 1.3; }
+.glance .m-figure { flex-wrap: wrap; }
+.glance .m-value { font-size: clamp(1.3rem, 2.4vw, 1.6rem); }
+.glance .g-year { font-size: .78rem; color: var(--ink-faint); }
+
+.section-jump {
+  display: flex; flex-wrap: wrap; gap: .35rem;
+  margin: 1.25rem 0 0; padding: .7rem .8rem;
+  background: var(--paper-sunken); border-radius: 9px;
+}
+.section-jump a {
+  font-size: .84rem; text-decoration: none; color: var(--accent-ink);
+  background: var(--paper-raised); border: 1px solid var(--rule);
+  border-radius: 999px; padding: .18rem .7rem;
+}
+.section-jump a:hover { border-color: var(--accent); }
+
 /* Measures.
    ------------------------------------------------------------------
    One card per measure, not a table. A school profile is a long list of
@@ -525,3 +558,17 @@ code {
   body { background: #fff; color: #000; }
   .card, .table-wrap { box-shadow: none; }
 }
+
+/* ---- Glossary ----------------------------------------------------- */
+/* Definition lists read better than paragraphs for terms someone is
+   scanning for, and this one exists because three of four design reviewers
+   asked what a comparison group was. */
+
+.glossary { margin: 1.25rem 0 2rem; max-width: 44rem; }
+.glossary dt {
+  font-weight: 700; margin-top: 1.1rem; font-family: var(--mono);
+  font-size: .95rem;
+}
+.glossary dd { margin: .2rem 0 0; color: var(--ink-soft); }
+
+abbr[title] { text-decoration: underline dotted; cursor: help; }

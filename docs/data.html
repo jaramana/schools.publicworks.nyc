@@ -65,6 +65,35 @@
     </p>
     <div id="dict-table"></div>
 
+    <h2 class="section-label" id="json">Using the JSON directly</h2>
+    <div class="prose">
+      <p>
+        The site is static, so the files its own pages read are a usable
+        interface. No key, no rate limit, and CORS is open because GitHub Pages
+        serves it that way. Paths are stable; treat a change to them as a
+        breaking change.
+      </p>
+      <pre class="code-block"><code>data/search-index.json      every school: DBN, name, borough, district, type, grades, status
+data/metrics.json           every measure: label, unit, category, which schools report it
+data/sources.json           every source with its period, coverage and limits
+data/status.json            build date, reporting periods, counts, display constants
+data/schools/{DBN}.json     one school: identity, every series, every program</code></pre>
+      <p>
+        A school file holds <code>series</code> keyed by measure identifier.
+        Each series has parallel arrays: <code>y</code> for school years,
+        <code>v</code> for values, and optionally <code>n</code> for group
+        sizes, <code>c</code> for the comparison group average, <code>s</code>
+        for the City's score, <code>b</code> for its band, <code>bd</code> for a
+        published bound such as "Above 95%", <code>st</code> for status where
+        anything is not a plain reported value, and <code>rt</code> for the
+        report type where a school files two.
+      </p>
+      <p>
+        An absent <code>st</code> array means every value in that series was
+        reported. A <code>null</code> in <code>v</code> is never a zero.
+      </p>
+    </div>
+
     <h2 class="section-label">Rebuilding it yourself</h2>
     <div class="prose">
       <p>The pipeline is four Python stages and an entry point:</p>
