@@ -671,15 +671,23 @@ abbr[title] { text-decoration: underline dotted; cursor: help; }
 /* The × lives on the thing it removes. A separate strip of pills repeated the
    same list of schools two inches above the table that already listed them. */
 
+/* The remove control sits in a fixed leading gutter, the way a spreadsheet
+   puts row handles: the buttons line up in their own narrow column instead of
+   drifting with the length of each name, and they are always visible rather
+   than appearing on hover, which a keyboard or a touchscreen never triggers. */
 .row-with-remove {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: .6rem; width: 100%;
+  display: grid; grid-template-columns: 1.5rem minmax(0, 1fr);
+  align-items: start; gap: .55rem; width: 100%;
 }
 .row-remove {
-  flex: none; border: 1px solid var(--rule); background: var(--paper-sunken);
+  /* inline-flex centers the glyph in the circle. Left to line-height it sits
+     high, because the × character's own box is not centered on its em. */
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--rule); background: var(--paper-raised);
   color: var(--ink-faint); border-radius: 999px;
-  width: 1.4rem; height: 1.4rem; line-height: 1; padding: 0;
-  font: inherit; font-size: .9rem; cursor: pointer;
+  width: 1.5rem; height: 1.5rem; padding: 0;
+  font: inherit; font-size: 1rem; line-height: 1; cursor: pointer;
+  margin-top: -.1rem;
 }
 .row-remove:hover { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
 
@@ -692,3 +700,15 @@ abbr[title] { text-decoration: underline dotted; cursor: help; }
 }
 .compare-table.pivoted thead th.num a { text-decoration: none; }
 .compare-table.pivoted td.num { text-align: right; }
+
+/* The status line under the search doubles as the place a refused action is
+   reported, so it needs to read as a message rather than as a caption. */
+.hint.warned { color: var(--warn); font-weight: 600; }
+
+/* 24 by 24 is exactly the WCAG 2.2 AA minimum, which is fine with a mouse and
+   mean with a thumb. On a touch screen the tappable area grows to about 44
+   without the circle changing size, so the layout is unaffected. */
+@media (pointer: coarse) {
+  .row-remove { position: relative; }
+  .row-remove::after { content: ""; position: absolute; inset: -10px; }
+}

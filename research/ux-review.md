@@ -171,6 +171,28 @@ already does this more precisely than a verification date would.
 
 ---
 
+## Second pass on the comparison page, August 2026
+
+Running the page as a user rather than reading it turned up three faults, one
+reported and two not.
+
+**Removing a school updated the measures but not the school table.** `draw()`
+returned early when fewer than two schools were chosen, and the early return
+came before the school table was rendered. So an × removed a school from the
+comparison and from the address bar, and the table it had just been clicked in
+carried on listing it. Drawing is now three regions that each always reflect
+the current state, and every step from zero schools to twelve and back was
+walked through to confirm it.
+
+**Adding a school did nothing, silently, in two cases:** when the list was
+already full, and when the school was already on it. The click was simply
+ignored. Both now say what happened, in the status line under the search.
+
+**A shortlist could not be cleared.** It is remembered between visits, so
+arriving at the comparison page with no address parameters restored twelve
+schools from the last session, and the only way out was removing twelve rows by
+hand. There is now a clear-all button above the table.
+
 ## Still open
 
 - No screen reader has been run against the site. It remains the largest gap.
