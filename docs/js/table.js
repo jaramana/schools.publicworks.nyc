@@ -83,9 +83,13 @@
       // measure name can put its qualifier on a second, quieter line without
       // the label itself being rewritten.
       if (c.labelHtml) th.innerHTML = c.labelHtml;
-      else th.textContent = c.label;
+      else if (c.gutter) {
+        // A control column still needs a name for anyone not looking at it.
+        th.innerHTML = '<span class="sr-only">' + (c.label || 'Actions') + '</span>';
+      } else th.textContent = c.label;
       if (c.title) th.title = c.title;
       if (c.num) th.className = 'num';
+      if (c.gutter) th.classList.add('gutter');
       if (c.sortable !== false) {
         th.classList.add('sortable');
         th.tabIndex = 0;
@@ -177,6 +181,7 @@
           if (c.num) cell.classList.add('num');
           if (c.name) cell.classList.add('name');
           if (c.wrap) cell.classList.add('wrap-cell');
+          if (c.gutter) cell.classList.add('gutter');
           tr.appendChild(cell);
         });
         tbody.appendChild(tr);

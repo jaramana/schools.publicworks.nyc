@@ -328,14 +328,17 @@
 
   function identityTable(payloads) {
     var columns = [
+      // Its own column, not a button tucked inside the name cell. A grid
+      // inside a table cell resolves 1fr against min-content rather than the
+      // cell's real width, which wrapped long school names to one word a line
+      // and let the button overlap them.
+      { key: '_remove', label: 'Remove from comparison', gutter: true, sortable: false,
+        render: function (v, r) {
+          return removeButton(r.name, function () { removeSchool(r.dbn); });
+        } },
       { key: 'name', label: 'School', rowHeader: true, name: true,
         render: function (v, r) {
-          var cell = SF.el('span', { class: 'row-with-remove' });
-          cell.appendChild(SF.el('a', { href: 'school.html?dbn=' + r.dbn, text: v }));
-          // Removing a school from the row it is on, rather than from a
-          // separate strip of pills that repeated the same list.
-          cell.appendChild(removeButton(v, function () { removeSchool(r.dbn); }));
-          return cell;
+          return SF.el('a', { href: 'school.html?dbn=' + r.dbn, text: v });
         } },
       { key: 'dbn', label: 'DBN' },
       { key: 'boro', label: 'Borough' },
@@ -376,19 +379,21 @@
   // without end. Down the side, it just gets longer, which a page already does.
   function measureTable(payloads) {
     var columns = [{
-      key: 'measure', label: 'Measure', rowHeader: true, name: true,
-      sortable: false,
+      key: '_remove', label: 'Remove this measure', gutter: true, sortable: false,
       render: function (v, row) {
-        var cell = SF.el('span', { class: 'row-with-remove' });
-        cell.appendChild(removeButton(row._main, function () {
+        return removeButton(row._main, function () {
           picked = picked.filter(function (m) { return m !== row._id; });
           syncUrl();
           draw();
-        }));
-        var text = SF.el('span');
-        text.appendChild(SF.el('span', { class: 'th-main', text: row._main }));
-        if (row._sub) text.appendChild(SF.el('span', { class: 'th-sub', text: row._sub }));
-        cell.appendChild(text);
+        });
+      }
+    }, {
+      key: 'measure', label: 'Measure', rowHeader: true, name: true,
+      sortable: false,
+      render: function (v, row) {
+        var cell = SF.el('span');
+        cell.appendChild(SF.el('span', { class: 'th-main', text: row._main }));
+        if (row._sub) cell.appendChild(SF.el('span', { class: 'th-sub', text: row._sub }));
         return cell;
       }
     }];
