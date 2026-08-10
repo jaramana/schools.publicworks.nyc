@@ -149,7 +149,16 @@ instead of being shown as a gap. No value is ever defaulted to zero, and a
 failed parse produces no value rather than a number.
 
 **A value travels with its reporting period.** Nothing is displayed without the
-school year it describes.
+school year it describes, and every figure inside one measure comes from the
+same year.
+
+**An absence is shown, not skipped.** Under a measure, every student group the
+measure covers is listed for every school, with the reason where there is no
+figure: withheld, or not reported. Filtering the list down to groups that
+happen to have values is the tempting simplification and it is wrong: a race
+breakdown then shows two groups and omits the rest, and nothing on the page
+distinguishes "no such students" from "the City withheld it" from "the site has
+a bug". If you change the rendering, keep this.
 
 **Freshness comes from the data, not the file date.** Several New York City open
 data pages report a recent update when only the description changed. Two

@@ -538,6 +538,14 @@
     if (sharedYear && !o.yearStatedAbove) {
       body.appendChild(SF.el('p', { class: 'm-meta', text: 'All from ' + sharedYear }));
     }
+    if (o.explainAbsences) {
+      body.appendChild(SF.el('p', {
+        class: 'm-meta',
+        text: 'Every group this measure covers is listed. Withheld means the ' +
+              'City calculated a figure and held it back because too few ' +
+              'students are in the group. Not reported means it published none.'
+      }));
+    }
     return body;
   }
 
@@ -573,7 +581,8 @@
       groups.appendChild(SF.el('summary', {
         text: 'By student group (' + base.groups.length + ')'
       }));
-      groups.appendChild(groupsNode(base.groups, { yearStatedAbove: true }));
+      groups.appendChild(groupsNode(base.groups,
+        { yearStatedAbove: true, explainAbsences: true }));
       item.appendChild(groups);
     }
     return item;
@@ -587,52 +596,81 @@
     return (metric.applies_to || []).some(function (r) { return mine.indexOf(r) !== -1; });
   }
 
+  function metric_base(metric, metricId) {
+    return metric.base_id || (metric.category + ':' + metricId);
+  }
+
+  function newBase(key, metric) {
+    return {
+      key: key,
+      label: metric.base_label || metric.label,
+      category: metric.category,
+      categoryLabel: metric.category_label,
+      themeRank: metric.theme_rank,
+      headline: false,
+      primaries: [],
+      groups: []
+    };
+  }
+
   function collectBases(payload, metrics) {
     var series = payload.series || {};
     var bases = {};
     var absent = {};
 
+    // First pass: every measure the source said anything about for this school.
+    //
+    // "Said anything" includes a withheld value. A group the City suppressed
+    // because too few students are in it is a published fact, and one this
+    // whole site is built around keeping. Dropping those rows made a race
+    // breakdown show Black and Hispanic and silently omit Asian and White,
+    // leaving a reader to guess whether the school has no such students, or
+    // the page has a hole in it. Neither guess was right.
+    Object.keys(metrics).forEach(function (metricId) {
+      var raw = series[metricId];
+      if (!raw) return;                     // nothing at all: handled below
+      var parts = splitByReport(raw);
+
+      var key = metric_base(metrics[metricId], metricId);
+      var base = bases[key] || (bases[key] = newBase(key, metrics[metricId]));
+      if (metrics[metricId].headline) base.headline = true;
+      base.themeRank = Math.min(base.themeRank, metrics[metricId].theme_rank);
+
+      parts.forEach(function (p) {
+        var entry = {
+          metricId: metricId, metric: metrics[metricId],
+          series: p.series, read: reading(p.series), scope: p.scope
+        };
+        if (metrics[metricId].subgroup && metrics[metricId].theme !== 'all') {
+          base.groups.push(entry);
+        } else {
+          base.primaries.push(entry);
+        }
+      });
+    });
+
+    // Second pass: the measures with nothing at all.
+    //
+    // A student group that belongs to a card already on the page is listed
+    // there as not reported, so the list of groups is the same list for every
+    // school and a gap is never left to inference. Anything else goes to the
+    // collapsed note at the end of its section.
     Object.keys(metrics).forEach(function (metricId) {
       var metric = metrics[metricId];
-      var parts = splitByReport(series[metricId]);
-      var withValues = parts
-        .map(function (p) { return { scope: p.scope, series: p.series, read: reading(p.series) }; })
-        .filter(function (p) { return !p.read.absent || p.read.stated; });
+      if (series[metricId]) return;
+      if (!appliesToSchool(metric, payload.school)) return;
 
-      if (!withValues.length) {
-        if (appliesToSchool(metric, payload.school)) {
-          (absent[metric.category] = absent[metric.category] || [])
-            .push(metric.label || metricId);
-        }
+      var key = metric_base(metric, metricId);
+      if (metric.subgroup && metric.theme !== 'all' && bases[key]) {
+        bases[key].groups.push({
+          metricId: metricId, metric: metric, series: null,
+          read: { absent: true, status: 'missing', bound: null, year: null },
+          scope: null
+        });
         return;
       }
-
-      var key = metric.base_id || (metric.category + ':' + metricId);
-      var base = bases[key] || (bases[key] = {
-        key: key,
-        label: metric.base_label || metric.label,
-        category: metric.category,
-        categoryLabel: metric.category_label,
-        themeRank: metric.theme_rank,
-        headline: false,
-        primaries: [],
-        groups: []
-      });
-      if (metric.headline) base.headline = true;
-      base.themeRank = Math.min(base.themeRank, metric.theme_rank);
-
-      withValues.forEach(function (p) {
-        var entry = {
-          metricId: metricId, metric: metric,
-          series: p.series, read: p.read, scope: p.scope
-        };
-        // "All Students" is a group name in the source, but it is the figure
-        // the card is about, so it leads the card and gets the definition
-        // panel rather than sitting in the list underneath. Graduation rate,
-        // credit accumulation and college readiness all arrive this way.
-        if (metric.subgroup && metric.theme !== 'all') base.groups.push(entry);
-        else base.primaries.push(entry);
-      });
+      (absent[metric.category] = absent[metric.category] || [])
+        .push(metric.label || metricId);
     });
 
     Object.keys(bases).forEach(function (key) { alignToOneYear(bases[key]); });
@@ -658,6 +696,9 @@
 
     base.year = year;
     base.primaries.concat(base.groups).forEach(function (entry) {
+      // A group with no series at all keeps its not-reported reading, and
+      // takes the card's year so the row is not the one line without one.
+      if (!entry.series) { entry.read.year = year; return; }
       entry.read = reading(entry.series, year);
     });
     // A card where nothing at all lands on the anchor year would be worse than
@@ -668,7 +709,7 @@
     if (!anySaid) {
       base.year = null;
       base.primaries.concat(base.groups).forEach(function (entry) {
-        entry.read = reading(entry.series);
+        if (entry.series) entry.read = reading(entry.series);
       });
     }
   }
@@ -857,14 +898,14 @@
       numbers.forEach(function (row) {
         var cell = SF.el('div');
         cell.appendChild(SF.el('dt', { text: row[0] }));
-        var parts = [];
-        if (!SF.isBlank(row[1])) {
-          parts.push(format(row[1], row[0]) + ' general education');
-        }
-        if (!SF.isBlank(row[2])) {
-          parts.push(format(row[2], row[0]) + ' students with disabilities');
-        }
-        cell.appendChild(SF.el('dd', { text: parts.join(', ') }));
+        // Both audiences every time. Showing only the side that has a number
+        // left a reader unable to tell a program with no set-aside seats from
+        // one the directory simply did not publish.
+        var parts = [
+          'GE ' + (SF.isBlank(row[1]) ? 'not published' : format(row[1], row[0])),
+          'SWD ' + (SF.isBlank(row[2]) ? 'not published' : format(row[2], row[0]))
+        ];
+        cell.appendChild(SF.el('dd', { text: parts.join(' · ') }));
         grid.appendChild(cell);
       });
       item.appendChild(grid);

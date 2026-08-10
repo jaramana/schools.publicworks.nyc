@@ -208,6 +208,13 @@
         return { year: series.y[i], value: null, bound: series.bd[i],
                  n: null, score: null, band: null };
       }
+      // A value the City withheld is a fact about the group, not an absence of
+      // data, and it should not draw the same dash as a measure the school
+      // never reported.
+      if (series.st && series.st[i] === 'suppressed') {
+        return { year: series.y[i], value: null, withheld: true,
+                 n: null, score: null, band: null };
+      }
     }
     return null;
   }
@@ -257,8 +264,11 @@
       class: 'section-note',
       text: 'A colored cell carries the score New York City publishes for that ' +
             'measure against a group of schools it considers similar, out of 5. ' +
-            'Where the City publishes no score, the value is shown plain. Sorting ' +
-            'a column reorders the list by one published measure and nothing else.'
+            'Where the City publishes no score, the value is shown plain. ' +
+            'Withheld means the City held a figure back because too few students ' +
+            'are in the group; a dash means the school published nothing. ' +
+            'Sorting a column reorders the list by one published measure and ' +
+            'nothing else.'
     }));
   }
 
@@ -349,7 +359,15 @@
         num: true,
         render: function (v, row) {
           var point = row['_' + id];
-          if (!point) return '<span class="muted">—</span>';
+          if (!point) {
+            return '<span class="muted" title="This school published no figure ' +
+                   'for this measure">—</span>';
+          }
+          if (point.withheld) {
+            return '<span class="muted" title="The City withheld this figure ' +
+                   'because too few students are in the group. It is not a zero.">' +
+                   'Withheld</span>';
+          }
           var text = point.bound || SF.formatValue(point.value, metric.format);
           var cell = point.band
             ? '<span class="cell-band band-' + point.band + '" title="' +
