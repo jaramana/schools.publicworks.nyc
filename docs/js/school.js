@@ -467,18 +467,15 @@
 
     if (read.absent) {
       row.appendChild(SF.el('span', {
+        class: 'g-meta',
+        text: (read.bound && !o.sharedYear) ? read.year : ''
+      }));
+      row.appendChild(SF.el('span', {
         class: read.bound ? 'g-value' : 'g-value absent',
         text: read.bound || SF.ABSENCE[read.status] || SF.ABSENCE.missing
       }));
-      if (read.bound && !o.sharedYear) {
-        row.appendChild(SF.el('span', { class: 'g-meta', text: read.year }));
-      }
       return row;
     }
-
-    row.appendChild(SF.el('span', {
-      class: 'g-value', text: SF.formatValue(read.value, member.metric.format)
-    }));
 
     var meta = [];
     // The year is dropped from the rows when every row shares it, and stated
@@ -490,7 +487,12 @@
     if (!SF.isBlank(read.n) && member.metric.source_id !== 'demographics') {
       meta.push(SF.fmt.count(read.n) + ' students');
     }
-    if (meta.length) row.appendChild(SF.el('span', { class: 'g-meta', text: meta.join(' · ') }));
+    row.appendChild(SF.el('span', {
+      class: 'g-meta', text: meta.length ? meta.join(' · ') : ''
+    }));
+    row.appendChild(SF.el('span', {
+      class: 'g-value', text: SF.formatValue(read.value, member.metric.format)
+    }));
     return row;
   }
 

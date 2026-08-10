@@ -119,6 +119,17 @@ Measures are grouped: a card leads with the all-students figure and holds the
 breakdowns by student group under it, in a stated theme order, alphabetical
 within each theme. Group names are the Department of Education's own wording.
 
+A group row reads name, then the number of students it is calculated over, then
+the figure, hard against a shared right edge. The figure last and aligned is
+what makes a column of them scannable. The last two columns are fixed widths
+rather than `auto`, because each row is its own grid and auto sizing let every
+row pick its own edge.
+
+On the comparison page, measures are rows and schools are columns. The two axes
+grow differently: a shortlist stops at twelve schools, and the measures do not
+stop at all. Across the top, adding the measures you care about pushed the table
+sideways without end.
+
 ## Performance
 
 The published files are small once compressed, which is what matters: a school
