@@ -54,37 +54,41 @@
 
   // ---- Chosen schools ----------------------------------------------------
 
-  // Whatever the last action was, said out loud. Silence after a click reads
-  // as a broken page: picking a school when the list is full, or picking one
-  // that is already on it, both used to do nothing at all and say nothing.
-  var lastAction = '';
+  function renderChosen() {
+    var host = document.getElementById('chosen');
+    host.innerHTML = '';
+    chosen.forEach(function (dbn) {
+      var payload = loaded[dbn];
+      var name = payload ? (payload.school.name || dbn) : dbn;
+      var item = SF.el('li');
+      item.appendChild(SF.el('span', { text: name }));
+      var remove = SF.el('button', {
+        type: 'button', text: '×',
+        'aria-label': 'Remove ' + name + ' from the comparison'
+      });
+      remove.addEventListener('click', function () {
+        chosen = chosen.filter(function (d) { return d !== dbn; });
+        syncUrl();
+        draw();
+      });
+      item.appendChild(remove);
+      host.appendChild(item);
+    });
 
-  function add(dbn, name) {
-    if (chosen.indexOf(dbn) !== -1) {
-      lastAction = (name || dbn) + ' is already in this comparison.';
-      renderNote();
-      return;
-    }
-    if (chosen.length >= maxSchools) {
-      lastAction = 'This comparison already holds ' + maxSchools +
-        ' schools. Remove one before adding ' + (name || dbn) + '.';
-      renderNote();
-      return;
-    }
+    var note = document.getElementById('picker-note');
+    note.textContent = chosen.length >= maxSchools
+      ? maxSchools + ' schools is the limit. Remove one to add another.'
+      : chosen.length + ' of up to ' + maxSchools + ' schools.';
+  }
+
+  function add(dbn) {
+    if (chosen.indexOf(dbn) !== -1 || chosen.length >= maxSchools) return;
     chosen.push(dbn);
-    lastAction = '';
     syncUrl();
     // Load before drawing. Drawing first was why a newly added school only
     // appeared after a reload: its profile had not arrived yet.
+    renderChosen();
     loadAll().then(draw);
-  }
-
-  function clearAll() {
-    chosen = [];
-    picked = [];
-    lastAction = '';
-    syncUrl();
-    draw();
   }
 
   // ---- Which measures are columns ----------------------------------------
@@ -153,17 +157,32 @@
     control.appendChild(select);
     host.appendChild(control);
 
-    var reset = SF.el('button', { class: 'pill', type: 'button',
-                                  text: 'Reset to the default measures' });
-    reset.addEventListener('click', function () {
+    var chips = SF.el('ul', { class: 'picked-measures' });
+    picked.forEach(function (id) {
+      var chip = SF.el('li');
+      var button = SF.el('button', {
+        class: 'pill', type: 'button',
+        'aria-label': 'Remove the ' + metrics[id].label + ' column',
+        text: metrics[id].label + ' ×'
+      });
+      button.addEventListener('click', function () {
+        picked = picked.filter(function (m) { return m !== id; });
+        syncUrl();
+        draw();
+      });
+      chip.appendChild(button);
+      chips.appendChild(chip);
+    });
+    var reset = SF.el('li');
+    var resetButton = SF.el('button', { class: 'pill', type: 'button', text: 'Reset columns' });
+    resetButton.addEventListener('click', function () {
       picked = defaultMeasures(availableMeasures());
       syncUrl();
       draw();
     });
-    var resetWrap = SF.el('div', { class: 'control' });
-    resetWrap.appendChild(SF.el('label', { html: '&nbsp;', 'aria-hidden': 'true' }));
-    resetWrap.appendChild(reset);
-    host.appendChild(resetWrap);
+    reset.appendChild(resetButton);
+    chips.appendChild(reset);
+    host.appendChild(chips);
   }
 
   // ---- Reading a value ---------------------------------------------------
@@ -189,70 +208,34 @@
         return { year: series.y[i], value: null, bound: series.bd[i],
                  n: null, score: null, band: null };
       }
-      // A value the City withheld is a fact about the group, not an absence of
-      // data, and it should not draw the same dash as a measure the school
-      // never reported.
-      if (series.st && series.st[i] === 'suppressed') {
-        return { year: series.y[i], value: null, withheld: true,
-                 n: null, score: null, band: null };
-      }
     }
     return null;
   }
 
   // ---- Drawing -----------------------------------------------------------
 
-  // Draw is three independent regions, each of which always reflects the
-  // current state. It used to bail out early when fewer than two schools were
-  // chosen, which left the school table showing whatever it had last time: an
-  // × removed a school from the comparison and from the URL, and the table it
-  // was clicked in carried on listing it.
   function draw() {
-    renderNote();
-    renderSchools();
-    renderMeasures();
-  }
+    renderChosen();
+    var host = document.getElementById('comparison');
+    host.innerHTML = '';
 
-  function renderNote() {
-    var note = document.getElementById('picker-note');
-    if (lastAction) {
-      note.textContent = lastAction;
-      note.className = 'hint warned';
+    if (chosen.length < 2) {
+      document.getElementById('measure-picker').hidden = true;
+      host.appendChild(SF.el('div', {
+        class: 'note-box',
+        html: '<p>Choose at least two schools to compare. Search above, or open ' +
+              'a school profile and use <em>Add to comparison</em>.</p>'
+      }));
       return;
     }
-    note.className = 'hint';
-    if (!chosen.length) {
-      note.textContent = 'Search for a school to start a comparison.';
-    } else if (chosen.length >= maxSchools) {
-      note.textContent = maxSchools + ' schools is the limit. Remove one to add another.';
-    } else {
-      note.textContent = chosen.length + ' of up to ' + maxSchools + ' schools.' +
-        (chosen.length === 1 ? ' Add one more to compare them.' : '');
-    }
-  }
 
-  function renderSchools() {
-    var host = document.getElementById('schools-table');
-    host.innerHTML = '';
-    var payloads = loadedPayloads();
-    if (!payloads.length) return;
+    var payloads = chosen.map(function (d) { return loaded[d]; }).filter(Boolean);
+    if (payloads.length < 2) return;
 
-    host.appendChild(SF.el('h2', {
-      class: 'section-label', text: 'Schools being compared'
-    }));
-
-    // A shortlist is remembered between visits, so there has to be a way out of
-    // one that is not removing twelve rows by hand.
-    var tools = SF.el('div', { class: 'table-tools' });
-    var clear = SF.el('button', {
-      class: 'pill', type: 'button',
-      text: payloads.length === 1 ? 'Remove this school' : 'Clear all ' + payloads.length + ' schools'
-    });
-    clear.addEventListener('click', clearAll);
-    tools.appendChild(clear);
-    host.appendChild(tools);
-
-    host.appendChild(identityTable(payloads));
+    var available = availableMeasures();
+    picked = picked.filter(function (id) { return available.indexOf(id) !== -1; });
+    if (!picked.length) picked = defaultMeasures(available);
+    renderPicker();
 
     var kinds = {};
     payloads.forEach(function (p) { kinds[p.school.school_type || 'unknown'] = true; });
@@ -265,33 +248,8 @@
               'That is a difference in reporting, not in quality.</p>'
       }));
     }
-  }
 
-  function renderMeasures() {
-    var host = document.getElementById('comparison');
-    var picker = document.getElementById('measure-picker');
-    host.innerHTML = '';
-
-    var payloads = loadedPayloads();
-    if (payloads.length < 2) {
-      picker.hidden = true;
-      picker.innerHTML = '';
-      host.appendChild(SF.el('div', {
-        class: 'note-box',
-        html: payloads.length
-          ? '<p>One school so far. Add another to see their measures side by ' +
-            'side.</p>'
-          : '<p>Search above to add a school, or open a school profile and use ' +
-            '<em>Add to comparison</em>.</p>'
-      }));
-      return;
-    }
-
-    var available = availableMeasures();
-    picked = picked.filter(function (id) { return available.indexOf(id) !== -1; });
-    if (!picked.length) picked = defaultMeasures(available);
-    renderPicker();
-
+    host.appendChild(identityTable(payloads));
     host.appendChild(SF.el('h2', { class: 'section-label', text: 'Published measures' }));
     host.appendChild(renderActions(payloads));
     host.appendChild(measureTable(payloads));
@@ -299,46 +257,16 @@
       class: 'section-note',
       text: 'A colored cell carries the score New York City publishes for that ' +
             'measure against a group of schools it considers similar, out of 5. ' +
-            'Where the City publishes no score, the value is shown plain. ' +
-            'Withheld means the City held a figure back because too few students ' +
-            'are in the group; a dash means the school published nothing.'
+            'Where the City publishes no score, the value is shown plain. Sorting ' +
+            'a column reorders the list by one published measure and nothing else.'
     }));
-  }
-
-  // The schools that are chosen and whose profiles have arrived, in the order
-  // they were chosen.
-  function loadedPayloads() {
-    return chosen.map(function (d) { return loaded[d]; }).filter(Boolean);
-  }
-
-  function removeSchool(dbn) {
-    chosen = chosen.filter(function (d) { return d !== dbn; });
-    syncUrl();
-    draw();
-  }
-
-  function removeButton(label, onRemove) {
-    var button = SF.el('button', {
-      class: 'row-remove', type: 'button',
-      'aria-label': 'Remove ' + label, title: 'Remove ' + label, text: '×'
-    });
-    button.addEventListener('click', onRemove);
-    return button;
   }
 
   function identityTable(payloads) {
     var columns = [
-      // Its own column, not a button tucked inside the name cell. A grid
-      // inside a table cell resolves 1fr against min-content rather than the
-      // cell's real width, which wrapped long school names to one word a line
-      // and let the button overlap them.
-      { key: '_remove', label: 'Remove from comparison', gutter: true, sortable: false,
-        render: function (v, r) {
-          return removeButton(r.name, function () { removeSchool(r.dbn); });
-        } },
       { key: 'name', label: 'School', rowHeader: true, name: true,
         render: function (v, r) {
-          return SF.el('a', { href: 'school.html?dbn=' + r.dbn, text: v });
+          return '<a href="school.html?dbn=' + r.dbn + '">' + SF.escapeHtml(v) + '</a>';
         } },
       { key: 'dbn', label: 'DBN' },
       { key: 'boro', label: 'Borough' },
@@ -353,12 +281,12 @@
       { key: 'status', label: 'Status' }
     ];
     var rows = payloads.map(function (p) {
-      var school = p.school;
+      var s = p.school;
       return {
-        name: school.name || school.dbn, dbn: school.dbn, boro: school.boro,
-        district: school.district, type: school.school_type, grades: school.grades,
-        enrollment: school.enrollment, enrollment_year: school.enrollment_year,
-        status: school.status === 'open' ? 'Open' : 'Closed or former'
+        name: s.name || s.dbn, dbn: s.dbn, boro: s.boro, district: s.district,
+        type: s.school_type, grades: s.grades, enrollment: s.enrollment,
+        enrollment_year: s.enrollment_year,
+        status: s.status === 'open' ? 'Open' : 'Closed or former'
       };
     });
     var host = SF.el('div');
@@ -371,68 +299,36 @@
     return host;
   }
 
-  // Measures are rows and schools are columns.
-  //
-  // The two axes grow very differently. A shortlist stops at twelve schools; the
-  // measures do not stop at all, and there are 485 to choose from. With measures
-  // across the top, adding the ones you care about pushed the table sideways
-  // without end. Down the side, it just gets longer, which a page already does.
   function measureTable(payloads) {
+    // Every column states its own reporting period when the schools disagree,
+    // so a mixed-year row can never read as a like-for-like comparison.
     var columns = [{
-      key: '_remove', label: 'Remove this measure', gutter: true, sortable: false,
-      render: function (v, row) {
-        return removeButton(row._main, function () {
-          picked = picked.filter(function (m) { return m !== row._id; });
-          syncUrl();
-          draw();
-        });
-      }
-    }, {
-      key: 'measure', label: 'Measure', rowHeader: true, name: true,
-      sortable: false,
-      render: function (v, row) {
-        var cell = SF.el('span');
-        cell.appendChild(SF.el('span', { class: 'th-main', text: row._main }));
-        if (row._sub) cell.appendChild(SF.el('span', { class: 'th-sub', text: row._sub }));
-        return cell;
+      key: 'name', label: 'School', rowHeader: true, name: true,
+      render: function (v, r) {
+        return '<a href="school.html?dbn=' + r.dbn + '">' + SF.escapeHtml(v) + '</a>';
       }
     }];
 
-    payloads.forEach(function (p) {
-      columns.push({
-        key: p.school.dbn, num: true, sortable: false,
-        label: p.school.name || p.school.dbn,
-        labelHtml: '<a href="school.html?dbn=' + p.school.dbn + '">' +
-                   SF.escapeHtml(p.school.name || p.school.dbn) + '</a>',
-        render: function (v, row) {
-          var point = row['_pt_' + p.school.dbn];
-          if (!point) {
-            return '<span class="muted" title="This school published no figure ' +
-                   'for this measure">—</span>';
-          }
-          if (point.withheld) {
-            return '<span class="muted" title="The City withheld this figure ' +
-                   'because too few students are in the group. It is not a zero.">' +
-                   'Withheld</span>';
-          }
-          var text = point.bound || SF.formatValue(point.value, row._format);
-          var cell = point.band
-            ? '<span class="cell-band band-' + point.band + '" title="' +
-              SF.escapeHtml(SF.BAND_LABEL[point.band]) + ', scored ' +
-              Number(point.score).toFixed(1) + ' out of 5 by New York City">' +
-              SF.escapeHtml(text) + '</span>'
-            : SF.escapeHtml(text);
-          return row._sharedYear
-            ? cell
-            : cell + '<span class="period">' + SF.escapeHtml(point.year) + '</span>';
-        }
-      });
-    });
-
-    var rows = picked.map(function (id) {
+    picked.forEach(function (id) {
       var metric = metrics[id];
       var scale = SF.scaleOf(metric.format);
 
+      // Where every school in the column reports the same year, say it once in
+      // the header instead of on every cell. The cells then only carry a year
+      // when the schools disagree, which is exactly when it needs noticing.
+      var years = {};
+      payloads.forEach(function (p) {
+        var point = latestPoint((p.series || {})[id], p.school.report_type);
+        if (point) years[point.year] = true;
+      });
+      var yearList = Object.keys(years);
+      var sharedYear = yearList.length === 1 ? yearList[0] : null;
+
+      // Measure names run long: "Percentage of Students with 90%+ Attendance
+      // (EMS)" is most of a column on its own. The name is not rewritten. It is
+      // split: the qualifier the pipeline appended, and the unit, drop to a
+      // quieter second line, which takes about a third off the header height
+      // and leaves one thing to read on the first line.
       var main = metric.label;
       var sub = [];
       var qualifier = main.match(/\s*\(([^)]+)\)\s*$/);
@@ -441,28 +337,49 @@
         sub.push(qualifier[1]);
       }
       if (scale) sub.push('out of ' + scale.replace('/ ', ''));
+      if (sharedYear) sub.push(sharedYear);
 
-      var row = { _id: id, _main: main, _format: metric.format, measure: metric.label };
-      var years = {};
-      payloads.forEach(function (p) {
-        var point = latestPoint((p.series || {})[id], p.school.report_type);
-        row['_pt_' + p.school.dbn] = point;
-        row[p.school.dbn] = point ? point.value : null;
-        if (point) years[point.year] = true;
+      columns.push({
+        key: id,
+        label: metric.label,
+        title: metric.label,
+        labelHtml: '<span class="th-main">' + SF.escapeHtml(main) + '</span>' +
+          (sub.length ? '<span class="th-sub">' + SF.escapeHtml(sub.join(' · ')) +
+           '</span>' : ''),
+        num: true,
+        render: function (v, row) {
+          var point = row['_' + id];
+          if (!point) return '<span class="muted">—</span>';
+          var text = point.bound || SF.formatValue(point.value, metric.format);
+          var cell = point.band
+            ? '<span class="cell-band band-' + point.band + '" title="' +
+              SF.escapeHtml(SF.BAND_LABEL[point.band]) + ', scored ' +
+              Number(point.score).toFixed(1) + ' out of 5 by New York City">' +
+              SF.escapeHtml(text) + '</span>'
+            : SF.escapeHtml(text);
+          return sharedYear
+            ? cell
+            : cell + '<span class="period">' + SF.escapeHtml(point.year) + '</span>';
+        }
       });
-      var yearList = Object.keys(years);
-      row._sharedYear = yearList.length === 1 ? yearList[0] : null;
-      if (row._sharedYear) sub.push(row._sharedYear);
-      row._sub = sub.join(' · ');
+    });
+
+    var rows = payloads.map(function (p) {
+      var row = { name: p.school.name || p.school.dbn, dbn: p.school.dbn };
+      picked.forEach(function (id) {
+        var point = latestPoint((p.series || {})[id], p.school.report_type);
+        row['_' + id] = point;
+        row[id] = point ? point.value : null;   // the sortable value
+      });
       return row;
     });
 
     var host = SF.el('div');
     SFTable.render(host, {
-      columns: columns, rows: rows, search: false,
-      caption: 'Published measures for the schools being compared. Each row is ' +
-               'one measure, and states the school year it describes.',
-      tableClass: 'compare-table pivoted'
+      columns: columns, rows: rows, search: false, sortKey: 'name', sortDir: 'asc',
+      caption: 'Published measures for the schools being compared. Each cell ' +
+               'shows the value and the school year it describes.',
+      tableClass: 'compare-table'
     });
     return host;
   }
@@ -586,7 +503,7 @@
       SFSearch.mount('#compare-search', {
         placeholder: 'Add a school by name or DBN…',
         label: 'Add a school to the comparison',
-        onPick: function (row) { add(row.dbn, row.name); }
+        onPick: function (row) { add(row.dbn); }
       });
 
       return loadAll();
