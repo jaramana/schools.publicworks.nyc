@@ -313,6 +313,17 @@
       var metric = metrics[id];
       var scale = SF.scaleOf(metric.format);
 
+      // Where every school in the column reports the same year, say it once in
+      // the header instead of on every cell. The cells then only carry a year
+      // when the schools disagree, which is exactly when it needs noticing.
+      var years = {};
+      payloads.forEach(function (p) {
+        var point = latestPoint((p.series || {})[id], p.school.report_type);
+        if (point) years[point.year] = true;
+      });
+      var yearList = Object.keys(years);
+      var sharedYear = yearList.length === 1 ? yearList[0] : null;
+
       // Measure names run long: "Percentage of Students with 90%+ Attendance
       // (EMS)" is most of a column on its own. The name is not rewritten. It is
       // split: the qualifier the pipeline appended, and the unit, drop to a
@@ -326,6 +337,7 @@
         sub.push(qualifier[1]);
       }
       if (scale) sub.push('out of ' + scale.replace('/ ', ''));
+      if (sharedYear) sub.push(sharedYear);
 
       columns.push({
         key: id,
@@ -345,7 +357,9 @@
               Number(point.score).toFixed(1) + ' out of 5 by New York City">' +
               SF.escapeHtml(text) + '</span>'
             : SF.escapeHtml(text);
-          return cell + '<span class="period">' + SF.escapeHtml(point.year) + '</span>';
+          return sharedYear
+            ? cell
+            : cell + '<span class="period">' + SF.escapeHtml(point.year) + '</span>';
         }
       });
     });

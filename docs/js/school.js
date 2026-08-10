@@ -69,11 +69,32 @@
     return -1;
   }
 
-  // One reading of a series: the newest year that carries a value, with
-  // everything published alongside it.
-  function reading(series) {
+  // One reading of a series. With no year given, the newest that carries
+  // something. With a year given, that year and no other.
+  //
+  // Forcing a year matters more than it sounds. Left to itself, every student
+  // group in a measure falls back to its own most recent figure, and a card
+  // ends up reading "All students 100%, English Language Learners 85.7%" with
+  // the years eight apart and set in small grey type. That is not a hard
+  // comparison to misread; it is an impossible one, and it looks like a defect
+  // in the school rather than in the page.
+  function reading(series, year) {
     if (!series) return null;
-    var i = latestIndex(series);
+    var i = year === undefined ? latestIndex(series) : series.y.indexOf(year);
+    if (i !== -1 && year !== undefined &&
+        SF.isBlank(series.v[i]) && !(series.bd && series.bd[i])) {
+      // The year exists in the series but holds nothing.
+      return {
+        absent: true,
+        status: series.st ? series.st[i] : 'missing',
+        bound: null,
+        year: year
+      };
+    }
+    if (i === -1 && year !== undefined) {
+      // The source published no row at all for this group in this year.
+      return { absent: true, status: 'missing', bound: null, year: year };
+    }
     if (i === -1) {
       var last = series.y.length - 1;
       return {
@@ -514,7 +535,7 @@
       rows.forEach(function (m) { list.appendChild(groupRow(m, { sharedYear: sharedYear })); });
       body.appendChild(list);
     });
-    if (sharedYear) {
+    if (sharedYear && !o.yearStatedAbove) {
       body.appendChild(SF.el('p', { class: 'm-meta', text: 'All from ' + sharedYear }));
     }
     return body;
@@ -552,7 +573,7 @@
       groups.appendChild(SF.el('summary', {
         text: 'By student group (' + base.groups.length + ')'
       }));
-      groups.appendChild(groupsNode(base.groups));
+      groups.appendChild(groupsNode(base.groups, { yearStatedAbove: true }));
       item.appendChild(groups);
     }
     return item;
@@ -605,12 +626,62 @@
           metricId: metricId, metric: metric,
           series: p.series, read: p.read, scope: p.scope
         };
-        if (metric.subgroup) base.groups.push(entry);
+        // "All Students" is a group name in the source, but it is the figure
+        // the card is about, so it leads the card and gets the definition
+        // panel rather than sitting in the list underneath. Graduation rate,
+        // credit accumulation and college readiness all arrive this way.
+        if (metric.subgroup && metric.theme !== 'all') base.groups.push(entry);
         else base.primaries.push(entry);
       });
     });
 
+    Object.keys(bases).forEach(function (key) { alignToOneYear(bases[key]); });
     return { bases: bases, absent: absent };
+  }
+
+  // Put every reading in a card on the same school year.
+  //
+  // The year is taken from the all-students figure, because that is the line
+  // the card leads with and the one a reader anchors to. A group with nothing
+  // that year reads as not reported, which is what it is. Its earlier figures
+  // are not lost: they are in the year-by-year strip in the panel, which is
+  // where someone deliberately looking for history will go.
+  function alignToOneYear(base) {
+    var anchor = base.primaries.length ? base.primaries[0] : null;
+    if (!anchor) {
+      anchor = base.groups.filter(function (g) { return g.metric.theme === 'all'; })[0] || null;
+    }
+    var year = anchor && anchor.read && !anchor.read.absent
+      ? anchor.read.year
+      : latestYearAcross(base);
+    if (!year) return;
+
+    base.year = year;
+    base.primaries.concat(base.groups).forEach(function (entry) {
+      entry.read = reading(entry.series, year);
+    });
+    // A card where nothing at all lands on the anchor year would be worse than
+    // a mixed one, so fall back rather than blank the whole thing.
+    var anySaid = base.primaries.concat(base.groups).some(function (e) {
+      return !e.read.absent || e.read.stated || e.read.bound;
+    });
+    if (!anySaid) {
+      base.year = null;
+      base.primaries.concat(base.groups).forEach(function (entry) {
+        entry.read = reading(entry.series);
+      });
+    }
+  }
+
+  function latestYearAcross(base) {
+    var best = null;
+    base.primaries.concat(base.groups).forEach(function (entry) {
+      var read = entry.read;
+      if (read && read.year && (!best || String(read.year) > String(best))) {
+        best = read.year;
+      }
+    });
+    return best;
   }
 
   // The measures worth showing before anything else. A profile can run to a

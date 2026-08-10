@@ -511,10 +511,19 @@ code {
      edge. Wrapping is unavoidable at this length. Made deliberate, it stops
      looking like an accident. */
 .compare-table thead th.num {
-  width: 9.5rem; min-width: 9.5rem; max-width: 9.5rem;
+  width: 11rem; min-width: 11rem; max-width: 11rem;
   white-space: normal; vertical-align: bottom;
-  font-size: .76rem; line-height: 1.25; hyphens: auto;
+  font-size: .74rem; line-height: 1.22;
   padding-top: .7rem;
+  /* No hyphenation. Breaking "Index" into "In-dex" to save a few pixels makes
+     a reader stop and reassemble the word, which costs more than the line it
+     saved. Words break between words only. */
+  hyphens: none;
+  overflow-wrap: normal;
+  /* Even the lines out rather than leaving one orphan word on the last line,
+     which is what makes a wrapped header look accidental. Ignored by browsers
+     that do not support it, with no fallback needed. */
+  text-wrap: balance;
 }
 .compare-table .th-main { display: block; }
 .compare-table .th-sub {
