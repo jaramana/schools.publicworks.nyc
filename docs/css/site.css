@@ -215,6 +215,9 @@ button.pill, a.pill {
   color: var(--ink-soft); cursor: pointer; text-decoration: none; display: inline-block;
 }
 button.pill:hover, a.pill:hover { border-color: var(--accent); color: var(--accent); }
+/* Present but not yet usable, rather than absent and appearing later. */
+button.pill:disabled { opacity: .5; cursor: default; }
+button.pill:disabled:hover { border-color: var(--rule); color: var(--ink-soft); }
 button.pill[aria-pressed="true"] {
   background: var(--accent); border-color: var(--accent); color: var(--on-accent);
 }
@@ -697,6 +700,11 @@ abbr[title] { text-decoration: underline dotted; cursor: help; }
   text-transform: uppercase; color: var(--ink-faint);
 }
 .spec-sheet .school-head { min-width: 9rem; text-align: right; }
+/* The column a first school will land in, held open so the sheet does not
+   change shape the moment one is chosen. */
+.spec-sheet .school-head.ghost { color: var(--ink-faint); font-weight: 400; }
+.spec-sheet td.ghost { background: repeating-linear-gradient(
+  -45deg, transparent, transparent 6px, var(--paper-sunken) 6px, var(--paper-sunken) 7px); }
 .spec-sheet .school-head a { text-decoration: none; font-weight: 600; }
 .spec-sheet .school-head a:hover { text-decoration: underline; }
 

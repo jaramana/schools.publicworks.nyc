@@ -102,9 +102,17 @@
       return;
     }
     note.className = 'hint';
-    note.textContent = chosen.length >= maxSchools
-      ? maxSchools + ' schools is the limit. Remove one to add another.'
-      : chosen.length + ' of up to ' + maxSchools + ' schools.';
+    if (!chosen.length) {
+      // The guidance that used to replace the table now lives here, because the
+      // table no longer goes away to make room for it.
+      note.textContent = 'Search for a school to start a comparison, or open a ' +
+        'school profile and use Add to comparison.';
+    } else if (chosen.length >= maxSchools) {
+      note.textContent = maxSchools + ' schools is the limit. Remove one to add another.';
+    } else {
+      note.textContent = chosen.length + ' of up to ' + maxSchools + ' schools.' +
+        (chosen.length === 1 ? ' Add one more to compare them.' : '');
+    }
   }
 
   function add(dbn, name) {
@@ -165,12 +173,13 @@
     return available.slice(0, 6);
   }
 
+  // The picker is always on the page, even with nothing to offer yet. A control
+  // that appears once you have done something else is a control nobody expects.
   function renderPicker() {
     var host = document.getElementById('measure-picker');
     host.innerHTML = '';
-    var available = availableMeasures();
-    if (!available.length) { host.hidden = true; return; }
     host.hidden = false;
+    var available = availableMeasures();
 
     var byCategory = {};
     available.forEach(function (id) {
@@ -185,7 +194,11 @@
     var control = SF.el('div', { class: 'control' });
     control.appendChild(SF.el('label', { for: 'add-measure', text: 'Add a measure' }));
     var select = SF.el('select', { id: 'add-measure' });
-    select.appendChild(SF.el('option', { value: '', text: 'Choose a measure to add…' }));
+    select.appendChild(SF.el('option', {
+      value: '',
+      text: available.length ? 'Choose a measure to add…' : 'Add a school first…'
+    }));
+    if (!available.length) select.disabled = true;
     order.forEach(function (category) {
       var group = SF.el('optgroup', { label: metrics[byCategory[category][0]].category_label });
       byCategory[category]
@@ -223,6 +236,7 @@
     });
     var reset = SF.el('li');
     var resetButton = SF.el('button', { class: 'pill', type: 'button', text: 'Reset columns' });
+    resetButton.disabled = !available.length;
     resetButton.addEventListener('click', function () {
       picked = defaultMeasures(availableMeasures());
       syncUrl();
@@ -311,22 +325,14 @@
 
   function renderSheet() {
     var host = document.getElementById('comparison');
-    var picker = document.getElementById('measure-picker');
     host.innerHTML = '';
 
+    // The sheet is drawn at every count, including none. It used to be replaced
+    // by a note until two schools were chosen, so the table, the picker and the
+    // download buttons all appeared at once on the second pick. Nothing on this
+    // page should arrive that a reader did not ask for: adding a school adds a
+    // column and adding a measure adds a row, and that is the whole of it.
     var payloads = loadedPayloads();
-    if (payloads.length < 2) {
-      picker.hidden = true;
-      picker.innerHTML = '';
-      host.appendChild(SF.el('div', {
-        class: 'note-box',
-        html: payloads.length
-          ? '<p>One school so far. Add another to put them side by side.</p>'
-          : '<p>Search above to add a school, or open a school profile and use ' +
-            '<em>Add to comparison</em>.</p>'
-      }));
-      return;
-    }
 
     var available = availableMeasures();
     picked = picked.filter(function (id) { return available.indexOf(id) !== -1; });
@@ -379,7 +385,11 @@
   }
 
   function specSheet(payloads) {
-    var span = payloads.length + 1;
+    // With nothing chosen the sheet still stands, with one empty column in
+    // place of the first school, so the frame a reader is filling in is visible
+    // before they start rather than appearing once they have.
+    var ghost = payloads.length === 0;
+    var span = (ghost ? 1 : payloads.length) + 1;
 
     var table = SF.el('table', { class: 'spec-sheet' });
     var caption = 'Every chosen school in a column and every chosen fact in a ' +
@@ -393,6 +403,11 @@
     var headRow = SF.el('tr');
     var corner = SF.el('th', { scope: 'col', class: 'corner', text: 'Measure' });
     headRow.appendChild(corner);
+    if (ghost) {
+      headRow.appendChild(SF.el('th', {
+        scope: 'col', class: 'school-head ghost', text: 'No school chosen yet'
+      }));
+    }
     payloads.forEach(function (p) {
       var th = SF.el('th', { scope: 'col', class: 'school-head' });
       th.appendChild(SF.el('a', {
@@ -433,6 +448,7 @@
       });
       var sharedSub = Object.keys(subs).length === 1 ? Object.keys(subs)[0] : null;
       tr.appendChild(labelCell(field.label, sharedSub));
+      if (ghost) tr.appendChild(SF.el('td', { class: 'ghost' }));
       payloads.forEach(function (p) {
         var value = field.get(p.school);
         var td = SF.el('td');
@@ -590,11 +606,16 @@
     return lines.join('\n');
   }
 
+  // These sit above the sheet at every count. Disabled while there is nothing
+  // to take away, rather than absent: a button that materializes on the second
+  // school is a button nobody was looking for.
   function renderActions(payloads) {
     var host = SF.el('div', { class: 'table-tools' });
+    var empty = payloads.length === 0;
 
     var download = SF.el('button', { class: 'pill', type: 'button',
                                      text: 'Download this comparison (CSV)' });
+    download.disabled = empty;
     download.addEventListener('click', function () {
       var blob = new Blob([buildCsv(payloads)], { type: 'text/csv;charset=utf-8' });
       var url = URL.createObjectURL(blob);
@@ -611,6 +632,7 @@
 
     var copy = SF.el('button', { class: 'pill', type: 'button',
                                  text: 'Copy link to this comparison' });
+    copy.disabled = empty;
     var said = SF.el('span', { class: 'count', role: 'status' });
     copy.addEventListener('click', function () {
       var url = location.href;

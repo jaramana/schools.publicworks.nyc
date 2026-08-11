@@ -222,6 +222,14 @@ is what the × was meant to fix, and that remains the open objection to it.
 **An absent cell now says which kind of absence it is:** withheld, not reported,
 or does not apply, rather than a dash for all three.
 
+**Nothing arrives that was not asked for.** The sheet used to be replaced by a
+note until two schools were chosen, so the table, the measure picker and the
+download buttons all appeared at once on the second pick. All three are now on
+the page at every count, with an empty column held open where the first school
+will land, and the controls that have nothing to act on are disabled rather than
+absent. Adding a school adds a column and adding a measure adds a row; that is
+the whole of what moves.
+
 ## Still open
 
 - No screen reader has been run against the site. It remains the largest gap.
