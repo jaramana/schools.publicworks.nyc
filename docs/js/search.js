@@ -187,9 +187,21 @@
     var emptyNote = 'No schools found';
 
     function pick(row) {
+      if (!o.onPick) {
+        render([]);
+        location.href = 'school.html?dbn=' + encodeURIComponent(row.dbn);
+        return;
+      }
+      // The query has done its job. Clearing it leaves the box ready for the
+      // next school, which is how a shortlist gets built: search, pick, search
+      // again. Left standing, the text reopened its own results on the next
+      // keystroke or focus, offering the school that had just been chosen.
+      // Cleared before rendering, so the status line reports nothing rather
+      // than announcing a count for a query that is gone.
+      input.value = '';
       render([]);
-      if (o.onPick) o.onPick(row);
-      else location.href = 'school.html?dbn=' + encodeURIComponent(row.dbn);
+      o.onPick(row);
+      input.focus();
     }
 
     function run() {
