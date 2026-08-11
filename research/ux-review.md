@@ -219,6 +219,12 @@ sight while the other is on screen.
 schools and the chips for measures. The strip does repeat the school list, which
 is what the × was meant to fix, and that remains the open objection to it.
 
+**A school already on the shortlist is no longer offered by the search.** The
+second pass answered a duplicate pick with "already in this comparison", which
+makes the reader do the work of noticing a thing the list could simply not have
+shown. It is left out instead. Only the twelve-school limit still speaks,
+because leaving every school out of the results would say nothing about why.
+
 **An absent cell now says which kind of absence it is:** withheld, not reported,
 or does not apply, rather than a dash for all three.
 

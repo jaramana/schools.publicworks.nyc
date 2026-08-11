@@ -1,6 +1,9 @@
 /* School search, shared by the finder and the comparison page.
    ------------------------------------------------------------------
-   SFSearch.mount(host, { onPick, autofocus, placeholder })
+   SFSearch.mount(host, { onPick, autofocus, placeholder, label, exclude })
+
+   `exclude` is called with a row and drops it from the results when it returns
+   true, so a caller can leave out schools it would only refuse.
 
    Matches a school name or a DBN against the search index. The index is one
    small file, so the whole thing is held in memory and every keystroke is
@@ -174,9 +177,14 @@
       if (announce) {
         announce.textContent = list.length
           ? list.length + ' schools found'
-          : (input.value.trim().length >= MIN_QUERY ? 'No schools found' : '');
+          : (input.value.trim().length >= MIN_QUERY ? emptyNote : '');
       }
     }
+
+    // What an empty result list means. Normally there was no match; when every
+    // match was excluded, saying "No schools found" about a school the reader
+    // can see on their own shortlist would be a small lie.
+    var emptyNote = 'No schools found';
 
     function pick(row) {
       render([]);
@@ -187,7 +195,21 @@
     function run() {
       var query = input.value.trim();
       if (query.length < MIN_QUERY) { render([]); return; }
-      data().then(function (rows) { render(score(rows, query)); });
+      data().then(function (rows) {
+        var hits = score(rows, query);
+        // A caller can drop rows that would be refused anyway. Offering a
+        // school the comparison already holds, and answering the click with a
+        // message, makes the reader do the work of noticing; leaving it out of
+        // the list says the same thing without being told.
+        if (o.exclude) {
+          var kept = hits.filter(function (r) { return !o.exclude(r); });
+          emptyNote = (!kept.length && hits.length)
+            ? (o.excludedNote || 'Already chosen')
+            : 'No schools found';
+          hits = kept;
+        }
+        render(hits);
+      });
     }
 
     function move(step) {

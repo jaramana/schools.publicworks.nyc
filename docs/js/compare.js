@@ -121,11 +121,10 @@
   }
 
   function add(dbn, name) {
-    if (chosen.indexOf(dbn) !== -1) {
-      lastAction = (name || dbn) + ' is already in this comparison.';
-      renderChosen();
-      return;
-    }
+    // A guard, not a path anyone should reach: the search leaves out schools
+    // already on the shortlist, so a duplicate cannot be offered in the first
+    // place. Kept because add() is also reachable from a hand-edited address.
+    if (chosen.indexOf(dbn) !== -1) return;
     if (chosen.length >= maxSchools) {
       lastAction = 'This comparison already holds ' + maxSchools +
         ' schools. Remove one before adding ' + (name || dbn) + '.';
@@ -698,6 +697,10 @@
       SFSearch.mount('#compare-search', {
         placeholder: 'Add a school by name or DBN…',
         label: 'Add a school to the comparison',
+        // A school already on the shortlist is not offered again, so picking
+        // one can never be refused for being a duplicate.
+        exclude: function (row) { return chosen.indexOf(row.dbn) !== -1; },
+        excludedNote: 'Already in this comparison',
         onPick: function (row) { add(row.dbn, row.name); }
       });
 
