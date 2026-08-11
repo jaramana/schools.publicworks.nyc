@@ -19,10 +19,16 @@
   var picked = [];          // metric ids shown as columns
   var maxSchools = 12;
 
+  // Whatever the last action was, said out loud. Silence after a click reads
+  // as a broken page: picking a school when the list is full, or picking one
+  // that is already on it, both used to do nothing at all and say nothing.
+  var lastAction = '';
+
   // What to show before anyone chooses. One measure from each part of a
   // profile, so the first view is useful rather than empty.
+  // Total enrollment is not here: the sheet always carries a Students row in
+  // the schools group, and the same figure twice is just noise.
   var DEFAULT_MEASURES = [
-    'demo_enrollment_total',
     'demo_economic_need_index',
     'attendance_k8_all', 'attendance_hs_all',
     'chronic_absent_ems_all', 'chronic_absent_hs_all',
@@ -68,6 +74,7 @@
       });
       remove.addEventListener('click', function () {
         chosen = chosen.filter(function (d) { return d !== dbn; });
+        lastAction = '';
         syncUrl();
         draw();
       });
@@ -75,20 +82,58 @@
       host.appendChild(item);
     });
 
+    // A shortlist is remembered between visits, so there has to be a way out
+    // of one that is not removing every row by hand.
+    var tools = document.getElementById('chosen-tools');
+    tools.innerHTML = '';
+    if (chosen.length) {
+      var clear = SF.el('button', {
+        class: 'pill', type: 'button',
+        text: chosen.length === 1 ? 'Remove this school' : 'Clear all ' + chosen.length + ' schools'
+      });
+      clear.addEventListener('click', clearAll);
+      tools.appendChild(clear);
+    }
+
     var note = document.getElementById('picker-note');
+    if (lastAction) {
+      note.textContent = lastAction;
+      note.className = 'hint warned';
+      return;
+    }
+    note.className = 'hint';
     note.textContent = chosen.length >= maxSchools
       ? maxSchools + ' schools is the limit. Remove one to add another.'
       : chosen.length + ' of up to ' + maxSchools + ' schools.';
   }
 
-  function add(dbn) {
-    if (chosen.indexOf(dbn) !== -1 || chosen.length >= maxSchools) return;
+  function add(dbn, name) {
+    if (chosen.indexOf(dbn) !== -1) {
+      lastAction = (name || dbn) + ' is already in this comparison.';
+      renderChosen();
+      return;
+    }
+    if (chosen.length >= maxSchools) {
+      lastAction = 'This comparison already holds ' + maxSchools +
+        ' schools. Remove one before adding ' + (name || dbn) + '.';
+      renderChosen();
+      return;
+    }
     chosen.push(dbn);
+    lastAction = '';
     syncUrl();
     // Load before drawing. Drawing first was why a newly added school only
     // appeared after a reload: its profile had not arrived yet.
     renderChosen();
     loadAll().then(draw);
+  }
+
+  function clearAll() {
+    chosen = [];
+    picked = [];
+    lastAction = '';
+    syncUrl();
+    draw();
   }
 
   // ---- Which measures are columns ----------------------------------------
@@ -101,9 +146,12 @@
       var payload = loaded[dbn];
       if (!payload) return;
       Object.keys(payload.series || {}).forEach(function (id) {
-        if (metrics[id] && latestPoint(payload.series[id], payload.school.report_type)) {
-          seen[id] = true;
-        }
+        if (!metrics[id]) return;
+        var point = latestPoint(payload.series[id], payload.school.report_type);
+        // A point that carries only a reason, and no figure, does not make the
+        // measure worth offering as a row: it would come back empty for every
+        // school on the list.
+        if (point && !point.status) seen[id] = true;
       });
     });
     return Object.keys(seen);
@@ -209,28 +257,76 @@
                  n: null, score: null, band: null };
       }
     }
+    // No figure in any year. The reason is still worth carrying: a value the
+    // City withheld because too few students are in the group is not the same
+    // as one it never published, and a dash would say neither.
+    for (var j = series.y.length - 1; j >= 0; j--) {
+      if (series.rt && reportType && series.rt[j] !== reportType) continue;
+      return { year: series.y[j], value: null, n: null, score: null, band: null,
+               status: series.st ? series.st[j] : 'missing' };
+    }
     return null;
   }
 
   // ---- Drawing -----------------------------------------------------------
 
+  // One sheet, the way a car comparison reads: the schools stay across the top
+  // and every fact runs down the side in labelled groups, so a reader scrolls
+  // one continuous list instead of moving between tables and working out which
+  // control drives which. The schools are the first group of rows, not a
+  // separate table above.
+  //
+  // The two axes grow differently, which is why the schools are the columns. A
+  // shortlist stops at twelve; the measures do not stop at all, and there are
+  // 485 to choose from. Across the top, adding the ones you care about pushed
+  // the sheet sideways without end. Down the side it only gets longer, which a
+  // page already does.
   function draw() {
     renderChosen();
+    renderSheet();
+  }
+
+  // The schools that are chosen and whose profiles have arrived, in the order
+  // they were chosen. Drawing reads this rather than `chosen`, so a region can
+  // never show a school whose profile has not loaded.
+  function loadedPayloads() {
+    return chosen.map(function (d) { return loaded[d]; }).filter(Boolean);
+  }
+
+  // Fixed facts about a school, in the order a reader asks for them. These are
+  // always present, so they are not part of the measure picker.
+  var IDENTITY = [
+    { label: 'DBN', get: function (s) { return s.dbn; } },
+    { label: 'Borough', get: function (s) { return s.boro; } },
+    { label: 'District', get: function (s) { return s.district_label || s.district; } },
+    { label: 'Type', get: function (s) { return s.school_type; } },
+    { label: 'Grades', get: function (s) { return s.grades; } },
+    { label: 'Students', sub: function (s) { return s.enrollment_year; },
+      get: function (s) {
+        return SF.isBlank(s.enrollment) ? null : SF.fmt.count(s.enrollment);
+      } },
+    { label: 'Status',
+      get: function (s) { return s.status === 'open' ? 'Open' : 'Closed or former'; } }
+  ];
+
+  function renderSheet() {
     var host = document.getElementById('comparison');
+    var picker = document.getElementById('measure-picker');
     host.innerHTML = '';
 
-    if (chosen.length < 2) {
-      document.getElementById('measure-picker').hidden = true;
+    var payloads = loadedPayloads();
+    if (payloads.length < 2) {
+      picker.hidden = true;
+      picker.innerHTML = '';
       host.appendChild(SF.el('div', {
         class: 'note-box',
-        html: '<p>Choose at least two schools to compare. Search above, or open ' +
-              'a school profile and use <em>Add to comparison</em>.</p>'
+        html: payloads.length
+          ? '<p>One school so far. Add another to put them side by side.</p>'
+          : '<p>Search above to add a school, or open a school profile and use ' +
+            '<em>Add to comparison</em>.</p>'
       }));
       return;
     }
-
-    var payloads = chosen.map(function (d) { return loaded[d]; }).filter(Boolean);
-    if (payloads.length < 2) return;
 
     var available = availableMeasures();
     picked = picked.filter(function (id) { return available.indexOf(id) !== -1; });
@@ -244,144 +340,201 @@
         class: 'note-box caution',
         html: '<p><strong>These schools are different types.</strong> ' +
               SF.escapeHtml(Object.keys(kinds).join(', ')) + '. They report ' +
-              'different measures, so some cells will be empty for some of them. ' +
+              'different measures, so some rows will be empty for some of them. ' +
               'That is a difference in reporting, not in quality.</p>'
       }));
     }
 
-    host.appendChild(identityTable(payloads));
-    host.appendChild(SF.el('h2', { class: 'section-label', text: 'Published measures' }));
     host.appendChild(renderActions(payloads));
-    host.appendChild(measureTable(payloads));
+    host.appendChild(specSheet(payloads));
     host.appendChild(SF.el('p', {
       class: 'section-note',
-      text: 'A colored cell carries the score New York City publishes for that ' +
+      text: 'A colored figure carries the score New York City publishes for that ' +
             'measure against a group of schools it considers similar, out of 5. ' +
-            'Where the City publishes no score, the value is shown plain. Sorting ' +
-            'a column reorders the list by one published measure and nothing else.'
+            'Where the City publishes no score, the figure is shown plain. ' +
+            'Withheld means the City held a figure back because too few students ' +
+            'are in the group; it is not a zero.'
     }));
   }
 
-  function identityTable(payloads) {
-    var columns = [
-      { key: 'name', label: 'School', rowHeader: true, name: true,
-        render: function (v, r) {
-          return '<a href="school.html?dbn=' + r.dbn + '">' + SF.escapeHtml(v) + '</a>';
-        } },
-      { key: 'dbn', label: 'DBN' },
-      { key: 'boro', label: 'Borough' },
-      { key: 'district', label: 'District' },
-      { key: 'type', label: 'Type' },
-      { key: 'grades', label: 'Grades' },
-      { key: 'enrollment', label: 'Students', num: true,
-        render: function (v, r) {
-          return SF.isBlank(v) ? '—' : SF.fmt.count(v) +
-            '<span class="period">' + SF.escapeHtml(r.enrollment_year || '') + '</span>';
-        } },
-      { key: 'status', label: 'Status' }
-    ];
-    var rows = payloads.map(function (p) {
-      var s = p.school;
+  // Measures grouped the way a profile groups them, in the config's theme
+  // order, so the sheet reads in sections rather than as one long undivided
+  // list. A group the reader has picked nothing from does not appear.
+  function measureGroups() {
+    var byCategory = {};
+    picked.forEach(function (id) {
+      var category = metrics[id].category;
+      (byCategory[category] = byCategory[category] || []).push(id);
+    });
+    var order = (SF.display.category_order || []).filter(function (c) { return byCategory[c]; });
+    Object.keys(byCategory).forEach(function (c) {
+      if (order.indexOf(c) === -1) order.push(c);
+    });
+    return order.map(function (category) {
       return {
-        name: s.name || s.dbn, dbn: s.dbn, boro: s.boro, district: s.district,
-        type: s.school_type, grades: s.grades, enrollment: s.enrollment,
-        enrollment_year: s.enrollment_year,
-        status: s.status === 'open' ? 'Open' : 'Closed or former'
+        label: metrics[byCategory[category][0]].category_label,
+        ids: byCategory[category]
       };
     });
-    var host = SF.el('div');
-    SFTable.render(host, {
-      columns: columns, rows: rows, search: false, sortKey: 'name', sortDir: 'asc',
-      caption: 'The schools being compared. Sorting reorders the list; it does ' +
-               'not rank the schools.',
-      tableClass: 'compare-table'
-    });
-    return host;
   }
 
-  function measureTable(payloads) {
-    // Every column states its own reporting period when the schools disagree,
-    // so a mixed-year row can never read as a like-for-like comparison.
-    var columns = [{
-      key: 'name', label: 'School', rowHeader: true, name: true,
-      render: function (v, r) {
-        return '<a href="school.html?dbn=' + r.dbn + '">' + SF.escapeHtml(v) + '</a>';
-      }
-    }];
+  function specSheet(payloads) {
+    var span = payloads.length + 1;
 
-    picked.forEach(function (id) {
-      var metric = metrics[id];
-      var scale = SF.scaleOf(metric.format);
+    var table = SF.el('table', { class: 'spec-sheet' });
+    var caption = 'Every chosen school in a column and every chosen fact in a ' +
+      'row. Each row states the school year it describes. Nothing is added up ' +
+      'and no school is marked as better than another.';
+    table.appendChild(SF.el('caption', { class: 'sr-only', text: caption }));
 
-      // Where every school in the column reports the same year, say it once in
-      // the header instead of on every cell. The cells then only carry a year
-      // when the schools disagree, which is exactly when it needs noticing.
-      var years = {};
+    // The schools stay across the top while the sheet scrolls, so a figure far
+    // down the list never loses the column it belongs to.
+    var thead = SF.el('thead');
+    var headRow = SF.el('tr');
+    var corner = SF.el('th', { scope: 'col', class: 'corner', text: 'Measure' });
+    headRow.appendChild(corner);
+    payloads.forEach(function (p) {
+      var th = SF.el('th', { scope: 'col', class: 'school-head' });
+      th.appendChild(SF.el('a', {
+        href: 'school.html?dbn=' + p.school.dbn,
+        text: p.school.name || p.school.dbn
+      }));
+      th.appendChild(SF.el('span', { class: 'th-sub', text: p.school.dbn }));
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    var body = SF.el('tbody');
+
+    function groupRow(label) {
+      var tr = SF.el('tr', { class: 'group' });
+      var th = SF.el('th', { scope: 'colgroup', colspan: String(span), text: label });
+      tr.appendChild(th);
+      body.appendChild(tr);
+    }
+
+    function labelCell(main, sub) {
+      var th = SF.el('th', { scope: 'row', class: 'spec-label' });
+      th.appendChild(SF.el('span', { class: 'th-main', text: main }));
+      if (sub) th.appendChild(SF.el('span', { class: 'th-sub', text: sub }));
+      return th;
+    }
+
+    groupRow('The schools');
+    IDENTITY.forEach(function (field) {
+      var tr = SF.el('tr');
+      // Where every school gives the same answer, say it once under the label
+      // rather than on each cell.
+      var subs = {};
       payloads.forEach(function (p) {
-        var point = latestPoint((p.series || {})[id], p.school.report_type);
-        if (point) years[point.year] = true;
+        var s = field.sub && field.sub(p.school);
+        if (s) subs[s] = true;
       });
-      var yearList = Object.keys(years);
-      var sharedYear = yearList.length === 1 ? yearList[0] : null;
-
-      // Measure names run long: "Percentage of Students with 90%+ Attendance
-      // (EMS)" is most of a column on its own. The name is not rewritten. It is
-      // split: the qualifier the pipeline appended, and the unit, drop to a
-      // quieter second line, which takes about a third off the header height
-      // and leaves one thing to read on the first line.
-      var main = metric.label;
-      var sub = [];
-      var qualifier = main.match(/\s*\(([^)]+)\)\s*$/);
-      if (qualifier) {
-        main = main.slice(0, qualifier.index).trim();
-        sub.push(qualifier[1]);
-      }
-      if (scale) sub.push('out of ' + scale.replace('/ ', ''));
-      if (sharedYear) sub.push(sharedYear);
-
-      columns.push({
-        key: id,
-        label: metric.label,
-        title: metric.label,
-        labelHtml: '<span class="th-main">' + SF.escapeHtml(main) + '</span>' +
-          (sub.length ? '<span class="th-sub">' + SF.escapeHtml(sub.join(' · ')) +
-           '</span>' : ''),
-        num: true,
-        render: function (v, row) {
-          var point = row['_' + id];
-          if (!point) return '<span class="muted">—</span>';
-          var text = point.bound || SF.formatValue(point.value, metric.format);
-          var cell = point.band
-            ? '<span class="cell-band band-' + point.band + '" title="' +
-              SF.escapeHtml(SF.BAND_LABEL[point.band]) + ', scored ' +
-              Number(point.score).toFixed(1) + ' out of 5 by New York City">' +
-              SF.escapeHtml(text) + '</span>'
-            : SF.escapeHtml(text);
-          return sharedYear
-            ? cell
-            : cell + '<span class="period">' + SF.escapeHtml(point.year) + '</span>';
+      var sharedSub = Object.keys(subs).length === 1 ? Object.keys(subs)[0] : null;
+      tr.appendChild(labelCell(field.label, sharedSub));
+      payloads.forEach(function (p) {
+        var value = field.get(p.school);
+        var td = SF.el('td');
+        if (SF.isBlank(value)) {
+          td.className = 'muted';
+          td.textContent = 'Not reported';
+          td.setAttribute('aria-label', 'Not published');
+        } else {
+          td.appendChild(SF.el('span', { text: String(value) }));
+          var own = field.sub && field.sub(p.school);
+          if (own && !sharedSub) td.appendChild(SF.el('span', { class: 'period', text: own }));
         }
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+
+    measureGroups().forEach(function (group) {
+      groupRow(group.label);
+      group.ids.forEach(function (id) {
+        var metric = metrics[id];
+        var scale = SF.scaleOf(metric.format);
+
+        // Measure names run long. The name is not rewritten: the qualifier the
+        // pipeline appended, the unit and the shared year drop to a quieter
+        // second line, leaving one thing to read on the first.
+        var main = metric.label;
+        var sub = [];
+        var qualifier = main.match(/\s*\(([^)]+)\)\s*$/);
+        if (qualifier) {
+          main = main.slice(0, qualifier.index).trim();
+          sub.push(qualifier[1]);
+        }
+        if (scale) sub.push('out of ' + scale.replace('/ ', ''));
+
+        var points = payloads.map(function (p) {
+          return latestPoint((p.series || {})[id], p.school.report_type);
+        });
+        var years = {};
+        points.forEach(function (point) { if (point) years[point.year] = true; });
+        var yearList = Object.keys(years);
+        var sharedYear = yearList.length === 1 ? yearList[0] : null;
+        if (sharedYear) sub.push(sharedYear);
+
+        var tr = SF.el('tr');
+        tr.appendChild(labelCell(main, sub.join(' · ')));
+        points.forEach(function (point) {
+          tr.appendChild(valueCell(point, metric, sharedYear));
+        });
+        body.appendChild(tr);
       });
     });
 
-    var rows = payloads.map(function (p) {
-      var row = { name: p.school.name || p.school.dbn, dbn: p.school.dbn };
-      picked.forEach(function (id) {
-        var point = latestPoint((p.series || {})[id], p.school.report_type);
-        row['_' + id] = point;
-        row[id] = point ? point.value : null;   // the sortable value
-      });
-      return row;
-    });
+    table.appendChild(body);
 
-    var host = SF.el('div');
-    SFTable.render(host, {
-      columns: columns, rows: rows, search: false, sortKey: 'name', sortDir: 'asc',
-      caption: 'Published measures for the schools being compared. Each cell ' +
-               'shows the value and the school year it describes.',
-      tableClass: 'compare-table'
-    });
-    return host;
+    // The sheet scrolls sideways once there are more schools than fit, so the
+    // scrolling box has to be reachable from the keyboard and announced.
+    var wrap = SF.el('div', { class: 'table-wrap sheet-wrap' });
+    wrap.tabIndex = 0;
+    wrap.setAttribute('role', 'region');
+    wrap.setAttribute('aria-label', caption);
+    wrap.appendChild(table);
+    return wrap;
+  }
+
+  // An absence is written out, never left as a blank cell. A silent empty cell
+  // reads as nothing at all rather than as a gap in the data, and it hides the
+  // difference between a figure the City withheld and one it never published.
+  function valueCell(point, metric, sharedYear) {
+    var td = SF.el('td', { class: 'num' });
+
+    if (!point || point.status) {
+      var reason = point ? (SF.ABSENCE[point.status] || SF.ABSENCE.missing)
+                         : SF.ABSENCE.not_applicable;
+      td.className = 'num muted';
+      td.textContent = reason;
+      td.setAttribute('aria-label', reason);
+      if (point && SF.ABSENCE_DETAIL[point.status]) {
+        td.title = SF.ABSENCE_DETAIL[point.status];
+      } else if (!point) {
+        td.title = 'This measure is not published for this school.';
+      }
+      return td;
+    }
+
+    var text = point.bound || SF.formatValue(point.value, metric.format);
+    if (point.band) {
+      td.appendChild(SF.el('span', {
+        class: 'cell-band band-' + point.band,
+        title: SF.BAND_LABEL[point.band] + ', scored ' +
+               Number(point.score).toFixed(1) + ' out of 5 by New York City',
+        text: text
+      }));
+    } else {
+      td.appendChild(SF.el('span', { text: text }));
+    }
+    // A cell carries its own year only when the schools disagree, which is
+    // exactly when it needs noticing. Otherwise the row header says it once.
+    if (!sharedYear) {
+      td.appendChild(SF.el('span', { class: 'period', text: point.year }));
+    }
+    return td;
   }
 
   // ---- Taking the comparison with you ------------------------------------
@@ -412,6 +565,10 @@
       var row = [s.dbn, s.name, s.boro, s.district, s.school_type, s.grades];
       picked.forEach(function (id) {
         var point = latestPoint((p.series || {})[id], s.report_type);
+        // A point that carries only a reason is an absence, not a reading, so
+        // it leaves the value and the year empty rather than dating a figure
+        // that was never published.
+        if (point && point.status) point = null;
         // Raw values, not formatted strings: a proportion stays a proportion so
         // a spreadsheet can do arithmetic with it.
         row.push(point ? (point.bound !== undefined && point.bound !== null
@@ -503,7 +660,7 @@
       SFSearch.mount('#compare-search', {
         placeholder: 'Add a school by name or DBN…',
         label: 'Add a school to the comparison',
-        onPick: function (row) { add(row.dbn); }
+        onPick: function (row) { add(row.dbn, row.name); }
       });
 
       return loadAll();

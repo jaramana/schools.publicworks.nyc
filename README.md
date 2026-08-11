@@ -130,6 +130,14 @@ grow differently: a shortlist stops at twelve schools, and the measures do not
 stop at all. Across the top, adding the measures you care about pushed the table
 sideways without end.
 
+It is one sheet, the way a car comparison reads, rather than a table of schools
+above a table of measures. The schools are the first group of rows, not a
+separate table, and the measures follow in the same theme order a profile uses.
+The school names stay pinned across the top while the sheet scrolls, because a
+figure far down the list is useless if you cannot see whose column it is in, and
+the measure name stays pinned down the side for the same reason. Two tables with
+a control wedged between them left it unclear which control moved which table.
+
 ## Performance
 
 The published files are small once compressed, which is what matters: a school

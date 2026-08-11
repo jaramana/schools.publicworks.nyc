@@ -193,6 +193,35 @@ arriving at the comparison page with no address parameters restored twelve
 schools from the last session, and the only way out was removing twelve rows by
 hand. There is now a clear-all button above the table.
 
+## Third pass on the comparison page, August 2026
+
+The second pass hung the fixes on an × control inside the table, which turned
+out worse than the strip of pills it replaced, and all of it was reverted
+together. This pass keeps the fixes and drops the ×.
+
+**The page was two tables and did not read as one thing.** Schools sat in one
+table, measures in another, with the measure picker between them, so it was
+never obvious which control moved which table, and a reader crossed a boundary
+in the middle of one comparison. It is now a single sheet on the model of a car
+comparison: the schools across the top, every fact down the side in labelled
+groups, with the school identity as the first group rather than a table of its
+own. The measure picker is the only control above it.
+
+**The axes are pivoted.** Schools are columns and measures are rows. A shortlist
+stops at twelve; the measures do not stop, and there are 485 to choose from, so
+the axis that grows without limit now grows downward.
+
+**Both headers stay put.** The school names pin to the top of the sheet and the
+measure names to the left, so neither a figure nor its label can scroll out of
+sight while the other is on screen.
+
+**Removing is still done outside the table**, with the strip of pills for
+schools and the chips for measures. The strip does repeat the school list, which
+is what the × was meant to fix, and that remains the open objection to it.
+
+**An absent cell now says which kind of absence it is:** withheld, not reported,
+or does not apply, rather than a dash for all three.
+
 ## Still open
 
 - No screen reader has been run against the site. It remains the largest gap.

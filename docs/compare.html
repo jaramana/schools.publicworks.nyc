@@ -19,8 +19,8 @@
   <section class="wrap console">
     <h1>Compare schools</h1>
     <p class="console-sub">
-      A shortlist of up to twelve schools, one to a row. Choose the measures
-      you care about as columns. Every cell states the school year it comes
+      A shortlist of up to twelve schools, one to a column, and the facts you
+      care about down the side. Every row states the school year it comes
       from, nothing is added up, and no school is marked as better than
       another.
     </p>
@@ -28,12 +28,16 @@
     <div class="search-shell" id="compare-search"></div>
     <ul class="chosen" id="chosen"></ul>
     <p class="hint" id="picker-note" role="status"></p>
-    <div class="controls" id="measure-picker" hidden
-         role="group" aria-label="Choose which measures to compare"></div>
+    <div class="table-tools" id="chosen-tools"></div>
     <p class="statusline mono" data-status></p>
   </section>
 
+  <!-- One sheet, and one control directly above it. The schools used to have a
+       table of their own above the measures, with a picker wedged between the
+       two, so it was never obvious which control moved which table. -->
   <section class="wrap">
+    <div class="controls" id="measure-picker" hidden
+         role="group" aria-label="Choose which measures to compare"></div>
     <div id="comparison"></div>
   </section>
 

@@ -187,6 +187,10 @@ main { padding-bottom: 5rem; }
 
 /* ---- Controls ---------------------------------------------------- */
 
+/* A `display` of its own beats the browser's rule for [hidden], so a hidden
+   .controls kept drawing its border as an empty box. */
+[hidden] { display: none !important; }
+
 .controls {
   display: flex; flex-wrap: wrap; gap: .9rem;
   padding: .9rem 1rem; margin: 1.25rem 0 1rem;
@@ -666,4 +670,79 @@ code {
 .glossary dd { margin: .2rem 0 0; color: var(--ink-soft); }
 
 abbr[title] { text-decoration: underline dotted; cursor: help; }
+
+/* ---- The comparison sheet -------------------------------------------- */
+/* One sheet: schools across the top, every fact down the side in labelled
+   groups. The schools stay pinned while the sheet scrolls, because a figure
+   two hundred rows down is useless if you cannot see whose column it is in. */
+
+.sheet-wrap { max-height: 80vh; overflow: auto; border: 1px solid var(--rule); border-radius: 9px; }
+.spec-sheet { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .93rem; }
+
+.spec-sheet th, .spec-sheet td {
+  padding: .5rem .75rem; text-align: left; vertical-align: baseline;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Two sticky axes meet at the corner, which needs the highest layer of the
+   three or the school names slide underneath it. */
+.spec-sheet thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--paper-sunken); vertical-align: bottom;
+  border-bottom: 1px solid var(--rule-strong);
+}
+.spec-sheet thead th.corner {
+  left: 0; z-index: 3;
+  font-size: .72rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.spec-sheet .school-head { min-width: 9rem; text-align: right; }
+.spec-sheet .school-head a { text-decoration: none; font-weight: 600; }
+.spec-sheet .school-head a:hover { text-decoration: underline; }
+
+/* The label column is the axis a reader keeps their place on, so it stays put
+   while the schools scroll sideways. */
+.spec-sheet th.spec-label, .spec-sheet thead th.corner {
+  position: sticky; left: 0;
+  min-width: 14rem; max-width: 20rem;
+  background: var(--paper-raised); font-weight: 500; white-space: normal;
+}
+.spec-sheet th.spec-label { z-index: 1; box-shadow: 1px 0 0 var(--rule); }
+.spec-sheet thead th.corner { box-shadow: 1px 0 0 var(--rule-strong); }
+
+/* A group heading spans the sheet and breaks the list into sections, the way
+   a profile groups the same measures. */
+.spec-sheet tr.group th {
+  position: sticky; left: 0;
+  background: var(--paper-sunken); color: var(--ink-soft);
+  font-size: .72rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase;
+  border-top: 1px solid var(--rule-strong);
+  padding-top: .7rem; padding-bottom: .45rem;
+}
+
+.spec-sheet tbody tr:hover td { background: var(--paper-sunken); }
+.spec-sheet tbody tr:hover th.spec-label { background: var(--paper-sunken); }
+
+.spec-sheet td { text-align: right; font-variant-numeric: tabular-nums; }
+.spec-sheet td.muted { font-variant-numeric: normal; font-size: .86rem; }
+.spec-sheet .cell-band {
+  display: inline-block; border-radius: 5px; padding: .05rem .4rem; font-weight: 600;
+}
+.spec-sheet .period { display: block; font-size: .76rem; color: var(--ink-faint); }
+.spec-sheet .th-main { display: block; }
+.spec-sheet .th-sub {
+  display: block; font-size: .76rem; font-weight: 400; color: var(--ink-faint);
+}
+
+/* Below about 34rem the label column would leave no room for a single figure,
+   so it stops being sticky and simply narrows. */
+@media (max-width: 34rem) {
+  .spec-sheet th.spec-label, .spec-sheet thead th.corner { position: static; min-width: 9rem; }
+  .spec-sheet th.spec-label { box-shadow: none; }
+}
+
+/* The status line under the search doubles as the place a refused action is
+   reported, so it needs to read as a message rather than as a caption. */
+.hint.warned { color: var(--warn); font-weight: 600; }
 

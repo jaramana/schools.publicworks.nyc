@@ -62,6 +62,7 @@ PAIRS = [
     ("text on the accent fill", "on-accent", "accent", "normal"),
     ("current page in the nav", "accent", "accent-soft", "normal"),
     ("caution note", "warn", "warn-soft", "normal"),
+    ("a refused action, in the status line under the search", "warn", "paper", "normal"),
     ("caution heading", "ink", "warn-soft", "normal"),
     ("table head", "ink-soft", "paper-sunken", "normal"),
     ("body text on a sunken panel", "ink", "paper-sunken", "normal"),
