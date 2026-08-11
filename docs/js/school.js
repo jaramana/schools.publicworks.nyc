@@ -193,7 +193,7 @@
             '</abbr>' + (rest ? ' · ' + SF.escapeHtml(rest) : '')
     }));
 
-    document.title = (school.name || school.dbn) + ' — schoolsfinder.nyc';
+    document.title = (school.name || school.dbn) + ' — schools.publicworks.nyc';
 
     if (school.status === 'former') {
       host.appendChild(SF.el('div', {

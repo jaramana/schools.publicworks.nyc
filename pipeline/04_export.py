@@ -435,8 +435,8 @@ def write_workbook(tables, dictionary, staging):
             "HEADLINE_METRICS in 00_config.py.")
 
 
-CSV_README = """schoolsfinder.nyc, public data archive
-=====================================
+CSV_README = """Schools (schools.publicworks.nyc), public data archive
+======================================================
 
 Generated {generated} from the sources listed in sources.csv.
 
@@ -476,7 +476,8 @@ comparability notes in metrics.csv and the methodology page on the site.
 Licence and credit
 ------------------
 The underlying data is published by New York City Public Schools and NYC
-OpenData. Credit them for the data and schoolsfinder.nyc for the compilation.
+OpenData. Credit them for the data and Schools (schools.publicworks.nyc) for
+the compilation.
 """
 
 
@@ -510,6 +511,16 @@ def publish(staging):
         source = staging / name
         if source.exists():
             shutil.move(str(source), str(cfg.SITE_DATA / name))
+
+    # Same rule as the profiles above: a download that is no longer produced
+    # should not linger. A renamed file in SITE["downloads"] left its old name
+    # sitting in the served directory and in git, undetected, until someone
+    # went looking. Anything already in DOWNLOADS that is not one of the
+    # current filenames is removed before the new ones are moved in.
+    wanted = set(cfg.SITE["downloads"].values())
+    for existing in cfg.DOWNLOADS.glob("*"):
+        if existing.is_file() and existing.name not in wanted:
+            existing.unlink()
 
     for name in cfg.SITE["downloads"].values():
         source = staging / name

@@ -1,11 +1,12 @@
-# schoolsfinder.nyc
+# Schools
 
 A public reference for New York City public school statistics. Every figure the
 city publishes about a school, on one page, with the definition, the reporting
 period and the source next to each value.
 
-The site is at [schoolsfinder.nyc](https://schoolsfinder.nyc). It is not
-affiliated with New York City Public Schools.
+The site is at [schools.publicworks.nyc](https://schools.publicworks.nyc), a
+project of [publicworks.nyc](https://publicworks.nyc). It is not affiliated
+with New York City Public Schools.
 
 There is no ranking, no overall score and no recommendation. The published data
 does not support one.

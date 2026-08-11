@@ -59,7 +59,7 @@ jobs:
 
       - name: Publish if the public files changed
         run: |
-          git config user.name "schoolsfinder bot"
+          git config user.name "schools.publicworks.nyc bot"
           git config user.email "actions@github.com"
           git add docs/data docs/downloads
 

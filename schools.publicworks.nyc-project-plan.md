@@ -1,4 +1,9 @@
-# schoolsfinder.nyc
+# schools.publicworks.nyc
+
+Formerly schoolsfinder.nyc, renamed under the publicworks.nyc portfolio
+convention before its first launch. This plan predates the rename; the product
+goal, scope and rules below are unchanged, only the name and file references
+are current.
 
 Read `working-with-claude_jaramana` first. It defines working style, tone, and general stack preferences.
 
@@ -67,8 +72,8 @@ Make the stitched public dataset a first-class V1 deliverable.
 
 Publish:
 
-- `schoolsfinder-data.xlsx` for people using Excel.
-- `schoolsfinder-csv.zip` containing normalized CSV tables for machines and reproducible analysis.
+- `schools-publicworks-nyc-data.xlsx` for people using Excel.
+- `schools-publicworks-nyc-csv.zip` containing normalized CSV tables for machines and reproducible analysis.
 
 Both downloads and the website JSON must be generated from the same canonical pipeline.
 
@@ -175,8 +180,8 @@ docs/data/metrics.json
 docs/data/sources.json
 docs/data/status.json
 docs/data/schools/{dbn}.json
-docs/downloads/schoolsfinder-data.xlsx
-docs/downloads/schoolsfinder-csv.zip
+docs/downloads/schools-publicworks-nyc-data.xlsx
+docs/downloads/schools-publicworks-nyc-csv.zip
 ```
 
 Keep the search index compact. Load detailed school data only when a profile is opened.

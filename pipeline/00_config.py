@@ -1,4 +1,4 @@
-"""schoolsfinder.nyc: configuration.
+"""Schools (schools.publicworks.nyc): configuration.
 
 Every tunable path, source identifier, threshold, and display rule lives here.
 Nothing downstream should hard-code a URL, a cutoff, or a label.
@@ -604,15 +604,16 @@ STALENESS_DAYS = {
 # ---- Site output -----------------------------------------------------------
 
 SITE = {
-    "name": "schoolsfinder.nyc",
+    "name": "Schools",
+    "domain": "schools.publicworks.nyc",
     "tagline": "New York City public school statistics, in one place",
-    "repo": "https://github.com/jaramana/schoolsfinder.nyc",
+    "repo": "https://github.com/jaramana/schools.publicworks.nyc",
     "search_index_fields": ["dbn", "name", "boro", "district", "type", "grades"],
     # Profiles are written one file per DBN so a page loads only what it shows.
     "school_file": "schools/{dbn}.json",
     "downloads": {
-        "xlsx": "schoolsfinder-data.xlsx",
-        "zip": "schoolsfinder-csv.zip",
+        "xlsx": "schools-publicworks-nyc-data.xlsx",
+        "zip": "schools-publicworks-nyc-csv.zip",
     },
     # A shortlist, not a pair. Twelve is where a family's real list tends to
     # land, and the comparison view is built as rows of schools so it stays
