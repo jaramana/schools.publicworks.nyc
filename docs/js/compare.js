@@ -48,8 +48,13 @@
       .filter(function (s, i, a) { return a.indexOf(s) === i; })
       .slice(0, maxSchools);
 
+    // The default rows are laid down before any school is chosen, so the sheet
+    // opens with the measures already on it and a school fills them in rather
+    // than bringing them into existence.
     var measures = SF.param('measures');
-    picked = measures ? measures.split(',').filter(function (m) { return metrics[m]; }) : [];
+    picked = measures
+      ? measures.split(',').filter(function (m) { return metrics[m]; })
+      : DEFAULT_MEASURES.filter(function (m) { return metrics[m]; });
   }
 
   function syncUrl() {
@@ -138,7 +143,10 @@
 
   function clearAll() {
     chosen = [];
-    picked = [];
+    // The button clears schools. The rows go back to the set the sheet opens
+    // with rather than emptying, so clearing lands on the resting state and not
+    // on a stripped sheet the reader then has to rebuild.
+    picked = DEFAULT_MEASURES.filter(function (m) { return metrics[m]; });
     lastAction = '';
     syncUrl();
     draw();
@@ -223,7 +231,7 @@
       var chip = SF.el('li');
       var button = SF.el('button', {
         class: 'pill', type: 'button',
-        'aria-label': 'Remove the ' + metrics[id].label + ' column',
+        'aria-label': 'Remove the ' + metrics[id].label + ' row',
         text: metrics[id].label + ' ×'
       });
       button.addEventListener('click', function () {
@@ -235,10 +243,11 @@
       chips.appendChild(chip);
     });
     var reset = SF.el('li');
-    var resetButton = SF.el('button', { class: 'pill', type: 'button', text: 'Reset columns' });
-    resetButton.disabled = !available.length;
+    var resetButton = SF.el('button', { class: 'pill', type: 'button', text: 'Reset rows' });
     resetButton.addEventListener('click', function () {
-      picked = defaultMeasures(availableMeasures());
+      // Back to the set the sheet opens with, not to whatever the current
+      // shortlist happens to report, so reset lands somewhere predictable.
+      picked = DEFAULT_MEASURES.filter(function (m) { return metrics[m]; });
       syncUrl();
       draw();
     });
@@ -334,9 +343,15 @@
     // column and adding a measure adds a row, and that is the whole of it.
     var payloads = loadedPayloads();
 
+    // A row that is on the sheet stays on it. Rows used to be dropped when no
+    // chosen school reported them, which meant adding or removing one school
+    // silently rewrote the list of measures; the cell says "Does not apply"
+    // instead, which is both stable and the truth. The only exception is a
+    // shortlist that reports none of the picked measures at all, where falling
+    // back to what it does report beats a sheet of nothing.
     var available = availableMeasures();
-    picked = picked.filter(function (id) { return available.indexOf(id) !== -1; });
-    if (!picked.length) picked = defaultMeasures(available);
+    var anyReported = picked.some(function (id) { return available.indexOf(id) !== -1; });
+    if (payloads.length && !anyReported) picked = defaultMeasures(available);
     renderPicker();
 
     var kinds = {};
@@ -495,6 +510,7 @@
 
         var tr = SF.el('tr');
         tr.appendChild(labelCell(main, sub.join(' · ')));
+        if (ghost) tr.appendChild(SF.el('td', { class: 'ghost' }));
         points.forEach(function (point) {
           tr.appendChild(valueCell(point, metric, sharedYear));
         });

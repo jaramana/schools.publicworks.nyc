@@ -227,8 +227,12 @@ note until two schools were chosen, so the table, the measure picker and the
 download buttons all appeared at once on the second pick. All three are now on
 the page at every count, with an empty column held open where the first school
 will land, and the controls that have nothing to act on are disabled rather than
-absent. Adding a school adds a column and adding a measure adds a row; that is
-the whole of what moves.
+absent. The default rows are laid down before any school is chosen, so a school
+fills the sheet in rather than bringing it into existence, and a row stays on
+the sheet once it is there: a measure no chosen school reports reads "Does not
+apply" rather than being dropped, which used to mean adding or removing one
+school silently rewrote the list of measures. Adding a school adds a column and
+adding a measure adds a row; that is the whole of what moves.
 
 ## Still open
 
