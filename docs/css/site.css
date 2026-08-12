@@ -122,6 +122,12 @@ main { padding-bottom: 5rem; }
 
 /* ---- Masthead --------------------------------------------------- */
 
+/* This block is the reference implementation of the shared publicworks.nyc
+   header, and other projects are copied from it. Only --accent, and any
+   control a project genuinely needs, may differ between sites. Retuning the
+   sizes here changes the standard, so change it everywhere or not at all.
+   The measurements are written down in the publicworks.nyc README. */
+
 .masthead { border-bottom: 1px solid var(--rule); background: var(--paper); }
 .masthead-inner {
   display: flex; align-items: center; gap: 1.25rem;
