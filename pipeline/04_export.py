@@ -435,7 +435,7 @@ def write_workbook(tables, dictionary, staging):
             "HEADLINE_METRICS in 00_config.py.")
 
 
-CSV_README = """Schools (schools.publicworks.nyc), public data archive
+CSV_README = """Schools Finder (schools.publicworks.nyc), public data archive
 ======================================================
 
 Generated {generated} from the sources listed in sources.csv.
@@ -476,7 +476,7 @@ comparability notes in metrics.csv and the methodology page on the site.
 Licence and credit
 ------------------
 The underlying data is published by New York City Public Schools and NYC
-OpenData. Credit them for the data and Schools (schools.publicworks.nyc) for
+OpenData. Credit them for the data and Schools Finder (schools.publicworks.nyc) for
 the compilation.
 """
 

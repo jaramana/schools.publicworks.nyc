@@ -1,62 +1,42 @@
-# Schools
+# Schools Finder
 
 A public reference for New York City public school statistics. Every figure the
 city publishes about a school, on one page, with the definition, the reporting
 period and the source next to each value.
 
-The site is at [schools.publicworks.nyc](https://schools.publicworks.nyc), a
-project of [publicworks.nyc](https://publicworks.nyc). It is not affiliated
-with New York City Public Schools.
+The site is at [schools.publicworks.nyc](https://schools.publicworks.nyc).
+
+## Background
+
+The figures exist already. They are public and they are thorough. The difficulty
+is that they are split across a quality report dataset, an enrollment workbook,
+three admissions directories and a set of files whose locations change each
+year, in formats that assume you already know what a DBN is and which report
+type a school files.
+
+This site does the joining once, in the open, and shows the definition and the
+reporting period next to every value. It answers what a school publishes about
+itself.
 
 There is no ranking, no overall score and no recommendation. The published data
-does not support one.
+does not support one. The site is not affiliated with New York City Public
+Schools.
 
-## What is here
+## Data sources
 
-| Path | What it is |
-| --- | --- |
-| `pipeline/` | Four Python stages that build everything |
-| `run.py` | Runs the stages in order |
-| `docs/` | The published site, served by GitHub Pages |
-| `docs/js/` | One file per page, plus shared search, table and formatting |
-| `docs/data/` | Generated JSON the pages read |
-| `docs/downloads/` | The public Excel workbook and CSV archive |
-| `research/` | Source manifest and the inventory of the original workbook |
-| `data-raw/` | Cached downloads. Not committed |
-| `build/` | Intermediate tables and reports. Not committed |
+| Source | Grain | Latest period |
+| --- | --- | --- |
+| [School Quality Reports](https://data.cityofnewyork.us/d/dnpx-dfnc) (`dnpx-dfnc`) | DBN, school year, metric | 2024-25 |
+| [Demographic Snapshot](https://infohub.nyced.org/reports/school-quality/information-and-data-overview) | DBN, school year | 2024-25 |
+| [Directory data](https://infohub.nyced.org/reports/admissions-and-enrollment/directory-data), three workbooks | school, and school by program | Fall 2025 |
+| [GeoSearch](https://geosearch.planninglabs.nyc/) | address | continuous |
 
-## Running it
+`research/source-manifest.md` records what was checked, what was rejected and
+why.
 
-You need Python 3.9 or newer. No other tooling, no database, no build step for
-the site itself.
+## Analysis
 
-```bash
-python3 -m venv .venv
-.venv/bin/pip install pandas requests openpyxl XlsxWriter
-.venv/bin/python run.py
-```
-
-The first run downloads about 230 MB and geocodes roughly a thousand addresses,
-which together take about fifteen minutes. Both are cached, so later runs take
-about seven minutes, almost all of it writing the two thousand profile files.
-
-Useful variations:
-
-```bash
-.venv/bin/python run.py --skip-fetch      # use the cache, do not check for new files
-.venv/bin/python run.py --force-fetch     # download everything again
-.venv/bin/python run.py --stage 3         # run one stage on its own
-```
-
-To look at the result before publishing:
-
-```bash
-.venv/bin/python tools/serve.py
-```
-
-Then open `http://127.0.0.1:8787`.
-
-## The pipeline
+### The pipeline
 
 Four stages, deliberately separate, so a change to one does not re-run the
 others.
@@ -94,7 +74,7 @@ type that publishes very little, a school with no address.
 `build/staging/`, then moves them into place in one step. It refuses to run at
 all if validation did not pass, so a bad build leaves the live files untouched.
 
-## Reading a value on the site
+### Reading a value on the site
 
 Three things travel with every number, because a number alone is not usable.
 
@@ -111,10 +91,11 @@ that group. Both live inside the measure's panel, in a row labelled Similar
 schools, and nothing but the value and its scale sits on the measure line
 itself. A band and a score beside the number asked a reader to interpret two
 scales at once while scanning a column of measures. In the comparison table the
-band stays on the cell, because there standing across schools is the point. The score itself is always printed inside the band, and every
-band carries a written label as well as a color. The banding thresholds are in
-`SCORE_BANDS` in the config; the score is the City's. Where the City publishes
-no score, nothing is colored.
+band stays on the cell, because there standing across schools is the point. The
+score itself is always printed inside the band, and every band carries a written
+label as well as a color. The banding thresholds are in `SCORE_BANDS` in the
+config; the score is the City's. Where the City publishes no score, nothing is
+colored.
 
 Measures are grouped: a card leads with the all-students figure and holds the
 breakdowns by student group under it, in a stated theme order, alphabetical
@@ -139,7 +120,7 @@ figure far down the list is useless if you cannot see whose column it is in, and
 the measure name stays pinned down the side for the same reason. Two tables with
 a control wedged between them left it unclear which control moved which table.
 
-## Performance
+### Performance
 
 The published files are small once compressed, which is what matters: a school
 profile is about 15 KB on the wire and the metric manifest 14 KB. Three things
@@ -155,7 +136,7 @@ keep a page quick, and all three are easy to undo by accident.
   browsing is six times heavier than the real site and you optimize the wrong
   thing.
 
-## Rules the pipeline keeps
+### Rules the pipeline keeps
 
 These are the parts most worth preserving if you change anything.
 
@@ -196,18 +177,6 @@ bound is carried through to the page and the downloads with a `censored` status.
 two quality reports and publishes some measures in both, for different students.
 That is two observations, not a duplicate.
 
-## Sources
-
-| Source | Grain | Latest period |
-| --- | --- | --- |
-| [School Quality Reports](https://data.cityofnewyork.us/d/dnpx-dfnc) (`dnpx-dfnc`) | DBN, school year, metric | 2024-25 |
-| [Demographic Snapshot](https://infohub.nyced.org/reports/school-quality/information-and-data-overview) | DBN, school year | 2024-25 |
-| [Directory data](https://infohub.nyced.org/reports/admissions-and-enrollment/directory-data), three workbooks | school, and school by program | Fall 2025 |
-| [GeoSearch](https://geosearch.planninglabs.nyc/) | address | continuous |
-
-`research/source-manifest.md` records what was checked, what was rejected and
-why.
-
 ### When a source moves
 
 The InfoHub file names carry a content hash that changes when a file is
@@ -220,7 +189,7 @@ If a dataset changes shape rather than location, the validation stage will say
 which check failed and by how much. Do not raise a threshold to make a build
 pass without understanding what moved.
 
-## Keeping the data fresh
+### How the site stays current
 
 `.github/workflows/refresh.yml` runs the whole pipeline daily and on demand. It
 publishes only if validation passes, and commits only when the generated public
@@ -231,7 +200,7 @@ GitHub disables scheduled workflows after sixty days without repository
 activity. If the site's build date stops moving, that is the first thing to
 check, and the workflow can always be run by hand from the Actions tab.
 
-## Known gaps
+### Known gaps
 
 - No survey or school climate results yet. Those are in per-report-type
   workbooks that this version does not read.
@@ -243,8 +212,64 @@ check, and the workflow can always be run by hand from the Actions tab.
 - Open and closed status is inferred from whether a school appears in the newest
   snapshot or a current directory. No source publishes a status field.
 
-## Licence and credit
+## Tools used
 
-Code is free to reuse with attribution. The underlying data is published by New
-York City Public Schools and NYC OpenData and carries their terms. If you
-republish a figure, carry its reporting period with it.
+Python, with `pandas`, `requests`, `openpyxl` and `XlsxWriter` for the data
+pipeline. Vanilla HTML, CSS and JavaScript for the site — no framework, no
+build step. Claude for development.
+
+## Usage
+
+You need Python 3.9 or newer. No other tooling, no database, no build step for
+the site itself.
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install pandas requests openpyxl XlsxWriter
+.venv/bin/python run.py
+```
+
+The first run downloads about 230 MB and geocodes roughly a thousand addresses,
+which together take about fifteen minutes. Both are cached, so later runs take
+about seven minutes, almost all of it writing the two thousand profile files.
+
+Useful variations:
+
+```bash
+.venv/bin/python run.py --skip-fetch      # use the cache, do not check for new files
+.venv/bin/python run.py --force-fetch     # download everything again
+.venv/bin/python run.py --stage 3         # run one stage on its own
+```
+
+To look at the result before publishing:
+
+```bash
+.venv/bin/python tools/serve.py
+```
+
+Then open `http://127.0.0.1:8787`.
+
+## Repository layout
+
+| Path | What it is |
+| --- | --- |
+| `pipeline/` | Four Python stages that build everything |
+| `run.py` | Runs the stages in order |
+| `docs/` | The published site, served by GitHub Pages |
+| `docs/js/` | One file per page, plus shared search, table and formatting |
+| `docs/data/` | Generated JSON the pages read |
+| `docs/downloads/` | The public Excel workbook and CSV archive |
+| `research/` | Source manifest and the inventory of the original workbook |
+| `data-raw/` | Cached downloads. Not committed |
+| `build/` | Intermediate tables and reports. Not committed |
+
+Every tunable lives in `pipeline/00_config.py`. Change a value there and rebuild;
+nothing elsewhere hardcodes a URL or a cutoff.
+
+## License
+
+Code is released under the
+[BSD 3-Clause license](https://opensource.org/licenses/BSD-3-Clause). The
+compiled data is free to reuse with attribution. The underlying data is
+published by New York City Public Schools and NYC OpenData and carries their
+terms. If you republish a figure, carry its reporting period with it.

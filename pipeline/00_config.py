@@ -1,4 +1,4 @@
-"""Schools (schools.publicworks.nyc): configuration.
+"""Schools Finder (schools.publicworks.nyc): configuration.
 
 Every tunable path, source identifier, threshold, and display rule lives here.
 Nothing downstream should hard-code a URL, a cutoff, or a label.
@@ -604,7 +604,7 @@ STALENESS_DAYS = {
 # ---- Site output -----------------------------------------------------------
 
 SITE = {
-    "name": "Schools",
+    "name": "Schools Finder",
     "domain": "schools.publicworks.nyc",
     "tagline": "New York City public school statistics, in one place",
     "repo": "https://github.com/jaramana/schools.publicworks.nyc",

@@ -1,8 +1,8 @@
-/* Schools (schools.publicworks.nyc)
+/* Schools Finder (schools.publicworks.nyc)
    ------------------------------------------------------------------
    One stylesheet, no build step, no webfonts, light mode only.
 
-   The proportions, hairlines and restraint follow thepaygap.nyc, because
+   The proportions, hairlines and restraint follow The Pay Gap, because
    the two sites are the same kind of instrument. What is different here
    is that a school profile is mostly a long list of measured values, so
    the work goes into making a value, its definition and its absence all
@@ -11,7 +11,7 @@
 /* ---- Tokens ---------------------------------------------------- */
 
 :root {
-  /* The palette is the main thing separating this site from thepaygap.nyc,
+  /* The palette is the main thing separating this site from The Pay Gap,
      which is warm ivory and civic blue. Here the paper is cool and the accent
      is a deep institutional green: same restraint, different room. */
   --paper:        #f7f8f8;
@@ -127,17 +127,10 @@ main { padding-bottom: 5rem; }
   display: flex; align-items: center; gap: 1.25rem;
   padding: .55rem 0; flex-wrap: wrap;
 }
-/* Schools is a product of publicworks.nyc, not a page inside it, so the parent
-   sits as a small kicker above the mark rather than folded into it: this site
-   used to spell its own address into the wordmark, and the address has since
-   moved once already. Naming it in prose, once, costs less than another
-   rename baked into the logo. */
-.wordmark-group { display: flex; flex-direction: column; gap: .05rem; line-height: 1.1; }
-.parent-mark {
-  font-size: .68rem; font-weight: 600; letter-spacing: .02em;
-  color: var(--accent); text-decoration: none; white-space: nowrap;
-}
-.parent-mark:hover { text-decoration: underline; }
+/* The mark is the product name and nothing else. It deliberately does not
+   spell the site's own address, which has moved once already, and it does not
+   carry publicworks.nyc either: that is a filing cabinet, and a link at the
+   foot of the page is the whole of what it needs here. */
 .wordmark {
   font-weight: 700; letter-spacing: -.03em; font-size: 1.25rem;
   color: var(--ink); text-decoration: none; white-space: nowrap;

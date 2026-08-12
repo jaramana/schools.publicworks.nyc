@@ -1,4 +1,4 @@
-/* Schools (schools.publicworks.nyc) / shared behavior
+/* Schools Finder (schools.publicworks.nyc) / shared behavior
    ------------------------------------------------------------------
    Formatting, data loading, page chrome and URL parameters. Every page
    loads this first. No dependencies, no build step.
@@ -221,13 +221,7 @@
       head.className = 'masthead';
       head.innerHTML =
         '<div class="wrap masthead-inner">' +
-          '<div class="wordmark-group">' +
-            // The parent link is the kicker, not the mark: this site is a
-            // product of publicworks.nyc, not a page inside it, so the product
-            // name stays the large, primary link and the parent stays small.
-            '<a class="parent-mark" href="https://publicworks.nyc">publicworks.nyc</a>' +
-            '<a class="wordmark" href="index.html">Schools</a>' +
-          '</div>' +
+          '<a class="wordmark" href="index.html">Schools Finder</a>' +
           '<nav class="nav" aria-label="Sections">' + links + '</nav>' +
         '</div>';
     }
@@ -258,6 +252,9 @@
             '<li><a href="about.html">About this site</a></li>' +
             '<li><a href="https://github.com/jaramana/schools.publicworks.nyc">Source on GitHub</a></li>' +
             '<li><a href="https://github.com/jaramana/schools.publicworks.nyc/issues">Report an error</a></li>' +
+            // publicworks.nyc is the index the other projects are filed under.
+            // A link at the foot is the whole of its presence here.
+            '<li><a href="https://publicworks.nyc">publicworks.nyc</a></li>' +
           '</ul></div>' +
         '</div>' +
         '<p class="colophon"><strong>An experimental project.</strong> ' +

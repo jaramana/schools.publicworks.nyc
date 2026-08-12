@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Schools (schools.publicworks.nyc): build everything.
+"""Schools Finder (schools.publicworks.nyc): build everything.
 
     python run.py                 fetch if needed, then normalize, validate, export
     python run.py --force-fetch   download every source again
