@@ -85,10 +85,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, h4 { line-height: 1.15; letter-spacing: -.022em; font-weight: 700; margin: 0 0 .5em; }
-h1 { font-size: clamp(1.8rem, 3.6vw, 2.6rem); letter-spacing: -.03em; }
-h2 { font-size: clamp(1.3rem, 2.4vw, 1.7rem); margin-top: 2.4em; }
-h3 { font-size: 1.08rem; margin-top: 1.8em; }
+h1, h2, h3, h4 { line-height: 1.12; letter-spacing: -.022em; font-weight: 700; margin: 0 0 .5em; }
+h1 { font-size: clamp(2.1rem, 5.2vw, 3.6rem); letter-spacing: -.03em; }
+h2 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); margin-top: 2.5em; }
+h3 { font-size: 1.1rem; letter-spacing: -.01em; margin-top: 2em; }
 h4 { font-size: .95rem; margin-top: 1.4em; }
 
 p { margin: 0 0 1em; max-width: var(--measure); }
@@ -154,6 +154,10 @@ main { padding-bottom: 5rem; }
 /* ---- Console and section headings -------------------------------- */
 
 .console { padding: clamp(2rem, 5vw, 3.5rem) 0 1.5rem; }
+.console-h1 {
+  font-size: clamp(1.7rem, 3.4vw, 2.5rem);
+  letter-spacing: -.028em; margin-bottom: .5rem;
+}
 .console-sub { color: var(--ink-soft); max-width: 44rem; font-size: 1.02rem; margin-bottom: 1.75rem; }
 .statusline { color: var(--ink-faint); font-size: .8rem; margin: .9rem 0 0; max-width: none; }
 
@@ -651,7 +655,7 @@ code {
   border-top: 1px solid var(--rule); margin-top: 4rem; padding: 2rem 0 3rem;
   font-size: .87rem; color: var(--ink-faint);
 }
-.footer p { max-width: 42rem; }
+.footer p { max-width: 40rem; }
 .footer a { color: var(--ink-soft); }
 .footer a:hover { color: var(--accent); }
 .footer-grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }

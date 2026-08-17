@@ -231,7 +231,7 @@
       foot.className = 'footer';
       foot.innerHTML =
         '<div class="wrap"><div class="footer-grid">' +
-          '<div><h4>Find</h4><ul>' +
+          '<div><h4>Views</h4><ul>' +
             '<li><a href="index.html">Search by name or DBN</a></li>' +
             '<li><a href="browse.html">Browse by borough and district</a></li>' +
             '<li><a href="compare.html">Compare schools</a></li>' +
