@@ -380,7 +380,7 @@
     return wrapper;
   }
 
-  // The panel is a short table of labelled facts, not paragraphs. The content
+  // The panel is a short table of labeled facts, not paragraphs. The content
   // is the same as before; the change is that a reader can find the one line
   // they came for instead of reading four sentences to reach it.
   function detailBody(metricId, metric, series, read) {

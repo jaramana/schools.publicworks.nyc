@@ -4,7 +4,7 @@ Status: first pass. Verified by live request on 2026-08-08.
 Scope decision in force: all NYCDOE schools, elementary through high school, including
 District 75 and District 79 programs where published data exist.
 
-A warning that applies to the whole NYC OpenData education catalog: almost every education
+A warning that applies to the whole NYC Open Data education catalog: almost every education
 dataset reports `updatedAt` of 2024-11-26. That is a bulk metadata refresh, not new data.
 The `data_updated_at` field and the data period inside the table tell the real story, and
 they disagree with the metadata for most of these datasets. Every entry below records the
@@ -14,7 +14,7 @@ period that was read from the data.
 
 ### S1. School Quality Reports Data
 
-- Dataset ID: `dnpx-dfnc` on NYC OpenData. Owner: Department of Education.
+- Dataset ID: `dnpx-dfnc` on NYC Open Data. Owner: Department of Education.
 - Retrieval: SODA API at `https://data.cityofnewyork.us/resource/dnpx-dfnc.json`, or bulk
   CSV export. Update frequency stated as annual. Rows last updated 2026-04-09.
 - Grain: one row per DBN, school year, and metric variable.

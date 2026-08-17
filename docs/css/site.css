@@ -374,7 +374,7 @@ button.pill[aria-pressed="true"] {
 .m-detail p { margin: 0 0 .45rem; max-width: none; }
 .m-detail p:last-child { margin-bottom: 0; }
 
-/* The panel is a short table of labelled facts. Prose here made a reader
+/* The panel is a short table of labeled facts. Prose here made a reader
    consume four sentences to reach the one line they opened it for; a label
    column lets them jump straight to it. */
 .m-facts { margin: 0; display: grid; gap: .1rem 0; }
@@ -684,7 +684,7 @@ code {
 abbr[title] { text-decoration: underline dotted; cursor: help; }
 
 /* ---- The comparison sheet -------------------------------------------- */
-/* One sheet: schools across the top, every fact down the side in labelled
+/* One sheet: schools across the top, every fact down the side in labeled
    groups. The schools stay pinned while the sheet scrolls, because a figure
    two hundred rows down is useless if you cannot see whose column it is in. */
 

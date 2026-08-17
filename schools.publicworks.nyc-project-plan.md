@@ -130,8 +130,8 @@ Keep school organizations, programs, buildings, and geographic areas conceptuall
 
 Known starting sources:
 
-- NYC OpenData School Quality Reports Data: `dnpx-dfnc`
-- NYC OpenData School Point Locations: `jfju-ynrr`
+- NYC Open Data School Quality Reports Data: `dnpx-dfnc`
+- NYC Open Data School Point Locations: `jfju-ynrr`
 - NYC Public Schools InfoHub files for current School Quality Reports, demographics, attendance, surveys, tests, and other relevant measures.
 - Official admissions datasets where current, sufficiently complete, and legally publishable.
 

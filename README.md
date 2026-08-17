@@ -87,7 +87,7 @@ since a slash is spoken as "slash".
 
 **Where it stands, when the City says so.** For many measures New York City
 publishes both a comparison group average and its own score from 1 to 5 against
-that group. Both live inside the measure's panel, in a row labelled Similar
+that group. Both live inside the measure's panel, in a row labeled Similar
 schools, and nothing but the value and its scale sits on the measure line
 itself. A band and a score beside the number asked a reader to interpret two
 scales at once while scanning a column of measures. In the comparison table the
@@ -271,5 +271,5 @@ nothing elsewhere hardcodes a URL or a cutoff.
 Code is released under the
 [BSD 3-Clause license](https://opensource.org/licenses/BSD-3-Clause). The
 compiled data is free to reuse with attribution. The underlying data is
-published by New York City Public Schools and NYC OpenData and carries their
+published by New York City Public Schools and NYC Open Data and carries their
 terms. If you republish a figure, carry its reporting period with it.

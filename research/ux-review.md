@@ -203,7 +203,7 @@ together. This pass keeps the fixes and drops the ×.
 table, measures in another, with the measure picker between them, so it was
 never obvious which control moved which table, and a reader crossed a boundary
 in the middle of one comparison. It is now a single sheet on the model of a car
-comparison: the schools across the top, every fact down the side in labelled
+comparison: the schools across the top, every fact down the side in labeled
 groups, with the school identity as the first group rather than a table of its
 own. The measure picker is the only control above it.
 

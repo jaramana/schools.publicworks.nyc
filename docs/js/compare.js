@@ -293,7 +293,7 @@
   // ---- Drawing -----------------------------------------------------------
 
   // One sheet, the way a car comparison reads: the schools stay across the top
-  // and every fact runs down the side in labelled groups, so a reader scrolls
+  // and every fact runs down the side in labeled groups, so a reader scrolls
   // one continuous list instead of moving between tables and working out which
   // control drives which. The schools are the first group of rows, not a
   // separate table above.

@@ -37,7 +37,7 @@ SOURCES = {
         "dataset_id": "dnpx-dfnc",
         "url": f"https://{SOCRATA_DOMAIN}/api/views/dnpx-dfnc/rows.csv?accessType=DOWNLOAD",
         "page": f"https://{SOCRATA_DOMAIN}/d/dnpx-dfnc",
-        "retrieval": "NYC OpenData CSV export",
+        "retrieval": "NYC Open Data CSV export",
         "cadence": "Annual",
         "grain": "One row per DBN, school year, and metric variable.",
         "cache": "sqr.csv",
