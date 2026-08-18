@@ -203,7 +203,6 @@
     { href: 'index.html',   nav: 'Find a school' },
     { href: 'browse.html',  nav: 'Browse' },
     { href: 'compare.html', nav: 'Compare' },
-    { href: 'data.html',    nav: 'Data' },
     { href: 'method.html',  nav: 'Method' },
     { href: 'about.html',   nav: 'About' }
   ];
@@ -236,11 +235,11 @@
             '<li><a href="browse.html">Browse by borough and district</a></li>' +
             '<li><a href="compare.html">Compare schools</a></li>' +
           '</ul></div>' +
+          // Pages, not sections. Four entries that all opened method.html at
+          // a different anchor read as four destinations and were one.
           '<div><h4>Reference</h4><ul>' +
-            '<li><a href="data.html">Download the data</a></li>' +
-            '<li><a href="method.html">Method and limits</a></li>' +
-            '<li><a href="data.html#dictionary">Data dictionary</a></li>' +
-            '<li><a href="data.html#sources">Sources and freshness</a></li>' +
+            '<li><a href="method.html">Method</a></li>' +
+            '<li><a href="about.html">About</a></li>' +
           '</ul></div>' +
           '<div><h4>Sources</h4><ul>' +
             '<li><a href="https://data.cityofnewyork.us/d/dnpx-dfnc">School Quality Reports</a></li>' +
@@ -248,21 +247,25 @@
             '<li><a href="https://infohub.nyced.org/reports/admissions-and-enrollment/directory-data">Directory data</a></li>' +
             '<li><a href="https://www.myschools.nyc/">MySchools</a></li>' +
           '</ul></div>' +
+          // Code, not pages. About lives in Reference and was listed twice.
           '<div><h4>Project</h4><ul>' +
-            '<li><a href="about.html">About this site</a></li>' +
             '<li><a href="https://github.com/jaramana/schools.publicworks.nyc">Source on GitHub</a></li>' +
             '<li><a href="https://github.com/jaramana/schools.publicworks.nyc/issues">Report an error</a></li>' +
-            // publicworks.nyc is the index the other projects are filed under.
-            // A link at the foot is the whole of its presence here.
-            '<li><a href="https://publicworks.nyc">publicworks.nyc</a></li>' +
           '</ul></div>' +
         '</div>' +
-        '<p class="colophon"><strong>An experimental project.</strong> ' +
-          'Independent, unofficial, and not affiliated with New York City ' +
-          'Public Schools. For anything that decides something, including ' +
-          'eligibility, applications and deadlines, use ' +
-          '<a href="https://www.myschools.nyc/">MySchools</a> and the school ' +
-          'itself. Public data, public method, built with Python.</p>' +
+        // The disclaimer, word for word as it appears in the home page banner.
+        // One sentence, in one place in the source of each project, so the two
+        // can never drift apart. Only the agency changes between projects.
+        '<p class="colophon"><strong>This is not an official product.</strong> ' +
+          'It is an independent initiative, not affiliated with, endorsed by, ' +
+          'or produced by <a href="https://www.schools.nyc.gov/">New York City ' +
+          'Public Schools</a> or the City of New York. Please refer to them ' +
+          'for authoritative information.</p>' +
+        '<p class="built-with">Public data, public method, built with Python.</p>' +
+        // The portfolio mark, below everything and outside the columns. It is
+        // a filing cabinet, not a section of this site, so it is announced
+        // once at the foot rather than filed among the site's own pages.
+        '<p class="portfolio">A <a href="https://publicworks.nyc">publicworks.nyc</a> project</p>' +
         '</div>';
     }
   }
@@ -314,7 +317,7 @@
       html: '<p><strong>Some sources have not been refreshed.</strong> ' +
             escapeHtml(names) + '. The values shown are still the ones last ' +
             'published, but they may no longer be current. ' +
-            '<a href="data.html#sources">See source freshness</a>.</p>'
+            '<a href="method.html#sources">See source freshness</a>.</p>'
     });
     main.parentNode.insertBefore(box, main.nextSibling);
   }

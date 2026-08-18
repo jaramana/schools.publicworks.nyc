@@ -3,10 +3,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Method and limits — Schools Finder</title>
-<meta name="description" content="Where each figure comes from, what it counts, how missing and withheld values are handled, and when two numbers should not be compared.">
+<title>Method — Schools Finder</title>
+<meta name="description" content="Where each figure comes from, how this site calculates it, what it cannot show, and how to download and rebuild the data.">
 <link rel="stylesheet" href="css/site.css">
 <script src="js/site.js" defer></script>
+<script src="js/table.js" defer></script>
+<script src="js/data.js" defer></script>
+<style>
+  .prose h2 { margin-top: 2.75rem; }
+  .prose h3 { margin-top: 1.75rem; font-size: 1rem; }
+  .prose li { margin-bottom: .5rem; }
+  .prose ul, .prose ol { max-width: var(--measure); }
+  /* .wrap.prose holds its children to the reading measure. A table, a card
+     grid and a code block are not prose and need the full column. */
+  .wrap.prose > #source-table,
+  .wrap.prose > #dict-table,
+  .wrap.prose > #download-list,
+  .wrap.prose > #counts,
+  .wrap.prose > .code-block { max-width: none; }
+</style>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -14,392 +29,486 @@
 
 <main id="main">
   <section class="wrap console">
-    <h1 class="console-h1">Method and limits</h1>
+    <h1 class="console-h1">Method</h1>
     <p class="console-sub">
-      What this site does with the published data, and what it deliberately
-      does not do. The limits below are not footnotes. They are the part most
-      likely to change how you read a number.
+      This page tells you where each figure comes from, how this site calculates it, what it cannot show, and how to get the data.
     </p>
     <p class="statusline mono" data-status></p>
   </section>
 
-  <section class="wrap">
-    <div class="note-box caution">
-      <p>
-        <strong>Experimental, and unofficial.</strong> This site is one person's
-        compilation of published data. It is not produced, reviewed or endorsed
-        by New York City Public Schools, and a figure here can be wrong in ways
-        the official source is not: a file can move, a definition can change
-        mid-year, and a join can go wrong quietly. Every number links back to
-        where it came from. For a decision that matters, use the official source
-        and not this site.
-      </p>
-    </div>
-  </section>
+  <!-- The experimental notice lives on the home page, once. It was here too,
+       in different words, which read as two different claims about the same
+       site. -->
 
   <section class="wrap prose">
-    <h2 id="glossary">Words this data uses</h2>
+    <h2 id="scope">Scope</h2>
     <p>
-      New York City's school data has a vocabulary of its own. None of it is
-      hard, but all of it is assumed.
+      New York City publishes much data about its schools. The data is in
+      different places, and the places do not connect. The test results of a
+      school are in one dataset. Its enrollment is in a workbook. Its address
+      and its admissions are in a third file. The City releases that third file
+      one time each year, for one admissions season.
+    </p>
+    <p>
+      This site puts these sources on one page for each school. For each value,
+      it gives you the measure, the year, and the source.
+    </p>
+    <p>
+      This site is a reference. It is not a recommender. It has no overall
+      score, no rank, and no weight. These things need a decision about what is
+      important. A website must not make that decision for a family.
+    </p>
+    <p>
+      A school is on this site if New York City Public Schools publishes data
+      about it. The data is a quality report, an enrollment snapshot, or both.
+      This includes each district school, each District 75 special education
+      school, each District 79 alternative program, each transfer school, and
+      each Young Adult Borough Center.
+    </p>
+    <p>
+      This site uses the admissions directories to describe a school. It does
+      not use them to add a school to the list. The directories also contain
+      early childhood centers. The codes of those centers are not school
+      numbers, and the directories cover one admissions season only.
+    </p>
+    <p>
+      A school is <strong>open</strong> if it is in the most recent enrollment
+      snapshot or in a current directory. Each other school is <strong>closed or
+      former</strong>, and it keeps its full history. No source publishes a
+      status field. Thus these two labels are the reading of this site, and they
+      can be wrong for a new school.
+    </p>
+
+    <h2 id="sources">Sources</h2>
+    <p>
+      This site reads each reporting period from inside the data. It does not
+      use the date on a source page. Some New York City open data pages show a
+      recent update when only the description changed.
+    </p>
+    <div id="source-table"></div>
+
+    <h3>Joins</h3>
+    <p>
+      This site joins each source on the DBN. The DBN identifies a school in
+      each city system. No join uses a school name. Each file spells a name
+      differently, and a join on a name attaches the results of one school to a
+      different school.
+    </p>
+    <p>
+      This site reads the borough and the district from the DBN. It does not use
+      a lookup file, which can become old.
+    </p>
+
+    <h2 id="calculation">Calculation</h2>
+
+    <h3>Comparison groups and bands</h3>
+    <p>
+      A percentage alone is difficult to read. A result of 71 percent at Level 3
+      or Level 4 in English can be good or usual. The page cannot tell you which
+      one without a reference point.
+    </p>
+    <p>
+      New York City supplies that reference point. For many measures it
+      publishes two more figures with the value: the average of the
+      <strong>comparison group</strong> of the school, and a <strong>score from
+      1 to 5</strong>. The score gives the result of the school against that
+      group. The City calculates both figures against a set of schools that the
+      City finds similar.
+    </p>
+    <p>This site uses these two figures in three ways, and adds nothing:</p>
+    <ul>
+      <li>
+        It writes the comparison group average as a sentence, not as a second
+        number. Thus you see the distance and the direction: 5 points more than
+        an average of 89.2 percent.
+      </li>
+      <li>
+        If the City publishes a score, the value gets a colored band. The band
+        contains the score, out of 5.
+      </li>
+      <li>
+        The band always has a written label with the color. A color alone is not
+        readable for each person, and a color is not a reason.
+      </li>
+    </ul>
+    <p>
+      This site groups the score of the City into four bands: 4 and more, 3 to
+      4, 2 to 3, and less than 2. That grouping is the only judgment on this
+      site. The score stays visible. Thus you can disagree with the grouping and
+      read the number.
+    </p>
+    <p>
+      If the City publishes no score, this site shows no color. This is usual.
+      About one value in six has a score. A demographic figure never has one,
+      because the enrollment of a school has no good or bad version.
+    </p>
+    <p>
+      A band is not a rating of the school. It describes one measure, in one
+      year, against one comparison group of the City.
+    </p>
+
+    <h3>One year to a measure</h3>
+    <p>
+      Each figure in a measure comes from the same school year. That year is the
+      year of the most recent all-students figure. If a student group has no
+      figure in that year, this site shows it as not reported. It does not use
+      an older number.
+    </p>
+    <p>
+      This rule is important. Without it, each group moves to its own most
+      recent figure. A card then shows each group at 100 percent and English
+      language learners at 85.7 percent, with a difference of eight years
+      between them. That comparison is not difficult to misread. It is
+      impossible to read correctly, and it looks like a fact about the school.
+    </p>
+    <p>
+      This site keeps the earlier figures. The panel of each measure has the
+      full series, year by year.
+    </p>
+
+    <h3>Order of measures</h3>
+    <p>
+      In a section, a measure starts with its all-students figure. The
+      breakdowns by student group come after it. This site shows those groups in
+      this order: race and ethnicity, then gender, then student groups such as
+      English language learners, then service settings, then prior achievement.
+      In each of these, the order is alphabetical.
+    </p>
+    <p>
+      The alphabetical order is deliberate. A different order in a list of
+      racial groups or ethnic groups is a judgment about which group to read
+      first. This site has no basis for that judgment.
+    </p>
+    <p>
+      The names of the groups and the measures are the words of the Department
+      of Education. This site copies them. If the source writes "Multi-Racial"
+      or "Economic Need Index", this site writes the same. You will find these
+      terms again in each other City document about the same school.
+    </p>
+
+    <h3>Units</h3>
+    <p>
+      Most percentages come as a proportion between 0 and 1. This site shows
+      them as a percentage. A proficiency value is a scale of approximately 1.0
+      to 4.5. It is not a percentage.
+    </p>
+    <p>
+      If a source does not give a unit, this site calculates the unit from the
+      range of the published values. It then tells you in the dictionary and on
+      the measure. A calculated unit is a judgment. It is not a fact from the
+      source.
+    </p>
+
+    <h3>Addresses and coordinates</h3>
+    <p>
+      The addresses come from the current admissions directories. The source
+      publishes the coordinates of each high school with the address.
+    </p>
+    <p>
+      For each other school, this site matches the coordinate from the address
+      with the geocoder of the New York City Department of City Planning. Thus
+      that coordinate is a derived value. Each school records which of the two
+      types it has. If an address does not match, this site gives no coordinate.
+      It does not give an approximate one.
+    </p>
+    <p>
+      About 400 open schools have no published address, because they are not in
+      an admissions directory. Their profiles show no address section.
+    </p>
+
+    <h3>Programs and admissions</h3>
+    <p>
+      Admissions occur at the program level, not at the school level. One school
+      can operate an open program and a screened program at the same time.
+    </p>
+    <p>
+      This site shows the seats, the applicants, and the priority order for each
+      program. They describe the Fall 2025 admissions season only. They are a
+      record of one season. They are not a prediction.
+    </p>
+
+    <h2 id="absences">Absences</h2>
+    <p>
+      This site never fills in a value, estimates a value, or writes a zero in
+      place of a value. If it cannot read a figure from a source, the figure is
+      absent.
+    </p>
+    <p>There are three different types of absence, and this site keeps them apart.</p>
+    <ul>
+      <li>
+        <strong>Not reported</strong> means the source published no value for
+        that school and that year.
+      </li>
+      <li>
+        <strong>Withheld</strong> means the source has the value but does not
+        publish it, because the group has too few students. The measure exists
+        and the value is protected. It is not a zero and not a low score.
+      </li>
+      <li>
+        <strong>Does not apply</strong> means the source does not publish that
+        measure for that type of school. A graduation rate is not absent from an
+        elementary school. No person expected it. This site removes these
+        measures from a profile. It does not show them as gaps.
+      </li>
+    </ul>
+
+    <h3>Why an absence is never a zero</h3>
+    <p>
+      A zero and a blank look similar, but they have opposite meanings. If a
+      school has no Native American students, the enrollment snapshot gives 0.0
+      percent, and this site shows 0.0 percent. That is a measurement.
+    </p>
+    <p>
+      If the City withheld a test result for the same group, a value of 0
+      percent would tell you that no student in that group met the standard. No
+      person has said that, and it is probably false. Thus a withheld figure
+      says withheld.
+    </p>
+
+    <h3>Every group, every time</h3>
+    <p>
+      Below a measure, this site shows the same list of student groups for each
+      school: each race and ethnicity, each gender, English language learners,
+      students with disabilities, and each grade in the measure. If a group has
+      no figure, this site lists the group with the reason.
+    </p>
+    <p>
+      An earlier version removed these groups, and that was worse. A race
+      breakdown showed two groups and removed the others. The page could not
+      tell you the reason. The school could have no such students, or the City
+      could have withheld the figure, or this site could have an error. In one
+      real example, the City had withheld four of the five absent groups. The
+      City said so clearly, and the page discarded it.
+    </p>
+
+    <h2 id="limits">Limits</h2>
+
+    <h3>Comparisons to avoid</h3>
+    <p>
+      <strong>Different years.</strong> Schools do not all report in the same
+      year. A comparison row gives the period. It also tells you when the most
+      recent values of two schools come from different years.
+    </p>
+    <p>
+      <strong>The years 2019-20 and 2020-21.</strong> The State canceled testing
+      in spring 2020, and participation was very low in the next year.
+      Attendance in those years includes remote days. A trend line through that
+      period measures the pandemic, not the school.
+    </p>
+    <p>
+      <strong>Measures with new names.</strong> The City changed the definition
+      of some measures between the 2017-18 and 2018-19 school years, and gave
+      them new identifiers. This site publishes them as separate series with a
+      note. One line would imply continuity.
+    </p>
+    <p>
+      <strong>Different school types.</strong> A school with grades 6 to 12
+      files two quality reports, one for its middle grades and one for its high
+      school grades. It publishes some measures in both reports, for different
+      students. This site shows two labeled rows, not one.
+    </p>
+    <p>
+      <strong>Different group sizes.</strong> A percentage over 12 students and
+      a percentage over 900 students are not equally stable. If the source
+      publishes the group size, this site shows it with the value.
+    </p>
+    <p>
+      <strong>A sorted comparison.</strong> You can sort the comparison table by
+      each column. This puts a list in the order of one published measure, in
+      one year. That is a correct thing to do, but it is not a rank of the
+      schools. A different column often gives a different order.
+    </p>
+
+    <h3>Not included</h3>
+    <ul>
+      <li>No overall score, rank, or recommendation.</li>
+      <li>No commute time or travel time.</li>
+      <li>No address entry, zoning lookup, or interactive map.</li>
+      <li>No survey results. They are in workbooks that this version does not use.</li>
+      <li>
+        No SHSAT figures and no specialized high school admissions figures. The
+        high school directory has them in a separate set of columns. The
+        documentation of those columns is not clear enough to publish safely.
+      </li>
+      <li>No charter schools, except the schools in the reporting of the City.</li>
+    </ul>
+
+    <h3>Freshness</h3>
+    <p>
+      At least two datasets tell you that the City updates them each year. The
+      most recent rows in those two datasets are from 2011 and 2013. This site
+      does not use them.
+    </p>
+    <p>
+      If a source is later than its expected refresh window, this site shows a
+      warning on each page. A silent old figure is worse than an absent figure.
+    </p>
+
+    <h3>Language</h3>
+    <p>
+      This site is in English only. The City publishes school information in
+      nine languages, and it translates its
+      <a href="https://www.myschools.nyc/">MySchools</a> service. If English is
+      not your first language, start there to apply.
+    </p>
+    <p>
+      A translation of this site is more work than one release. Machine
+      translation would produce confident errors about the education of a child.
+      That is worse than this statement.
+    </p>
+
+    <h2 id="downloads">Downloads</h2>
+    <p>
+      The same pipeline writes the pages and these files, from the same
+      validated tables. Thus the site and the downloads cannot disagree.
+    </p>
+    <dl class="facts" id="counts"></dl>
+    <div class="downloads" id="download-list"></div>
+
+    <div class="note-box">
+      <p>
+        <strong>Three conventions to know before you open these files.</strong>
+        Join on <code>dbn</code>, never on a school name. An empty value is
+        never a zero: the <code>status</code> column tells you whether the
+        source reported the value, withheld it for a small group, or published
+        nothing. A percentage is a proportion between 0 and 1, unless the
+        dictionary gives a different unit.
+      </p>
+      <p>
+        The historical sheet of the workbook has a headline set of measures for
+        each year. The full observation table has more than 1.6 million rows,
+        and Excel stops at approximately one million. The CSV archive has
+        everything.
+      </p>
+    </div>
+
+    <h3>JSON</h3>
+    <p>
+      This site is static. Thus the files that its pages read are also an
+      interface for you. There is no key and no rate limit, and CORS is open
+      because GitHub Pages serves it that way. The paths are stable. A change to
+      a path is a breaking change.
+    </p>
+    <pre class="code-block"><code>data/search-index.json      every school: DBN, name, borough, district, type, grades, status
+data/metrics.json           every measure: label, unit, category, which schools report it
+data/sources.json           every source with its period, coverage and limits
+data/status.json            build date, reporting periods, counts, display constants
+data/schools/{DBN}.json     one school: identity, every series, every program</code></pre>
+    <p>
+      A school file has a <code>series</code> object, keyed by measure
+      identifier. Each series has parallel arrays: <code>y</code> for the school
+      years, <code>v</code> for the values, and then <code>n</code> for the
+      group sizes, <code>c</code> for the comparison group average, <code>s</code>
+      for the score of the City, <code>b</code> for its band, <code>bd</code>
+      for a published bound such as "Above 95%", <code>st</code> for a status
+      that is not a plain reported value, and <code>rt</code> for the report
+      type where a school files two reports.
+    </p>
+    <p>
+      If a series has no <code>st</code> array, the source reported each value
+      in that series. A <code>null</code> in <code>v</code> is never a zero.
+    </p>
+
+    <h2 id="dictionary">Dictionary</h2>
+
+    <h3>Terms</h3>
+    <p>
+      The school data of New York City has its own vocabulary. It is not
+      difficult, but each source assumes that you know it.
     </p>
     <dl class="glossary">
       <dt>DBN</dt>
       <dd>
-        District, borough, and school number, such as <code>02M475</code>. Every
-        City school has one and it never changes, which is why everything on
-        this site is joined by it rather than by name. The first two digits are
-        the district, the letter is the borough, the last three are the school.
+        District, borough, and school number, such as <code>02M475</code>. Each
+        City school has one, and it never changes. Thus this site joins each
+        source on it. The first two digits are the district, the letter is the
+        borough, and the last three digits are the school.
       </dd>
 
       <dt>Comparison group</dt>
       <dd>
-        A set of schools the City treats as similar to this one when judging a
-        measure. The City chooses the membership and publishes the group's
-        average, but not the list of schools in it, so neither this site nor you
-        can see exactly who is in a given group.
+        A set of schools that the City finds similar to this school for one
+        measure. The City selects the members and publishes the average of the
+        group. It does not publish the list of the schools in the group. Thus
+        neither this site nor you can see who is in a group.
       </dd>
 
       <dt>Score out of 5</dt>
       <dd>
-        The City's own rating of one measure against that comparison group.
-        Higher is stronger. It is not a rating of the school.
+        The rating of the City for one measure against that comparison group. A
+        higher score is stronger. It is not a rating of the school.
       </dd>
 
       <dt>Withheld</dt>
       <dd>
-        The City calculated a value and did not publish it, because so few
-        students are in the group that publishing it could identify them. It is
-        a protection, not a bad result, and it is not a zero.
+        The City calculated a value and did not publish it, because the group
+        has too few students. Publication could identify them. It is a
+        protection. It is not a bad result and not a zero.
       </dd>
 
       <dt>Economic Need Index</dt>
       <dd>
-        The City's estimate of the share of a school's students facing economic
-        hardship, based on public assistance, housing and similar records rather
-        than on a survey. Higher means greater need.
+        The estimate of the City of the proportion of the students of a school
+        with economic hardship. The City calculates it from public assistance
+        records, housing records, and similar records. It does not use a survey.
+        A higher value means more need.
       </dd>
 
       <dt>Report type</dt>
       <dd>
-        Which quality report a school files: elementary and middle, high school,
-        transfer school, early childhood, District 75, or Young Adult Borough
-        Center. It decides which measures a school publishes at all.
+        The quality report that a school files: elementary and middle, high
+        school, transfer school, early childhood, District 75, or Young Adult
+        Borough Center. The report type controls which measures a school
+        publishes.
       </dd>
 
       <dt>Screened, zoned, open</dt>
       <dd>
-        Admissions methods, set per program rather than per school. Open means
-        no academic requirement. Zoned gives priority to students living in the
-        school's zone. Screened uses grades or other criteria.
+        Admissions methods. The City sets them for each program, not for each
+        school. Open means no academic requirement. Zoned gives priority to a
+        student who lives in the zone of the school. Screened uses grades or
+        other criteria.
       </dd>
     </dl>
 
-    <h2>What this site is</h2>
+    <h3>Measures</h3>
     <p>
-      New York City publishes a great deal about its schools, in several places
-      that do not join up. A school's test results sit in one dataset, its
-      enrollment in a workbook, its address and admissions in a third file
-      released once a year for one admissions season. This site puts them
-      together on one page per school and states, for every value, what it
-      measures, which year it describes, and where it came from.
+      This table gives each measure on the site, its unit, and the schools that
+      publish it. The identifier is the value in the <code>metric_id</code>
+      column of the downloads.
+    </p>
+    <div id="dict-table"></div>
+
+    <h2 id="build">Build</h2>
+    <p>
+      The pipeline is four Python stages and one entry point. Run these
+      commands:
+    </p>
+    <pre class="code-block"><code>python -m venv .venv
+.venv/bin/pip install pandas requests openpyxl XlsxWriter
+.venv/bin/python run.py</code></pre>
+    <p>
+      The first run downloads about 230 MB and geocodes the school addresses. It
+      takes about 15 minutes. A later run uses the two caches again.
     </p>
     <p>
-      It is a reference, not a recommender. There is no overall score, no
-      ranking and no weighting. Those require deciding what matters, and that is
-      not a decision a website should make for a family.
+      The file <code>pipeline/00_config.py</code> holds each threshold, each
+      source identifier, and each display rule. Change a value in that file,
+      then build the site again.
     </p>
 
-    <h2>Which schools are included</h2>
+    <h2 id="reuse">Reuse</h2>
     <p>
-      A school appears here if New York City Public Schools publishes data about
-      it: a quality report, an enrollment snapshot, or both. That is every
-      district school, including District 75 special education schools,
-      District 79 alternative programs, transfer schools and Young Adult
-      Borough Centers.
+      The data is free to use, but you must give attribution. Give credit to New
+      York City Public Schools and to
+      <a href="https://data.cityofnewyork.us/d/dnpx-dfnc">NYC Open Data</a> for
+      the data. Read this page before you cite a figure.
     </p>
     <p>
-      The admissions directories are used to describe a school, never to admit
-      one to the list. They also contain early childhood centers whose codes are
-      not school numbers, and they cover one admissions season rather than every
-      school that exists.
-    </p>
-    <p>
-      A school is marked <strong>open</strong> when it appears in the newest
-      enrollment snapshot or in a current directory. Everything else is marked
-      <strong>closed or former</strong> and keeps its full history. Neither
-      label comes from an official status field, because none of the sources
-      publishes one. It is this site's reading of the evidence, and it can be
-      wrong for a school that has just opened.
-    </p>
-
-    <h2>Joining the sources</h2>
-    <p>
-      Everything joins on the DBN, the district, borough and school number that
-      identifies a school across every city system. Nothing joins on a school
-      name. Names are spelled differently in every file, and matching on them
-      quietly attaches one school's results to another.
-    </p>
-    <p>
-      Borough and district are read from the DBN itself rather than from a
-      lookup file, so they cannot go stale.
-    </p>
-
-    <h2>Missing, withheld, and not applicable</h2>
-    <p>These are three different facts and the site keeps them apart.</p>
-    <ul>
-      <li>
-        <strong>Not reported</strong> means the source published no value for
-        that school and year.
-      </li>
-      <li>
-        <strong>Withheld</strong> means the source deliberately suppressed the
-        value because too few students were in the group. The measure exists.
-        The value is protected. It is not a zero and not a low score.
-      </li>
-      <li>
-        <strong>Does not apply</strong> means the measure is not published for
-        that type of school. A graduation rate is not missing from an elementary
-        school. It was never expected. Those measures are left out of a profile
-        rather than listed as gaps.
-      </li>
-    </ul>
-    <p>
-      No value on this site is ever filled in, estimated or defaulted to zero. A
-      figure that could not be read from a source is absent.
-    </p>
-
-    <h3>Why an absence is never shown as zero</h3>
-    <p>
-      A zero and a blank look similar and mean opposite things. If a school has
-      no Native American students, the enrollment snapshot says 0.0% and this
-      site shows 0.0%, because that is a measurement. If the City withheld a
-      test result for the same group, writing 0% would state that none of those
-      students met the standard, which nobody has said and which is probably
-      false. So a withheld figure says withheld.
-    </p>
-
-    <h3>Every group is listed, every time</h3>
-    <p>
-      Under a measure, the same list of student groups appears for every school:
-      each race and ethnicity, each gender, English language learners, students
-      with disabilities, and each grade the measure covers. A group with no
-      figure is listed with the reason rather than left out.
-    </p>
-    <p>
-      Leaving it out was the earlier behavior and it was worse than it looked. A
-      race breakdown would show two groups and silently omit the rest, and there
-      was no way to tell from the page whether the school had no such students,
-      the City had withheld the figure, or the site had a hole in it. In one
-      real case the answer was that four of the five missing groups had been
-      withheld, which the City had said plainly and the page had thrown away.
-    </p>
-
-    <h2 id="comparing">When two numbers should not be compared</h2>
-    <p>
-      <strong>Different years.</strong> Schools do not all report in the same
-      year. A comparison row states the period, and says explicitly when the two
-      schools' most recent values come from different years.
-    </p>
-    <p>
-      <strong>Across 2019-20 and 2020-21.</strong> State testing was canceled
-      in spring 2020 and participation was unusually low the following year.
-      Attendance in those years counts remote days. A trend line through that
-      period is measuring the pandemic, not the school.
-    </p>
-    <p>
-      <strong>Renamed measures.</strong> A few measures were redefined between
-      the 2017-18 and 2018-19 school years and given new identifiers. They are
-      published here as separate series with a note, rather than stitched into
-      one line that would imply continuity.
-    </p>
-    <p>
-      <strong>Different school types.</strong> A school serving grades 6 to 12
-      files two quality reports, one for its middle grades and one for its high
-      school grades, and publishes some measures in both for different students.
-      Those appear as two labeled rows, not one.
-    </p>
-    <p>
-      <strong>Different group sizes.</strong> A percentage over 12 students and
-      a percentage over 900 are not equally stable. Where the source publishes
-      the group size, it is shown next to the value.
-    </p>
-    <p>
-      <strong>Sorting a comparison.</strong> The comparison table can be sorted
-      by any column. That reorders a list by one published measure in one year,
-      which is a legitimate thing to want. It is not a ranking of the schools,
-      and sorting by a different column will often produce a different order.
-    </p>
-
-    <h2 id="bands">Comparison groups, scores, and the colored bands</h2>
-    <p>
-      A raw percentage is hard to read on its own. Seventy-one percent at Level
-      3 or 4 in English is good or unremarkable depending on the school, and
-      nothing on the page can tell you which without a reference point.
-    </p>
-    <p>
-      New York City provides that reference point itself. For many measures it
-      publishes two extra figures alongside the value: the average for the
-      school's <strong>comparison group</strong>, and a <strong>score from 1 to
-      5</strong> reflecting how the school did against that group. Both are the
-      City's own calculations, made against a set of schools the City considers
-      similar to this one.
-    </p>
-    <p>This site uses them in three ways, and adds nothing of its own:</p>
-    <ul>
-      <li>
-        The comparison group average is written out as a sentence rather than a
-        second bare number, so you see the distance and its direction: five
-        points above a 89.2 percent average, not just "89.2".
-      </li>
-      <li>
-        Where the City publishes a score, the value carries a colored band. The
-        score itself is printed inside the band, out of 5.
-      </li>
-      <li>
-        The band always carries a written label as well as a color, because a
-        color alone is not readable by everyone and is not a reason on its own.
-      </li>
-    </ul>
-    <p>
-      The four bands are this site's grouping of the City's number: 4 and above,
-      3 to 4, 2 to 3, and below 2. That grouping is the only judgment involved,
-      it is stated here, and the underlying score is always visible so you can
-      disagree with the grouping and still read the number.
-    </p>
-    <p>
-      Where the City publishes no score, nothing is colored. That is common:
-      roughly one published value in six carries a score, and demographic
-      figures never do, because there is no better or worse version of a
-      school's enrollment.
-    </p>
-    <p>
-      A band is not a rating of the school. It describes one measure, in one
-      year, against one comparison group chosen by the City.
-    </p>
-
-    <h2>One year to a measure</h2>
-    <p>
-      Every figure in a measure comes from the same school year: the year its
-      all-students figure was last reported. A student group with nothing that
-      year reads as not reported rather than falling back to an older number.
-    </p>
-    <p>
-      This matters more than it sounds. Left to themselves, groups drift to
-      their own most recent figures, and a card ends up showing every group at
-      100 percent and English language learners at 85.7, with the years eight
-      apart in small grey type beside them. That is not a hard comparison to
-      misread. It is an impossible one, and it looks like a fact about the
-      school rather than an artifact of the page.
-    </p>
-    <p>
-      Earlier figures are not lost. Every measure's panel carries the full
-      year-by-year series.
-    </p>
-
-    <h2>How measures are ordered</h2>
-    <p>
-      Within a section, a measure leads with its all-students figure, and any
-      breakdowns by student group sit under it. Those groups are shown in a
-      stated order: race and ethnicity, then gender, then student groups such as
-      English language learners, then service settings, then prior achievement.
-      Within each of those, the order is alphabetical.
-    </p>
-    <p>
-      Alphabetical is deliberate. Any other order inside a list of racial or
-      ethnic groups is a judgment about which group to read first, and that is
-      not a judgment this site has any basis to make.
-    </p>
-    <p>
-      Group and measure names are the Department of Education's own wording,
-      copied rather than reworded. Where the source writes "Multi-Racial" or
-      "Economic Need Index", so does this site, because those are the terms you
-      will meet again in every other City document about the same school.
-    </p>
-
-    <h2>Units</h2>
-    <p>
-      Most percentages arrive as proportions between 0 and 1 and are shown as
-      percentages. Proficiency values are a scale of roughly 1.0 to 4.5, not a
-      percentage. Where a source does not state a unit, this site infers it from
-      the range of published values and says so in the data dictionary and on
-      the measure itself. An inferred unit is a judgment, not a fact from the
-      source.
-    </p>
-
-    <h2>Addresses and coordinates</h2>
-    <p>
-      Addresses come from the current admissions directories. High school
-      coordinates are published alongside the address by the source. For every
-      other school the coordinate is matched from the address using the New York
-      City Department of City Planning geocoder, which makes it a derived value.
-      Each school records which of the two it has. An address that does not
-      match produces no coordinate rather than an approximate one.
-    </p>
-    <p>
-      About four hundred open schools have no published address, because they do
-      not appear in an admissions directory. Their profiles show no address
-      section rather than a placeholder.
-    </p>
-    <p>
-      This version of the site does not embed a map or load a mapping library.
-      An address links out to a map instead.
-    </p>
-
-    <h2>Programs and admissions</h2>
-    <p>
-      Admissions happen at the program level, not the school level. One school
-      can run an open program and a screened one at the same time. Seats,
-      applicants and priority order are shown per program and describe the
-      Fall 2025 admissions season only. They are a record of one season, not a
-      prediction about the next.
-    </p>
-
-    <h2>Freshness</h2>
-    <p>
-      Every reporting period on this site is read from inside the data. It is
-      never the date the build ran, and never the date a source page says it was
-      updated. Several New York City open data pages report a recent update when
-      only the description changed; at least two datasets that describe
-      themselves as annually updated last received rows in 2011 and 2013, and
-      they are not used here.
-    </p>
-    <p>
-      When a source passes its expected refresh window the site shows a warning
-      on every page. Silent staleness would be worse than a missing figure.
-    </p>
-
-    <h2>What is not here</h2>
-    <ul>
-      <li>No overall score, rank, or recommendation.</li>
-      <li>No commute or travel time.</li>
-      <li>No address entry, zoning lookup or interactive map.</li>
-      <li>No survey results yet. Those live in workbooks not used in this version.</li>
-      <li>
-        No SHSAT or specialized high school admissions figures. The high school
-        directory carries them in a separate set of columns whose grain is not
-        documented clearly enough to publish safely.
-      </li>
-      <li>No charter schools beyond what the city's own reporting covers.</li>
-    </ul>
-
-    <h2>Language</h2>
-    <p>
-      This site is in English only. The City publishes school information in
-      nine languages and its
-      <a href="https://www.myschools.nyc/">MySchools</a> service is translated;
-      if English is not your first language, that is the better starting point
-      for applying. A translated version of this site is a larger piece of work
-      than one release, and running the pages through machine translation would
-      produce confident-sounding errors about a child's education, which is
-      worse than saying plainly that it has not been done.
-    </p>
-
-    <h2>Errors</h2>
-    <p>
-      If a figure looks wrong, it is worth checking against the source linked on
-      the measure. If the error is here rather than there,
-      <a href="https://github.com/jaramana/schools.publicworks.nyc/issues">report it</a>.
+      If a figure looks wrong, compare it with the source on the measure. If the
+      error is on this site,
+      <a href="https://github.com/jaramana/schools.publicworks.nyc/issues">report
+      it</a>.
     </p>
   </section>
 </main>

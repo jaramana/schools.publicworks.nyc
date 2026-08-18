@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Schools Finder — New York City public school statistics</title>
+<title>Schools Finder</title>
 <meta name="description" content="Published statistics for every New York City public school, in one place. Search by name or DBN, or browse by borough, district and grade.">
 <link rel="stylesheet" href="css/site.css">
 <script src="js/site.js" defer></script>
@@ -25,28 +25,24 @@
     </p>
 
     <div class="search-shell" id="finder-search"></div>
-    <p class="hint">
-      No ranking, no overall score, no recommendation. Every figure comes with
-      the year it describes and where it came from.
-      <a href="method.html">How to read them</a>.
-    </p>
 
+    <!-- The suite's announcement banner. The wording is shared across every
+         publicworks.nyc project and only two things change: the body that did
+         not check it, and the official source to check a figure against. Keep
+         it that way, so a new project can carry the same notice by editing two
+         phrases. -->
     <div class="note-box">
       <p>
-        <strong>This is an experimental project, not an official one.</strong>
-        It is an independent compilation of data New York City publishes, built
-        to see whether those figures can be made readable in one place. It has
-        no standing, it can be wrong, and it is not checked by anyone at the
-        Department of Education. Before you act on anything here, confirm it
-        against <a href="https://www.myschools.nyc/">MySchools</a>, the school's
-        own website, or the source linked beside the figure.
+        <strong>This is not an official product.</strong> It is an independent
+        initiative, not affiliated with, endorsed by, or produced by
+        <a href="https://www.schools.nyc.gov/">New York City Public Schools</a>
+        or the City of New York. Please refer to them for authoritative
+        information.
       </p>
     </div>
 
     <h2 class="section-label">Or start from a borough</h2>
     <ul class="entry-grid" id="boroughs"></ul>
-
-    <p class="statusline mono" data-status>Loading…</p>
   </section>
 </main>
 

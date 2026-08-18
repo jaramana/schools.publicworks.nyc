@@ -50,6 +50,9 @@
   --band-low-ink:    #9c3d16;
 
   --shadow: 0 1px 2px rgba(20,22,28,.05), 0 8px 24px -12px rgba(20,22,28,.18);
+  /* The plain-panel shadow. One hairline lift, no ambient spread: a panel
+     sits on the paper, it does not float above it. */
+  --shadow-tight: 0 1px 2px rgba(20,22,28,.06);
 
   --measure: 34rem;
   --wide:    72rem;
@@ -122,8 +125,8 @@ main { padding-bottom: 5rem; }
 
 /* ---- Masthead --------------------------------------------------- */
 
-/* This block is the reference implementation of the shared publicworks.nyc
-   header, and other projects are copied from it. Only --accent, and any
+/* The shared publicworks.nyc header. The reference implementation is
+   paygap.publicworks.nyc; this is copied from it. Only --accent, and any
    control a project genuinely needs, may differ between sites. Retuning the
    sizes here changes the standard, so change it everywhere or not at all.
    The measurements are written down in the publicworks.nyc README. */
@@ -511,15 +514,16 @@ th, td { padding: .55rem .8rem; text-align: left; white-space: nowrap; }
 thead th {
   position: sticky; top: 0; z-index: 2; background: var(--paper-sunken);
   border-bottom: 1px solid var(--rule-strong);
-  font-size: .78rem; color: var(--ink-soft); font-weight: 700;
+  font-size: .78rem; letter-spacing: .02em; color: var(--ink-soft); font-weight: 700;
 }
 tbody tr + tr td { border-top: 1px solid var(--rule); }
 tbody tr:hover td { background: var(--paper-sunken); }
-td.num, th.num { text-align: right; }
-td.name, th.name { white-space: normal; min-width: 14rem; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.name, th.name { white-space: normal; min-width: 15rem; }
 td.wrap-cell { white-space: normal; min-width: 18rem; }
 
 th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--ink); }
 th.sortable::after { content: "\2195"; opacity: .3; margin-left: .35rem; font-size: .9em; }
 th[aria-sort="ascending"]::after  { content: "\2191"; opacity: 1; }
 th[aria-sort="descending"]::after { content: "\2193"; opacity: 1; }
@@ -610,10 +614,13 @@ code {
 /* ---- Downloads ---------------------------------------------------- */
 
 .downloads { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); padding: 0; list-style: none; }
+/* PLAIN PANEL. */
 .download {
   display: block; height: 100%; background: var(--paper-raised);
   border: 1px solid var(--rule); border-radius: 10px; padding: 1.1rem 1.2rem;
   text-decoration: none; color: inherit;
+  box-shadow: var(--shadow-tight);
+  transition: border-color .15s ease;
 }
 .download:hover { border-color: var(--accent); }
 .download h3 { margin: 0 0 .3rem; font-size: 1.02rem; }
@@ -630,20 +637,26 @@ code {
   display: grid; gap: .6rem; padding: 0; margin: .75rem 0 0; list-style: none;
   grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
 }
+/* PLAIN PANEL. Was 9px where every other card in the suite is 10px. */
 .entry {
   display: block; text-decoration: none; color: inherit;
   background: var(--paper-raised); border: 1px solid var(--rule);
-  border-radius: 9px; padding: .7rem .9rem;
+  border-radius: 10px; padding: .7rem .9rem;
+  box-shadow: var(--shadow-tight);
+  transition: border-color .15s ease;
 }
 .entry:hover { border-color: var(--accent); }
 .entry .e-name { display: block; font-weight: 600; }
 .entry .e-count { display: block; font-size: .8rem; color: var(--ink-faint); }
 
 .chapters { display: grid; gap: 1rem; margin: 2rem 0; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); padding: 0; list-style: none; }
+/* PLAIN PANEL — the suite's static box. Defined identically on all three. */
 .chapters a {
   display: block; height: 100%; background: var(--paper-raised);
   border: 1px solid var(--rule); border-radius: 10px; padding: 1.1rem 1.2rem;
   text-decoration: none; color: inherit;
+  box-shadow: var(--shadow-tight);
+  transition: border-color .15s ease;
 }
 .chapters a:hover { border-color: var(--accent); }
 .chapters h3 { margin: 0 0 .3rem; font-size: 1.02rem; color: var(--ink); }
@@ -666,6 +679,21 @@ code {
 .footer ul { list-style: none; padding: 0; margin: 0; }
 .footer li { margin-bottom: .25rem; }
 .colophon { margin-top: 1.5rem; font-size: .82rem; }
+/* The build credit, quieter than the disclaimer above it. The colophon now
+   carries the suite's disclaimer verbatim and nothing else, so the voice that
+   used to ride along at the end of it lives here instead. */
+.built-with { margin: .5rem 0 0; font-size: .82rem; color: var(--ink-faint); }
+/* The portfolio mark, at the very foot and outside the link columns. Set
+   quieter than the colophon above it and separated by a rule: publicworks.nyc
+   is the cabinet these projects are filed in, not a section of this site, so
+   it is announced once and does not compete with the site's own navigation. */
+.portfolio {
+  margin: 1.75rem 0 0; padding-top: 1.25rem;
+  border-top: 1px solid var(--rule);
+  font-size: .8rem; letter-spacing: .02em; color: var(--ink-faint);
+}
+.portfolio a { color: var(--ink-soft); text-decoration: none; font-weight: 600; }
+.portfolio a:hover { color: var(--accent); text-decoration: underline; }
 
 @media print {
   .masthead, .nav, .table-tools, .controls { display: none; }

@@ -53,13 +53,35 @@
               'for every year. Join on the DBN.'
       }
     ];
-    files.forEach(function (f) {
-      var link = SF.el('a', { class: 'download', href: f.href });
-      link.appendChild(SF.el('h3', { text: f.title }));
-      link.appendChild(SF.el('p', { text: f.text }));
-      link.appendChild(SF.el('span', { class: 'size', text: f.href.split('/').pop() }));
-      host.appendChild(link);
+    // A table, the shape every site in the suite uses for its downloads. The
+    // same three columns carry these two files and The Pay Gap's nineteen.
+    var wrap = SF.el('div', { class: 'table-wrap' });
+    var table = SF.el('table');
+    var thead = SF.el('thead');
+    var hrow = SF.el('tr');
+    ['Dataset', 'What it contains', 'File'].forEach(function (label) {
+      var th = SF.el('th', { text: label });
+      th.setAttribute('scope', 'col');
+      hrow.appendChild(th);
     });
+    thead.appendChild(hrow);
+    table.appendChild(thead);
+
+    var tbody = SF.el('tbody');
+    files.forEach(function (f) {
+      var tr = SF.el('tr');
+      var name = SF.el('td', { class: 'name' });
+      name.appendChild(SF.el('a', { href: f.href, text: f.title }));
+      var desc = SF.el('td', { class: 'wrap-cell' });
+      desc.appendChild(SF.el('span', { class: 'muted', text: f.text }));
+      var file = SF.el('td');
+      file.appendChild(SF.el('code', { text: f.href.split('/').pop() }));
+      tr.append(name, desc, file);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    host.appendChild(wrap);
   }
 
   function renderSources(sources, status) {
@@ -143,6 +165,30 @@
     }).catch(function (err) { SF.fail(host, err); });
   }
 
+  function restoreHash() {
+    if (!location.hash) return;
+    var target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    if (!target) return;
+
+    // Stop the moment the reader takes over. Re-applying the hash under
+    // someone who has already started scrolling is worse than landing in the
+    // wrong place.
+    var taken = false;
+    function yieldToUser() { taken = true; }
+    ['wheel', 'touchstart', 'keydown'].forEach(function (ev) {
+      window.addEventListener(ev, yieldToUser, { once: true, passive: true });
+    });
+
+    // setTimeout rather than requestAnimationFrame: rAF is throttled in a
+    // background tab, so a link opened in one would never be corrected.
+    function land() {
+      if (taken) return;
+      target.scrollIntoView({ behavior: 'instant', block: 'start' });
+    }
+    setTimeout(land, 0);
+    window.addEventListener('load', function () { setTimeout(land, 0); }, { once: true });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     Promise.all([SF.load('status.json'), SF.load('sources.json')])
       .then(function (both) {
@@ -150,6 +196,10 @@
         renderDownloads(both[0]);
         renderSources(both[1], both[0]);
         renderDictionary();
+        // The browser jumped to #downloads before the source table above it
+        // existed. Every row that table added moved the target, so re-apply
+        // the hash now that the page is built.
+        restoreHash();
       })
       .catch(function (err) { SF.fail(document.getElementById('counts'), err); });
   });
