@@ -57,7 +57,7 @@
   /* The refractive layer. On a desktop screen the masthead sits on it and the
      page passes underneath. Copied from NYC Hazard Historian, which is where
      the suite's glass is defined; only the tint follows this site's paper. */
-  --glass:      rgba(255, 255, 255, .82);
+  --glass:      rgba(247, 248, 248, .82);
   --glass-blur: saturate(140%) blur(14px);
   --glass-edge: inset 0 1px 0 rgba(255, 255, 255, .9);
 
