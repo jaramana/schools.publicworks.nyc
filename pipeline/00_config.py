@@ -61,8 +61,8 @@ SOURCES = {
         "source_id": "demographics",
         "agency": "NYC Public Schools",
         "title": "Demographic Snapshot, school level",
-        "dataset_id": "demographic-snapshot-2020-21-to-2024-25-public",
-        "url": f"{INFOHUB_DOCS}/demographic-snapshot-2020-21-to-2024-25-public.xlsx",
+        "dataset_id": "demographic-snapshot-2021-22-to-2025-26-public",
+        "url": f"{INFOHUB_DOCS}/demographic-snapshot-2021-22-to-2025-26-public.xlsx",
         "page": "https://infohub.nyced.org/reports/school-quality/information-and-data-overview",
         "retrieval": "InfoHub Excel workbook",
         "cadence": "Annual",
@@ -75,7 +75,7 @@ SOURCES = {
         "min_dbns": 1_800,
         "required_columns": ["DBN", "Year", "Total Enrollment"],
         "limitations": (
-            "Covers the 2020-21 school year onward only. The category for students who "
+            "Covers the 2021-22 school year onward only. The category for students who "
             "are neither female nor male was not reported in the earliest years, so an "
             "absent value there means not reported rather than none."
         ),
