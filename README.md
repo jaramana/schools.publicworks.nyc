@@ -14,9 +14,8 @@ three admissions directories and a set of files whose locations change each
 year, in formats that assume you already know what a DBN is and which report
 type a school files.
 
-This site does the joining once, in the open, and shows the definition and the
-reporting period next to every value. It answers what a school publishes about
-itself.
+This site combines those sources and shows the definition and the reporting
+period next to every value. It answers what a school publishes about itself.
 
 There is no ranking, no overall score and no recommendation. The published data
 does not support one. The site is not affiliated with New York City Public
