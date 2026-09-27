@@ -746,10 +746,6 @@ code {
 .footer ul { list-style: none; padding: 0; margin: 0; }
 .footer li { margin-bottom: .25rem; }
 .colophon { margin-top: 1.5rem; font-size: .82rem; }
-/* The build credit, quieter than the disclaimer above it. The colophon now
-   carries the suite's disclaimer verbatim and nothing else, so the voice that
-   used to ride along at the end of it lives here instead. */
-.built-with { margin: .5rem 0 0; font-size: .82rem; color: var(--ink-faint); }
 /* The portfolio mark, at the very foot and outside the link columns. Set
    quieter than the colophon above it and separated by a rule: publicworks.nyc
    is the cabinet these projects are filed in, not a section of this site, so
@@ -861,4 +857,3 @@ abbr[title] { text-decoration: underline dotted; cursor: help; }
 /* The status line under the search doubles as the place a refused action is
    reported, so it needs to read as a message rather than as a caption. */
 .hint.warned { color: var(--warn); font-weight: 600; }
-

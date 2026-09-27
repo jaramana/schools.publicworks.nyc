@@ -261,11 +261,10 @@
           'or produced by <a href="https://www.schools.nyc.gov/">New York City ' +
           'Public Schools</a> or the City of New York. Please refer to them ' +
           'for authoritative information.</p>' +
-        '<p class="built-with">Public data, public method, built with Python.</p>' +
         // The portfolio mark, below everything and outside the columns. It is
         // a filing cabinet, not a section of this site, so it is announced
         // once at the foot rather than filed among the site's own pages.
-        '<p class="portfolio">A <a href="https://publicworks.nyc">publicworks.nyc</a> project</p>' +
+        '<p class="portfolio">A <a href="https://publicworks.nyc/">publicworks.nyc</a> project.</p>' +
         '</div>';
     }
   }

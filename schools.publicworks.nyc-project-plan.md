@@ -1,11 +1,13 @@
 # schools.publicworks.nyc
 
-Formerly schoolsfinder.nyc, renamed under the publicworks.nyc portfolio
-convention before its first launch. This plan predates the rename; the product
-goal, scope and rules below are unchanged, only the name and file references
-are current.
+Historical first-release plan, written when the project was called
+schoolsfinder.nyc. The site is now live. Use `README.md`,
+`pipeline/00_config.py` and the current site files for its implemented scope,
+sources and maintenance. The `working-with-claude_jaramana` file named in the
+original plan is not present in this repository.
 
-Read `working-with-claude_jaramana` first. It defines working style, tone, and general stack preferences.
+The `School Ranking.xlsx` research workbook mentioned below is also not in
+this repository; `research/workbook-inventory.md` records its field inventory.
 
 Project-specific overrides:
 
@@ -294,9 +296,9 @@ Prepare for V2 without building or exposing it in V1:
 
 ---
 
-## Start here
+## Original build sequence (completed)
 
-1. Review `working-with-claude_jaramana`, `School Ranking.xlsx`, and thepaygap.nyc codebase. Do not copy workbook formulas without validating their meaning.
+1. Review `School Ranking.xlsx` and the original Pay Gap codebase. Do not copy workbook formulas without validating their meaning.
 2. Produce the source manifest and entity model. Report coverage gaps and methodology decisions before building the full site.
 3. Build one vertical slice: search index, one real school profile, metric metadata, source display, and one-row public download output.
 4. Validate the slice for key integrity, missing-data behavior, performance, design parity, and accessibility. Then expand sources and school types.
