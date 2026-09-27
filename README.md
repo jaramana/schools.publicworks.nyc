@@ -54,8 +54,9 @@ and validation limits are set in `pipeline/00_config.py`.
 
 ## Tools
 
-Data pipeline: Python, `pandas`, `requests`, `openpyxl` and `XlsxWriter`. Site:
-HTML, CSS and JavaScript. Claude was used in development.
+Data pipeline: Python, `pandas`, `requests`, `openpyxl` and `XlsxWriter`
+prepare and validate the data. Website: static HTML, CSS and JavaScript,
+served from GitHub Pages. Claude was used in development.
 
 ## License and reuse
 

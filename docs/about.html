@@ -16,8 +16,8 @@
   <section class="wrap console">
     <h1 class="console-h1">About</h1>
     <p class="console-sub">
-      A public reference for New York City school statistics, built from the
-      city's own published data.
+      Schools Finder brings published New York City school statistics into one
+      profile per school, with each figure's definition and reporting period.
     </p>
     <p class="statusline mono" data-status></p>
   </section>
@@ -41,38 +41,29 @@
       The site shows published school statistics and their reporting periods.
       It does not calculate an overall school score.
     </p>
+    <p>
+      For applications, use <a href="https://www.myschools.nyc/">MySchools</a>,
+      the City's admissions system. This site does not determine eligibility
+      or make offers.
+    </p>
 
     <h2>Built</h2>
     <p>
-      Static HTML, CSS and vanilla JavaScript, served from GitHub Pages. There
-      is no framework, no build step for the site, no database and no backend.
-      Python generates the data files; the browser only reads them.
-    </p>
-    <p>
-      The whole pipeline and every page are in the
-      <a href="https://github.com/jaramana/schools.publicworks.nyc">repository</a>.
-      The data is refreshed by a scheduled workflow that runs the same pipeline
-      and publishes only after validation passes.
+      Python, pandas, requests, openpyxl and XlsxWriter prepare and validate
+      the data. The website uses static HTML, CSS and JavaScript, served from
+      GitHub Pages.
     </p>
 
     <h2>Independence</h2>
     <p>
-      This is an independent compilation of published City data. No agency
-      reviewed it. Where a value here disagrees with an official source, the
-      official source is correct and the error is worth reporting.
-    </p>
-    <p>
-      For applying to a school, use
-      <a href="https://www.myschools.nyc/">MySchools</a>, the city's own
-      admissions system. Nothing here is an application, an offer, or advice
-      about eligibility.
+      No agency reviewed this site.
     </p>
 
     <h2>Credits</h2>
     <p>
       Data published by New York City Public Schools and NYC Open Data.
-      Coordinates matched with the Department of City Planning geocoder. Built
-      with Python and pandas. Written with help from Claude.
+      Coordinates matched with the Department of City Planning geocoder.
+      Claude was used in development.
     </p>
 
     <h2>Language</h2>
@@ -84,10 +75,9 @@
 
     <h2>Reuse</h2>
     <p>
-      The code is BSD 3-Clause licensed. The compiled data is free to reuse with
-      attribution to this site and to the agencies below. The underlying data
-      belongs to New York City Public Schools and NYC Open Data and carries their
-      terms. If you republish a figure, carry its reporting period with it.
+      Code is BSD 3-Clause licensed. Compiled data can be reused with
+      attribution; the source data retain their own terms. Carry the reporting
+      period when republishing a figure.
     </p>
 
     <h2>Contact</h2>
