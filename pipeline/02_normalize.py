@@ -16,7 +16,9 @@ and never let any of them become a zero.
 import importlib
 import json
 import re
+import struct
 import sys
+import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
@@ -342,6 +344,56 @@ def coordinates_from_hs(directories):
     return found
 
 
+def read_dbf(data, encoding="utf-8"):
+    """Rows of a dBase table, the attribute part of a shapefile.
+
+    The school point file carries latitude and longitude as attributes, so the
+    geometry is not needed and neither is a GIS library.
+    """
+    count = struct.unpack("<I", data[4:8])[0]
+    header, width = struct.unpack("<HH", data[8:12])
+    fields, pos = [], 32
+    while data[pos] != 0x0D:
+        name = data[pos:pos + 11].split(b"\0")[0].decode("ascii")
+        fields.append((name, data[pos + 16]))
+        pos += 32
+    rows = []
+    for i in range(count):
+        record = data[header + i * width: header + (i + 1) * width]
+        if record[:1] == b"*":      # deleted
+            continue
+        row, at = {}, 1
+        for name, size in fields:
+            row[name] = record[at:at + size].decode(encoding, "replace").strip()
+            at += size
+        rows.append(row)
+    return rows
+
+
+def coordinates_from_points():
+    """Coordinates from the Department of Education's school point file."""
+    source = cfg.SOURCES["school_points"]
+    with zipfile.ZipFile(cfg.RAW / source["cache"]) as archive:
+        name = next(n for n in archive.namelist() if n.lower().endswith(".dbf"))
+        rows = read_dbf(archive.read(name))
+
+    missing = [c for c in source["required_columns"] if rows and c not in rows[0]]
+    if missing or len(rows) < source["min_rows"]:
+        raise RuntimeError(
+            f"school_points: {len(rows):,} rows, missing columns {missing}. "
+            f"The file changed shape. Check {source['page']}")
+
+    west, south, east, north = cfg.NYC_BOUNDS
+    found = {}
+    for row in rows:
+        lat, lon = to_number(row["Latitude"]), to_number(row["Longitude"])
+        if lat is None or lon is None or not (west < lon < east and south < lat < north):
+            continue
+        found[row["ATS"].strip().upper()] = (lat, lon, "points")
+    log(f"  school point file: {len(found):,} usable points")
+    return found
+
+
 def geocode_one(address, session):
     """Look up one address. Returns a coordinate, None for a real no-match, or
     raises so the caller can leave it out of the cache and try again next run."""
@@ -392,7 +444,10 @@ def geocode_all(addresses, cache):
 
 def add_coordinates(schools, directories):
     log("resolving coordinates")
-    published = coordinates_from_hs(directories)
+
+    # The school point file wins over the high school directory. Both are
+    # published by the Department of Education; the point file covers every level.
+    published = {**coordinates_from_hs(directories), **coordinates_from_points()}
     cache = load_geocode_cache()
 
     # Only schools without a published coordinate need the geocoder.
@@ -420,10 +475,10 @@ def add_coordinates(schools, directories):
     # Education published is not the same fact as one matched from an address.
     schools["coordinate_source"] = sources
     have = schools["latitude"].notna().sum()
-    published_count = sum(1 for s in sources if s == "source")
     log(f"  {have:,} of {len(schools):,} schools have a coordinate "
-        f"({published_count:,} published by the source, "
-        f"{have - published_count:,} matched from an address)")
+        f"({sources.count('points'):,} from the point file, "
+        f"{sources.count('source'):,} from the high school directory, "
+        f"{sources.count('geocoded'):,} matched from an address)")
     return schools
 
 
@@ -828,6 +883,15 @@ def build_sources(observations, schools, programs, fetch_manifest):
             record["schools"] = int(subset["dbn"].nunique()) if len(subset) else 0
             record["latest_period"] = "Fall 2025"
             record["earliest_period"] = "Fall 2025"
+        elif key == "school_points":
+            record["rows"] = int(schools["coordinate_source"].eq("points").sum())
+            record["schools"] = record["rows"]
+            # The attachment's file name carries its snapshot date, for example
+            # SchoolPoints_APS_2024_08_28.zip.
+            stamp = re.search(r"(\d{4})_(\d{2})_(\d{2})",
+                              fetched.get(key, {}).get("filename") or "")
+            record["latest_period"] = "-".join(stamp.groups()) if stamp else None
+            record["earliest_period"] = record["latest_period"]
         elif key == "geosearch":
             record["rows"] = int(schools["coordinate_source"].eq("geocoded").sum())
             record["schools"] = record["rows"]

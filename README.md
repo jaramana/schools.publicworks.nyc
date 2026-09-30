@@ -13,7 +13,9 @@ period for each figure and definitions in the measure details.
 | [School Quality Reports](https://data.cityofnewyork.us/d/dnpx-dfnc), `dnpx-dfnc` | Attendance, performance and other reported measures | Through 2024–25 |
 | [Demographic Snapshot](https://infohub.nyced.org/reports/school-quality/information-and-data-overview) | Enrollment and demographics | Through 2025–26 |
 | [NYC Public Schools directory data](https://infohub.nyced.org/reports/admissions-and-enrollment/directory-data) | Addresses, grades, programs and admissions information | Fall 2025 |
-| [GeoSearch](https://geosearch.planninglabs.nyc/) | Coordinates for available addresses | Address lookup |
+| [School Point Locations](https://data.cityofnewyork.us/d/jfju-ynrr), `jfju-ynrr` | School coordinates | August 2024 snapshot |
+| [GeoSearch](https://geosearch.planninglabs.nyc/) | Coordinates for schools missing from the point file | Address lookup |
+| [School Districts](https://data.cityofnewyork.us/d/8ugf-3d8u), `8ugf-3d8u` | District outlines on the map | Updated May 2026 |
 
 The current periods are in `docs/data/status.json`. The dated
 [source manifest](research/source-manifest.md) records the original survey and
@@ -35,6 +37,10 @@ rejected sources; it is not updated with each build.
 - Survey and school-climate results, SHSAT figures and some specialized admissions
   measures are not included. About 400 open schools have no address in the
   available directories.
+- Coordinates come from the school point file first, then the high school
+  directory, then the geocoder. The point file is a dated snapshot, so a school
+  that opened after it falls back. The map draws every school alike and does not
+  show school zones.
 
 The [method page](https://schools.publicworks.nyc/method.html) explains the
 measures and missing-data states. The
@@ -52,11 +58,15 @@ still running. A stopped workflow cannot update the site's stale-source warning.
 The Python pipeline in `run.py` uses cached downloads on later runs. Source URLs
 and validation limits are set in `pipeline/00_config.py`.
 
+District outlines change rarely, so the daily run does not fetch them. Run
+`python tools/fetch_districts.py` when NYC Open Data publishes new ones.
+
 ## Tools
 
 Data pipeline: Python, `pandas`, `requests`, `openpyxl` and `XlsxWriter`
 prepare and validate the data. Website: static HTML, CSS and JavaScript,
-served from GitHub Pages. Claude was used in development.
+served from GitHub Pages. MapLibre GL is included with the site for maps, over
+the OpenFreeMap Positron basemap. Claude was used in development.
 
 ## License and reuse
 

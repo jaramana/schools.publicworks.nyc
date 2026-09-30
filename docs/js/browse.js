@@ -1,7 +1,8 @@
 /* Browse: filters for finding a school when you do not have a name.
    ------------------------------------------------------------------
    Filter state lives in the URL, so a narrowed list is a link someone can
-   send. Nothing here ranks: the list is alphabetical, always. */
+   send. Nothing here ranks: the list is alphabetical, always. The map shows
+   the same filtered list, and every point is drawn alike. */
 
 (function () {
   'use strict';
@@ -9,6 +10,18 @@
   var PAGE_SIZE = 60;
   var shown = PAGE_SIZE;
   var rows = [];
+
+  // The map is built on first use and kept, so switching views is instant
+  // after that. `mapReady` resolves with the map, or null if it cannot draw.
+  var mapReady = null;
+  var popup = null;
+  var hovered = null;
+  var byDbn = {};
+  var scrollAfterDraw = null;
+
+  // A wide screen shows the list beside a pinned map. A narrow one shows
+  // one at a time and swaps them with a floating button.
+  var wide = window.matchMedia('(min-width: 60rem)');
 
   var FILTERS = [
     { key: 'boro',     label: 'Borough',  all: 'Every borough' },
@@ -54,6 +67,8 @@
   function currentFilters() {
     var state = {};
     FILTERS.forEach(function (f) { state[f.key] = SF.param(f.key) || ''; });
+    // A typed link may say district=2; the data says "02".
+    if (/^\d$/.test(state.district)) state.district = '0' + state.district;
     return state;
   }
 
@@ -141,7 +156,8 @@
   function card(row) {
     var link = SF.el('a', {
       class: 'school-card',
-      href: 'school.html?dbn=' + encodeURIComponent(row.dbn)
+      href: 'school.html?dbn=' + encodeURIComponent(row.dbn),
+      'data-dbn': row.dbn
     });
     link.appendChild(SF.el('span', { class: 'name', text: row.name || row.dbn }));
     var where = [row.boro, districtLabel(row.district)].filter(Boolean).join(' · ');
@@ -152,38 +168,250 @@
     return link;
   }
 
-  function draw() {
+  function mapView() { return SF.param('view') === 'map'; }
+
+  function panes() {
+    if (wide.matches) return { map: true, list: true };
+    return { map: mapView(), list: !mapView() };
+  }
+
+  function countText(list) {
+    if (list.length === 0) return 'No schools match these filters.';
+    var total = list.length.toLocaleString('en-US');
+    if (shown < list.length) {
+      return 'Showing ' + shown.toLocaleString('en-US') + ' of ' + total +
+             ' schools, in alphabetical order.';
+    }
+    return total + (list.length === 1 ? ' school.' : ' schools, in alphabetical order.');
+  }
+
+  // "54 schools · District 15 · Middle", for the bar over a full-screen map.
+  function summary(state, list) {
+    var bits = [list.length.toLocaleString('en-US') + (list.length === 1 ? ' school' : ' schools')];
+    if (state.boro) bits.push(state.boro);
+    if (state.district) bits.push(districtLabel(state.district));
+    if (state.type) bits.push(state.type);
+    if (state.grade) bits.push(state.grade);
+    return bits.join(' · ');
+  }
+
+  // `animate` is set when a filter changes, so the list fades between
+  // results. Paging with "Show more" and switching views do not animate.
+  function draw(animate) {
     var state = currentFilters();
     var list = apply(state);
+    var p = panes();
+
+    var float = document.getElementById('float-toggle');
+    float.hidden = wide.matches;
+    float.textContent = mapView() ? 'Show list' : 'Show map';
+    document.body.classList.toggle('map-full', !wide.matches && mapView());
+
+    document.getElementById('list-panel').hidden = !p.list;
+    document.getElementById('map-panel').hidden = !p.map;
+    document.getElementById('school-count').textContent = countText(list);
+    document.getElementById('map-bar-summary').textContent = summary(state, list);
+
+    if (p.list) drawList(list, animate);
+    if (p.map) drawMap(state, list, animate);
+
+    // The profile's back link returns to exactly this view.
+    try { sessionStorage.setItem('sf-results', location.pathname + location.search); } catch (e) {}
+
+    // A jump, not a glide: the map has just closed over this spot.
+    if (scrollAfterDraw) {
+      scrollAfterDraw.scrollIntoView({ block: 'start' });
+      scrollAfterDraw = null;
+    }
+  }
+
+  function drawList(list, animate) {
     var grid = document.getElementById('school-list');
-    var count = document.getElementById('school-count');
     var more = document.getElementById('show-more');
-
-    grid.innerHTML = '';
-    list.slice(0, shown).forEach(function (row) {
-      grid.appendChild(SF.el('li', {}, [card(row)]));
+    var from = animate ? 0 : grid.children.length;
+    if (animate || shown <= grid.children.length) {
+      grid.innerHTML = '';
+      from = 0;
+    }
+    list.slice(from, shown).forEach(function (row, i) {
+      var item = SF.el('li', { class: animate ? 'enter' : '' }, [card(row)]);
+      // Only the first dozen stagger, so a long list does not trickle in.
+      if (animate) item.style.setProperty('--i', Math.min(i, 12));
+      grid.appendChild(item);
     });
-
-    count.textContent = list.length === 0
-      ? 'No schools match these filters.'
-      : (shown < list.length
-          ? 'Showing ' + shown.toLocaleString('en-US') + ' of ' +
-            list.length.toLocaleString('en-US') + ' schools, in alphabetical order.'
-          : list.length.toLocaleString('en-US') +
-            (list.length === 1 ? ' school.' : ' schools, in alphabetical order.'));
-
     more.hidden = shown >= list.length;
     more.textContent = 'Show ' + Math.min(PAGE_SIZE, list.length - shown) + ' more';
+  }
+
+  // ---- Map ----------------------------------------------------------
+
+  function geojson(list) {
+    return {
+      type: 'FeatureCollection',
+      features: list.filter(function (r) { return r.lat != null; }).map(function (r) {
+        return { type: 'Feature', properties: { dbn: r.dbn },
+                 geometry: { type: 'Point', coordinates: [r.lon, r.lat] } };
+      })
+    };
+  }
+
+  // One school in focus at a time: its card lights up in the list and its
+  // point grows on the map.
+  function setHover(map, dbn) {
+    if (hovered === dbn) return;
+    hovered = dbn;
+    var row = dbn && byDbn[dbn];
+    SFMap.focus(map, row && row.lat != null ? [row.lon, row.lat] : null);
+    document.querySelectorAll('.school-card.is-hover').forEach(function (c) {
+      c.classList.remove('is-hover');
+    });
+    if (dbn) {
+      var match = document.querySelector('#school-list .school-card[data-dbn="' + dbn + '"]');
+      if (match) match.classList.add('is-hover');
+    }
+  }
+
+  // The same basket the profile page fills, so a shortlist can start here.
+  function compareButton(dbn) {
+    var limit = (SF.display && SF.display.max_compare) || 12;
+    var button = SF.el('button', { class: 'pill', type: 'button' });
+    function paint() {
+      var inBasket = SF.store.get('compare', []).indexOf(dbn) !== -1;
+      button.setAttribute('aria-pressed', String(inBasket));
+      button.textContent = inBasket ? 'In your comparison' : 'Add to comparison';
+    }
+    button.addEventListener('click', function () {
+      var current = SF.store.get('compare', []);
+      var at = current.indexOf(dbn);
+      if (at > -1) current.splice(at, 1);
+      else if (current.length < limit) current.push(dbn);
+      else { button.textContent = 'Comparison is full'; return; }
+      SF.store.set('compare', current);
+      paint();
+    });
+    paint();
+    return button;
+  }
+
+  function popupBody(hits) {
+    return SF.el('div', { class: 'map-popup' }, hits.map(function (row) {
+      return SF.el('div', { class: 'map-popup-item' }, [card(row), compareButton(row.dbn)]);
+    }));
+  }
+
+  function ensureMap(state) {
+    if (mapReady) return mapReady;
+    var frame = document.getElementById('school-map');
+
+    // The wide map is pinned to the screen height, so it takes the wheel.
+    mapReady = SFMap.create(frame, { scrollZoom: wide.matches }).then(function (map) {
+      if (!map) return null;
+      return SFMap.addDistricts(map, state.district).then(function () {
+        SFMap.addSchools(map, geojson([]));
+
+        popup = new maplibregl.Popup({ closeButton: true, maxWidth: '20rem', offset: 12 });
+        map.on('click', 'schools', function (ev) {
+          // Schools that share a building sit on one point, so every school
+          // under the click is listed.
+          var hits = ev.features.map(function (f) { return byDbn[f.properties.dbn]; })
+            .filter(Boolean);
+          popup.setLngLat(ev.features[0].geometry.coordinates)
+            .setDOMContent(popupBody(hits)).addTo(map);
+        });
+        map.on('mousemove', 'schools', function (ev) {
+          map.getCanvas().style.cursor = 'pointer';
+          setHover(map, ev.features[0].properties.dbn);
+        });
+        map.on('mouseleave', 'schools', function () {
+          map.getCanvas().style.cursor = '';
+          setHover(map, null);
+        });
+
+        var list = document.getElementById('school-list');
+        list.addEventListener('mouseover', function (ev) {
+          var c = ev.target.closest('.school-card');
+          setHover(map, c ? c.dataset.dbn : null);
+        });
+        list.addEventListener('mouseleave', function () { setHover(map, null); });
+        return map;
+      });
+    });
+    return mapReady;
+  }
+
+  function drawMap(state, list, animate) {
+    var placed = list.filter(function (r) { return r.lat != null; });
+    var missing = list.length - placed.length;
+    var note = document.getElementById('map-note');
+    note.hidden = missing === 0;
+    note.textContent = missing.toLocaleString('en-US') + ' of ' +
+      list.length.toLocaleString('en-US') + ' schools ' +
+      (missing === 1 ? 'has' : 'have') + ' no published location and ' +
+      (missing === 1 ? 'appears' : 'appear') + ' only in the list.';
+
+    ensureMap(state).then(function (map) {
+      if (!map) return;
+      var data = geojson(list);
+      if (animate) SFMap.setSchools(map, data);
+      else map.getSource('schools').setData(data);
+      SFMap.chooseDistrict(map, state.district);
+      if (popup) popup.remove();
+      hovered = null;
+
+      var focus = SF.param('focus');
+      var target = focus && placed.filter(function (r) { return r.dbn === focus; })[0];
+      if (target) {
+        map.jumpTo({ center: [target.lon, target.lat], zoom: 14.5 });
+        setHover(map, target.dbn);
+      } else if (placed.length) {
+        var bounds = new maplibregl.LngLatBounds();
+        placed.forEach(function (r) { bounds.extend([r.lon, r.lat]); });
+        SFMap.frame(map, bounds, animate ? {} : { duration: 0 });
+      }
+    });
+  }
+
+  // On a narrow screen, opening the map adds a history entry, so the
+  // phone's back gesture closes the map instead of leaving the page.
+  function setView(view) {
+    if (view === 'map') {
+      var u = new URL(window.location);
+      u.searchParams.set('view', 'map');
+      history.pushState({ map: true }, '', u);
+    } else if (history.state && history.state.map) {
+      history.back();
+      return;
+    } else {
+      SF.setParam('view', '', true);
+    }
+    var toTop = !scrollAfterDraw;
+    draw();
+    if (toTop) window.scrollTo(0, 0);
   }
 
   document.addEventListener('DOMContentLoaded', function () {
     SFSearch.mount('#browse-search', {});
 
-    var listHost = document.getElementById('browse');
+    var listHost = document.getElementById('school-list');
     SFSearch.data().then(function (data) {
       rows = data;
+      rows.forEach(function (r) { byDbn[r.dbn] = r; });
       var controls = document.getElementById('filters');
-      buildControls(controls, currentFilters(), function () { shown = PAGE_SIZE; draw(); });
+      buildControls(controls, currentFilters(), function () {
+        shown = PAGE_SIZE;
+        SF.setParam('focus', '', true);
+        draw(true);
+      });
+
+      document.getElementById('float-toggle').addEventListener('click', function () {
+        setView(mapView() ? 'list' : 'map');
+      });
+      document.getElementById('map-filters').addEventListener('click', function () {
+        scrollAfterDraw = document.getElementById('filters');
+        setView('list');
+      });
+      window.addEventListener('popstate', function () { draw(); });
+      if (wide.addEventListener) wide.addEventListener('change', function () { draw(); });
 
       document.getElementById('show-more').addEventListener('click', function () {
         shown += PAGE_SIZE;

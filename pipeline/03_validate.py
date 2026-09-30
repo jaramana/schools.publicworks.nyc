@@ -272,6 +272,16 @@ def check_against_published(tables, report):
                         f"the observation count fell {loss:.1%}, past the "
                         f"{cfg.VALIDATION['max_row_shrinkage']:.0%} tolerance")
 
+    now_coords = int(tables["schools"]["latitude"].notna().sum())
+    was_coords = before.get("schools_with_coordinates")
+    if was_coords:
+        loss = (was_coords - now_coords) / was_coords
+        report.fact("coordinate_change", f"{was_coords:,} to {now_coords:,}")
+        if loss > cfg.VALIDATION["max_coordinate_loss"]:
+            report.fail("regression.coordinates",
+                        f"schools with a coordinate fell {loss:.1%}, past the "
+                        f"{cfg.VALIDATION['max_coordinate_loss']:.0%} tolerance")
+
     # A metric that disappears takes a profile section with it.
     was_metrics = set(previous.get("metric_ids", []))
     if was_metrics:

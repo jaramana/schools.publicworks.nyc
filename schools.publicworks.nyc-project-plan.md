@@ -67,6 +67,7 @@ Every statistic must expose its definition, reporting period, source, applicabil
 - Show the school's address, borough, district, and coordinates where available.
 - An external "Open in map" link is acceptable.
 - Do not embed an interactive map or load a mapping library in V1.
+- Superseded by V2 phase 1 (2026-09-29). See "V2 phase 1: map".
 
 ### Public downloads
 
@@ -274,6 +275,44 @@ Prepare for V2 without building or exposing it in V1:
 
 ---
 
+## V2 phase 1: map (2026-09-29)
+
+V2 opens with a map. The V1 location rules no longer apply.
+
+Built:
+
+- Browse has a List / Map toggle (`?view=map`). The map uses the same filters and URL state. List stays the default.
+- Each profile has a small locator map with the school's district outlined.
+- District outlines come from NYC Open Data `8ugf-3d8u`, fetched by hand with `tools/fetch_districts.py`.
+- Coordinates come from DOE School Point Locations (`jfju-ynrr`) first, then the high school directory, then GeoSearch. Open schools with a coordinate rose from 1,504 to 1,894 of 1,907.
+- MapLibre GL is vendored in `docs/vendor/` and loads only when a map is shown.
+- The basemap is OpenFreeMap Positron: vector, keyless, open. CARTO raster tiles now carry a key watermark, and the City basemap was rejected on looks.
+
+Guardrails:
+
+- Every point is drawn alike. No choropleth and no color by measure.
+- The map states how many filtered schools have no location.
+- No address entry, "near me" or zone display.
+- Validation fails a build that loses more than 5% of its coordinates.
+
+Known risk: the point file is a dated attachment whose download link changes with each upload. `01_fetch.py` resolves it from the dataset metadata on every run and fails the build if it cannot.
+
+## V2 next: zones and zone demographics
+
+Deferred, in order:
+
+1. School zones (elementary, middle, high) from NYC Open Data, labeled with their school year, shown on the map only. Most high schools and the citywide districts (75, 79, 84) are unzoned. Cidade Labs' `zonas-escolares` is a design precedent: outlines per level, with legend chips as filters.
+2. Zone-level census estimates, to answer "does this school's enrollment resemble the population of its zone?"
+
+Settle these before building step 2:
+
+- Zone residents include children at charter, private, gifted or out-of-zone schools. A gap between a zone and its school is expected and is not a finding by itself.
+- Census geography does not follow zone lines. Block groups must be apportioned into zones, and ACS margins of error grow at that scale.
+- The age window must match the grades served, for example ages 5 to 10 for a K to 5 zone.
+- A zone lookup leads toward address entry, which still needs the privacy review listed under V2 readiness.
+
+---
+
 ## Documentation
 
 - README: purpose, setup, pipeline, repository structure, refresh process, and source-change procedure. Assume no Python background.
@@ -291,7 +330,7 @@ Prepare for V2 without building or exposing it in V1:
 - Every included school is discoverable by name or DBN and opens a valid profile.
 - Every displayed value has a definition, source, reporting period, and correct missing-data behavior.
 - Website JSON, Excel, and CSV downloads agree because they come from the same validated tables.
-- The interface contains no site-created overall ranking, score, recommendation, commute result, or interactive map.
+- The interface contains no site-created overall ranking, score, recommendation, commute result, or interactive map. (The map was added in V2 phase 1.)
 - Accessibility, responsive layout, stale-data behavior, and pipeline failure behavior have been tested.
 
 ---

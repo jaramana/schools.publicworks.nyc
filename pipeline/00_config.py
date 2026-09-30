@@ -140,6 +140,28 @@ SOURCES = {
             "stop in a numeric field is the file's own marker for no value."
         ),
     },
+    # A file attachment on Open Data, not a table. The attachment's download
+    # address changes with each upload, so `01_fetch.py` looks it up from the
+    # dataset's metadata on every run instead of storing it here.
+    "school_points": {
+        "source_id": "school_points",
+        "agency": "NYC Public Schools",
+        "title": "School Point Locations",
+        "dataset_id": "jfju-ynrr",
+        "url": f"https://{SOCRATA_DOMAIN}/api/views/jfju-ynrr.json",
+        "page": f"https://{SOCRATA_DOMAIN}/d/jfju-ynrr",
+        "attachment": True,
+        "retrieval": "NYC Open Data file attachment, a zipped shapefile",
+        "cadence": "Irregular",
+        "grain": "One point per school, keyed by DBN.",
+        "cache": "school_points.zip",
+        "min_rows": 1_500,
+        "required_columns": ["ATS", "Latitude", "Longitude"],
+        "limitations": (
+            "A dated snapshot. Schools that opened after the snapshot date are not in "
+            "it and fall back to the directory or the geocoder."
+        ),
+    },
     "geosearch": {
         "source_id": "geosearch",
         "agency": "NYC Department of City Planning",
@@ -159,9 +181,14 @@ SOURCES = {
     },
 }
 
-# High school addresses arrive with coordinates already embedded in a text
-# field, so those schools never reach the geocoder.
+# Coordinates are taken from the first of these that has the school:
+#   points    the Department of Education's school point file
+#   source    the high school directory, which embeds a coordinate in the address
+#   geocoded  matched from the address by GeoSearch
 HS_LOCATION_COORDS = r"\(\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)\s*\)"
+
+# A point outside this box is a data error and is dropped. West, south, east, north.
+NYC_BOUNDS = (-74.26, 40.49, -73.69, 40.92)
 
 # The geocoder answers in about three seconds per address, so the work is
 # spread over a few connections. Keep this small: it is a free public service.
@@ -583,6 +610,9 @@ VALIDATION = {
     "max_row_shrinkage": 0.05,
     # Nor more than this share of its schools.
     "max_school_loss": 0.02,
+    # Nor more than this share of its schools with a coordinate. The map
+    # would lose them without any error on the page.
+    "max_coordinate_loss": 0.05,
     # A profile with fewer reported values than this is reported as thin, not
     # as a failure. Some school types genuinely publish very little.
     "thin_profile_values": 5,

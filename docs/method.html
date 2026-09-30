@@ -200,19 +200,46 @@
 
     <h3>Addresses and coordinates</h3>
     <p>
-      The addresses come from the current admissions directories. The source
-      publishes the coordinates of each high school with the address.
+      The addresses come from the current admissions directories. About 400
+      open schools have no published address, because they are not in an
+      admissions directory. Their profiles show no address section.
     </p>
     <p>
-      For each other school, this site matches the coordinate from the address
-      with the geocoder of the New York City Department of City Planning. Thus
-      that coordinate is a derived value. Each school records which of the two
-      types it has. If an address does not match, this site gives no coordinate.
-      It does not give an approximate one.
+      Each coordinate comes from the first of three places that has the school:
+    </p>
+    <ol>
+      <li>
+        The school point file of New York City Public Schools, on NYC Open
+        Data. It covers most open schools, including many with no published
+        address. It is a dated snapshot, so a school that opened after that
+        date is not in it.
+      </li>
+      <li>The high school directory, which publishes a coordinate with each address.</li>
+      <li>
+        The geocoder of the Department of City Planning, which matches a
+        coordinate from the address. That coordinate is a derived value.
+      </li>
+    </ol>
+    <p>
+      Each school records which of the three it has. If none has the school,
+      this site gives no coordinate. It does not give an approximate one.
+    </p>
+
+    <h3>Map</h3>
+    <p>
+      The browse page shows the filtered schools on a map beside the list, and
+      each profile shows a small map of the school. Every point is drawn the same way. The
+      map does not color schools by any measure.
     </p>
     <p>
-      About 400 open schools have no published address, because they are not in
-      an admissions directory. Their profiles show no address section.
+      The district outlines are the School Districts dataset of the Department
+      of City Planning, on NYC Open Data. Districts 75, 79 and 84 serve the
+      whole city and have no outline. The basemap is OpenFreeMap, drawn from
+      OpenStreetMap data. The map does not show school zones.
+    </p>
+    <p>
+      A school with no coordinate is in the list but not on the map. The map
+      says how many schools that is for the current filters.
     </p>
 
     <h3>Programs and admissions</h3>
@@ -323,7 +350,7 @@
     <ul>
       <li>No overall score, rank, or recommendation.</li>
       <li>No commute time or travel time.</li>
-      <li>No address entry, zoning lookup, or interactive map.</li>
+      <li>No address entry, zoning lookup, or school zones on the map.</li>
       <li>No survey results. They are in workbooks that this version does not use.</li>
       <li>
         No SHSAT figures and no specialized high school admissions figures. The
@@ -388,7 +415,8 @@
       because GitHub Pages serves it that way. The paths are stable. A change to
       a path is a breaking change.
     </p>
-    <pre class="code-block"><code>data/search-index.json      every school: DBN, name, borough, district, type, grades, status
+    <pre class="code-block"><code>data/search-index.json      every school: DBN, name, borough, district, type, grades, status, coordinates
+data/districts.json         school district outlines, GeoJSON
 data/metrics.json           every measure: label, unit, category, which schools report it
 data/sources.json           every source with its period, coverage and limits
 data/status.json            build date, reporting periods, counts, display constants
@@ -487,8 +515,14 @@ data/schools/{DBN}.json     one school: identity, every series, every program</c
 .venv/bin/pip install pandas requests openpyxl XlsxWriter
 .venv/bin/python run.py</code></pre>
     <p>
-      The first run downloads about 230 MB and geocodes the school addresses. It
-      takes about 15 minutes. A later run uses the two caches again.
+      The first run downloads about 230 MB and geocodes the few addresses that
+      have no other coordinate. It takes about 5 minutes. A later run uses the
+      two caches again.
+    </p>
+    <p>
+      The district outlines change rarely, so the daily build does not fetch
+      them. Run <code>tools/fetch_districts.py</code> when NYC Open Data
+      publishes new ones.
     </p>
     <p>
       The file <code>pipeline/00_config.py</code> holds each threshold, each

@@ -23,7 +23,8 @@ MANIFEST = cfg.BUILD / "fetch-manifest.json"
 
 # Sources fetched as whole files. The geocoder is not one of them: it is called
 # per address during normalization and keeps its own cache.
-FILE_SOURCES = ["sqr", "demographics", "directory_es", "directory_ms", "directory_hs"]
+FILE_SOURCES = ["sqr", "demographics", "directory_es", "directory_ms", "directory_hs",
+                "school_points"]
 
 
 def log(message):
@@ -37,6 +38,23 @@ def digest(path):
         for chunk in iter(lambda: handle.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()[:16]
+
+
+def resolve_attachment(source):
+    """Find the current download address of an Open Data file attachment.
+
+    Returns a copy of the source with `url` pointing at the file, plus the
+    file's own name, which carries the snapshot date.
+    """
+    meta = requests.get(source["url"], timeout=cfg.HTTP_TIMEOUT).json()
+    blob, name = meta.get("blobId"), meta.get("blobFilename")
+    if not blob or not name:
+        raise RuntimeError(
+            f"{source['source_id']}: the dataset has no file attachment. Check {source['page']}")
+    resolved = dict(source)
+    resolved["url"] = (f"https://{cfg.SOCRATA_DOMAIN}/api/views/{source['dataset_id']}"
+                       f"/files/{blob}?download=true&filename={name}")
+    return resolved, name
 
 
 def download(source, force=False):
@@ -102,7 +120,7 @@ def check_shape(source, record):
     path = cfg.ROOT / record["path"]
     head = path.open("rb").read(512)
 
-    if path.suffix == ".xlsx" and not head.startswith(b"PK"):
+    if path.suffix in (".xlsx", ".zip") and not head.startswith(b"PK"):
         raise RuntimeError(
             f"{source['source_id']}: expected an Excel workbook but got something else. "
             f"The InfoHub file name probably changed. Check {source['page']}")
@@ -126,7 +144,18 @@ def main(force=False):
     records = []
     for key in FILE_SOURCES:
         source = cfg.SOURCES[key]
-        record = download(source, force=force)
+        filename = None
+        if source.get("attachment"):
+            source, filename = resolve_attachment(source)
+            # A new upload has a new name, so a cached copy of the old one is
+            # replaced rather than kept.
+            previous = cfg.RAW / (source["cache"] + ".name")
+            stale = not previous.exists() or previous.read_text() != filename
+            record = download(source, force=force or stale)
+            previous.write_text(filename)
+            record["filename"] = filename
+        else:
+            record = download(source, force=force)
         check_shape(source, record)
         records.append(record)
 

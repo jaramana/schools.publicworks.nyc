@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="css/site.css">
 <script src="js/site.js" defer></script>
 <script src="js/search.js" defer></script>
+<script src="js/map.js" defer></script>
 <script src="js/school.js" defer></script>
 </head>
 <body>
@@ -16,6 +17,7 @@
 
 <main id="main">
   <section class="wrap console">
+    <p class="crumb"><a id="back-link" href="browse.html">← All schools</a></p>
     <div class="entity-head" id="school-head">
       <p class="kind">Loading</p>
       <h1>School profile</h1>
@@ -26,6 +28,7 @@
 
   <section class="wrap">
     <dl class="facts" id="school-facts"></dl>
+    <div class="locator" id="school-locator" hidden></div>
     <div id="school-overview" hidden></div>
     <div id="school-programs" hidden></div>
   </section>

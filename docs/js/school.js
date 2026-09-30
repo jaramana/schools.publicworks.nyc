@@ -171,6 +171,17 @@
 
   // ---- Head and facts ------------------------------------------------
 
+  // Back to Browse with the reader's filters. Browse records its address on
+  // every change; without one, the link falls back to the full list.
+  function renderBack() {
+    var saved = null;
+    try { saved = sessionStorage.getItem('sf-results'); } catch (e) {}
+    if (!saved) return;
+    var link = document.getElementById('back-link');
+    link.href = saved.replace(/^.*\//, '');
+    link.textContent = '← Back to browse';
+  }
+
   function renderHead(school) {
     var host = document.getElementById('school-head');
     host.innerHTML = '';
@@ -216,17 +227,10 @@
     }
     if (school.grades) host.appendChild(fact('Grades served', school.grades));
     if (school.address) {
-      // An external map link rather than an embedded map: this version of the
-      // site does not load a mapping library.
       host.appendChild(fact('Address', school.address, {
         href: 'https://www.openstreetmap.org/search?query=' +
               encodeURIComponent(school.address),
-        external: true,
-        note: school.latitude
-          ? (school.coordinate_source === 'source'
-              ? 'Coordinates published by the source'
-              : 'Coordinates matched from this address')
-          : null
+        external: true
       }));
     }
     if (school.phone) host.appendChild(fact('Telephone', school.phone, { href: 'tel:' + school.phone }));
@@ -259,6 +263,61 @@
               'Only schools in a current admissions directory have them.</dd>'
       }));
     }
+  }
+
+  var COORDINATE_ORIGIN = {
+    points: 'Location from the NYC Public Schools school point file.',
+    source: 'Location published in the high school directory.',
+    geocoded: 'Location matched from the address by this site.'
+  };
+
+  // A small map under the facts. The map library loads only when the map
+  // scrolls near the screen, so a reader who stays at the top never pays for it.
+  function renderLocator(school) {
+    var host = document.getElementById('school-locator');
+    host.innerHTML = '';
+    if (SF.isBlank(school.latitude) || SF.isBlank(school.longitude)) { host.hidden = true; return; }
+    host.hidden = false;
+
+    var frame = SF.el('div', { class: 'map-frame', role: 'region',
+      'aria-label': 'Map of where ' + (school.name || school.dbn) + ' is' });
+    host.appendChild(frame);
+    var plain = parseInt(school.district, 10);
+    var citywide = plain === 75 || plain === 79 || plain === 84;
+    host.appendChild(SF.el('p', { class: 'map-note', text:
+      (COORDINATE_ORIGIN[school.coordinate_source] || '') +
+      (citywide ? ' This school’s district is citywide, so no area is outlined.'
+                : ' The outlined area is ' + districtLabel(school.district) + '.') }));
+    host.appendChild(SF.el('p', { class: 'map-note' }, [SF.el('a', {
+      href: 'browse.html?view=map' +
+            (citywide ? '' : '&district=' + encodeURIComponent(school.district)) +
+            '&focus=' + encodeURIComponent(school.dbn),
+      text: citywide ? 'See nearby schools on the map' : 'See this district’s schools on the map'
+    })]));
+
+    var point = [school.longitude, school.latitude];
+    var drawn = false;
+    function draw() {
+      if (drawn) return;
+      drawn = true;
+      // On a touch screen one finger scrolls the page past the map, and two
+      // fingers pinch it. There is no overlay telling anyone how to scroll.
+      SFMap.create(frame, { center: point, zoom: 13, dragPan: !SFMap.touch })
+        .then(function (map) {
+          if (!map) return;
+          SFMap.addDistricts(map, citywide ? '' : school.district).then(function () {
+            SFMap.addSchools(map, { type: 'FeatureCollection', features: [{
+              type: 'Feature', properties: { dbn: school.dbn },
+              geometry: { type: 'Point', coordinates: point } }] });
+            SFMap.focus(map, point);
+          });
+        });
+    }
+    if (!('IntersectionObserver' in window)) return draw();
+    var watch = new IntersectionObserver(function (entries) {
+      if (entries.some(function (e) { return e.isIntersecting; })) { watch.disconnect(); draw(); }
+    }, { rootMargin: '300px' });
+    watch.observe(frame);
   }
 
   function renderOverview(school) {
@@ -1032,7 +1091,9 @@
       var payload = loaded[0], metrics = loaded[1];
       state.payload = payload; state.metrics = metrics;
       renderHead(payload.school);
+      renderBack();
       renderFacts(payload.school);
+      renderLocator(payload.school);
       renderOverview(payload.school);
       renderCompareButton(payload.school);
       renderPrograms(payload);

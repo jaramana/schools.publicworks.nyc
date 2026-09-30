@@ -274,6 +274,9 @@ main { padding-bottom: 5rem; }
    .controls kept drawing its border as an empty box. */
 [hidden] { display: none !important; }
 
+/* An anchored target clears the sticky masthead. */
+[id] { scroll-margin-top: calc(var(--masthead-h) + 1rem); }
+
 .controls {
   display: flex; flex-wrap: wrap; gap: .9rem;
   padding: .9rem 1rem; margin: 1.25rem 0 1rem;
@@ -318,7 +321,7 @@ button.pill[aria-pressed="true"] {
   background: var(--paper-raised);
   border: 1px solid var(--rule); border-left: 3px solid var(--rule-strong);
   border-radius: 0 8px 8px 0;
-  transition: border-left-color .12s ease, background .12s ease;
+  transition: border-left-color .2s ease, background .2s ease, box-shadow .2s ease;
 }
 .school-card:hover { border-left-color: var(--accent); background: var(--paper-sunken); }
 .school-card .name { font-size: 1rem; font-weight: 600; line-height: 1.3; color: var(--ink); }
@@ -328,8 +331,111 @@ button.pill[aria-pressed="true"] {
   letter-spacing: .02em;
 }
 
+/* ---- Map --------------------------------------------------------- */
+
+/* Browse keeps its header short so the pinned map starts high on the page. */
+.console.compact { padding: clamp(1.25rem, 3vw, 2rem) 0 .75rem; }
+.console.compact .console-h1 { margin-bottom: .35rem; }
+.console.compact .console-sub { font-size: .95rem; margin-bottom: 1rem; }
+.console.compact .statusline { margin-bottom: 0; }
+
+.school-card.is-hover {
+  border-left-color: var(--accent); background: var(--paper-sunken);
+  box-shadow: var(--shadow-tight);
+}
+
+/* New results fade up in a short stagger. */
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.school-grid li.enter {
+  animation: card-in .3s cubic-bezier(.2, .7, .3, 1) both;
+  animation-delay: calc(var(--i, 0) * 25ms);
+}
+
+.map-frame {
+  position: relative; height: min(70vh, 38rem);
+  background: var(--paper-sunken);
+  border: 1px solid var(--rule); border-radius: 9px; overflow: hidden;
+}
+.map-note { font-size: .84rem; color: var(--ink-faint); margin: .6rem 0 0; max-width: var(--measure); }
+.map-note a { color: inherit; }
+.map-unavailable { display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.map-unavailable p { color: var(--ink-soft); font-size: .9rem; text-align: center; max-width: 24rem; }
+
+.map-attrib {
+  position: absolute; right: .5rem; bottom: .5rem; z-index: 2;
+  font-size: .72rem; color: var(--ink-soft);
+  background: rgba(255, 255, 255, .85); border-radius: 4px; padding: .1rem .4rem;
+}
+.map-attrib a { color: inherit; }
+
+/* The school in focus. It grows in from nothing and settles. */
+.map-focus {
+  width: 22px; height: 22px; border-radius: 50%; pointer-events: none;
+  background: var(--accent); border: 3px solid #fff;
+  box-shadow: 0 0 0 6px rgba(20, 99, 74, .18), 0 2px 6px rgba(20, 22, 28, .25);
+  opacity: 0; transform: scale(.4);
+  transition: transform .28s cubic-bezier(.2, .9, .3, 1.25), opacity .2s ease;
+}
+.map-focus.is-on { opacity: 1; transform: scale(1); }
+
+.map-popup { display: grid; gap: .6rem; max-height: 18rem; overflow: auto; }
+.map-popup-item { display: grid; gap: .35rem; justify-items: start; }
+.map-popup .school-card { padding: .5rem .7rem; width: 100%; }
+.maplibregl-popup-content { padding: .6rem .6rem .5rem; border-radius: 8px; box-shadow: var(--shadow); }
+.maplibregl-popup-close-button { font-size: 1.1rem; padding: 0 .35rem; }
+
+/* Wide: list beside a map pinned to the screen height. */
+@media (min-width: 60rem) {
+  .browse-results {
+    display: grid; grid-template-columns: minmax(20rem, 25rem) 1fr;
+    gap: 1.25rem; align-items: start;
+  }
+  .browse-results .school-grid { grid-template-columns: 1fr; }
+  .results-list, .results-map { min-width: 0; }
+  .results-map { position: sticky; top: calc(var(--masthead-h) + .75rem); }
+  .results-map .map-frame { height: calc(100vh - var(--masthead-h) - 6.5rem); }
+}
+
+/* Narrow: the map fills the screen, with the filters one tap away and a
+   floating button back to the list. */
+.map-bar { display: none; }
+.float-toggle {
+  position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%); z-index: 60;
+  font: inherit; font-size: .9rem; font-weight: 600; cursor: pointer;
+  padding: .6rem 1.2rem; border: 0; border-radius: 999px;
+  background: var(--ink); color: var(--paper-raised); box-shadow: var(--shadow);
+}
+body.map-full .results-map {
+  position: fixed; inset: 0; z-index: 50; margin: 0;
+  display: flex; flex-direction: column; background: var(--paper-raised);
+  animation: card-in .25s ease both;
+}
+body.map-full .map-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  padding: .6rem 1rem; border-bottom: 1px solid var(--rule); font-size: .88rem;
+}
+body.map-full .map-bar-summary { color: var(--ink-soft); min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+body.map-full .results-map .map-frame { flex: 1; height: auto; border: 0; border-radius: 0; }
+body.map-full .results-map .map-note { margin: 0; padding: .35rem 1rem; }
+body.map-full .results-map .map-note:last-child { padding-bottom: 4.25rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .school-grid li.enter, body.map-full .results-map { animation: none; }
+  .map-focus { transition: none; }
+}
+
+.locator { margin: 1.25rem 0 0; }
+.locator .map-frame { height: 15rem; }
+
 /* ---- Profile ----------------------------------------------------- */
 
+.crumb { margin: 0 0 1rem; font-size: .88rem; }
+.crumb a { color: var(--ink-soft); text-decoration: none; }
+.crumb a:hover { color: var(--accent); text-decoration: underline; }
 .entity-head { margin-bottom: 1.25rem; }
 .entity-head .kind {
   font-size: .74rem; letter-spacing: .1em; text-transform: uppercase;
@@ -759,7 +865,7 @@ code {
 .portfolio a:hover { color: var(--accent); text-decoration: underline; }
 
 @media print {
-  .masthead, .nav, .table-tools, .controls { display: none; }
+  .masthead, .nav, .table-tools, .controls, .float-toggle, #map-panel, .locator { display: none; }
   body { background: #fff; color: #000; }
   .card, .table-wrap { box-shadow: none; }
 }

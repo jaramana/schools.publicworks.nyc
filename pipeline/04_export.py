@@ -107,10 +107,10 @@ def school_record(row):
 
 
 def build_search_index(schools, staging):
-    """A small file, loaded once, that powers search and the browse filters."""
+    """A small file, loaded once, that powers search, the browse filters and the map."""
     rows = []
     for _, school in schools.iterrows():
-        rows.append({
+        row = {
             "dbn": school["dbn"],
             "name": clean(school["name"]),
             "boro": clean(school["boro"]),
@@ -118,7 +118,13 @@ def build_search_index(schools, staging):
             "type": clean(school["school_type"]) or clean(school["report_type"]),
             "grades": clean(school["grades"]),
             "status": clean(school["status"]),
-        })
+        }
+
+        # Coordinates only where they exist, which keeps the file small.
+        lat, lon = clean(school["latitude"]), clean(school["longitude"])
+        if lat is not None and lon is not None:
+            row["lat"], row["lon"] = lat, lon
+        rows.append(row)
     rows.sort(key=lambda r: (r["name"] or "").upper())
     write_json(staging / "search-index.json", rows)
     size = (staging / "search-index.json").stat().st_size
@@ -288,6 +294,7 @@ def build_status_json(tables, sources_payload, staging, validation):
         "counts": {
             "schools": int(len(tables["schools"])),
             "schools_open": int((tables["schools"]["status"] == "open").sum()),
+            "schools_with_coordinates": int(tables["schools"]["latitude"].notna().sum()),
             "metrics": int(len(tables["metrics"])),
             "observations": int(len(observations)),
             "observations_reported": int((observations["status"] == cfg.STATUS_OK).sum()),
@@ -340,9 +347,9 @@ def data_dictionary(tables):
         ("status", "open when the school is in the newest snapshot or a current directory, otherwise former.", "text", "All schools"),
         ("enrollment", "Total students in the most recent demographic snapshot.", "count", "Schools in the snapshot"),
         ("address", "Street address from the current directory.", "text", "Schools in a directory"),
-        ("latitude", "Latitude. Published by the source for high schools, matched from the address for other schools.", "degrees", "Schools with an address"),
-        ("longitude", "Longitude. Same provenance as latitude.", "degrees", "Schools with an address"),
-        ("coordinate_source", "source when the Department of Education published the coordinate, geocoded when this project matched it.", "text", "Schools with a coordinate"),
+        ("latitude", "Latitude. From the Department of Education's school point file where it has the school, otherwise from the high school directory or matched from the address.", "degrees", "Schools with a coordinate"),
+        ("longitude", "Longitude. Same provenance as latitude.", "degrees", "Schools with a coordinate"),
+        ("coordinate_source", "points when the coordinate comes from the Department of Education's school point file, source when it comes from the high school directory, geocoded when this project matched it from the address.", "text", "Schools with a coordinate"),
     ]
     for field, description, unit, applies in school_fields:
         rows.append({"table": "schools", "field": field, "description": description,
