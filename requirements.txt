@@ -1,0 +1,6 @@
+pandas>=3.0
+requests>=2.34
+openpyxl>=3.1
+XlsxWriter>=3.2
+
+# tools/fetch_districts.py, which is run by hand, also needs shapely.

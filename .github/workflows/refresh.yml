@@ -30,7 +30,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install pandas requests openpyxl XlsxWriter
+        run: pip install -r requirements.txt
 
       # The geocoder answers per address and the results never change for an
       # address that has not moved, so the cache is worth carrying between runs.

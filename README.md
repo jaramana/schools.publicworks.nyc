@@ -53,7 +53,7 @@ To build locally:
 
 ```bash
 python -m venv .venv
-.venv/bin/pip install pandas requests openpyxl XlsxWriter
+.venv/bin/pip install -r requirements.txt
 .venv/bin/python run.py
 ```
 
