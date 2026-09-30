@@ -36,9 +36,10 @@ The current periods are in `docs/data/status.json`.
 - Survey results, SHSAT figures and specialized admissions measures are not
   included. About 400 open schools have no address in the directories.
 
-The [method page](https://schools.publicworks.nyc/method.html) shows the
-process step by step, the sources, the dictionary and the downloads: an Excel
-workbook and CSV tables built from the same validated data as the site.
+The [Data page](https://schools.publicworks.nyc/data.html) shows the process
+step by step, the sources, the column definitions and the downloads. The downloads
+are an Excel workbook and CSV tables built from the same validated data as the
+site.
 
 ## Updates
 

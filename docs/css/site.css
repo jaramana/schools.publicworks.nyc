@@ -173,7 +173,7 @@ main { padding-bottom: 5rem; }
   }
 
   /* An anchored link has to land below the bar rather than under it.
-     Without this, method.html#downloads opens with its own heading hidden. */
+     Without this, data.html#downloads opens with its own heading hidden. */
   :root { scroll-padding-top: calc(var(--masthead-h) + 1rem); }
 
   /* Where the page cannot be blurred behind, the bar is simply opaque. */
@@ -1017,36 +1017,6 @@ code {
 .wrap.prose.method > .dict-more,
 .wrap.prose.method > .code-block { max-width: none; }
 
-/* The process as a waterfall: each step sits one notch right of the last,
-   and an elbow carries the line down into the next. Steps are plain panels. */
-.waterfall { list-style: none; padding: 0; margin: 1.5rem 0 0; counter-reset: step; }
-.waterfall > li {
-  --notch: 2.5rem;
-  position: relative; counter-increment: step;
-  max-width: 30rem; margin: 0 0 1.25rem calc(var(--step, 0) * var(--notch));
-  padding: .85rem 1.1rem .9rem 3.2rem;
-  background: var(--paper-raised); border: 1px solid var(--rule);
-  border-radius: 10px; box-shadow: var(--shadow-tight);
-}
-.waterfall > li::before {
-  content: counter(step);
-  position: absolute; left: .9rem; top: .85rem;
-  width: 1.55rem; height: 1.55rem; border-radius: 50%;
-  display: grid; place-items: center;
-  background: var(--accent-soft); color: var(--accent-ink);
-  font-size: .8rem; font-weight: 700;
-}
-.waterfall > li:not(:last-child)::after {
-  content: ""; position: absolute; top: 100%; left: 1.65rem;
-  width: var(--notch); height: calc(1.25rem + 1px);
-  border-left: 2px solid var(--rule-strong); border-bottom: 2px solid var(--rule-strong);
-  border-bottom-left-radius: 8px;
-}
-.waterfall h3 { margin: 0 0 .2rem; font-size: 1rem; }
-.waterfall p { margin: 0; font-size: .92rem; color: var(--ink-soft); }
-@media (max-width: 40rem) {
-  .waterfall > li { --notch: .9rem; }
-}
 
 .method #download-list { margin-bottom: 1.25rem; }
 .dict-more { margin-top: 1rem; }
@@ -1133,3 +1103,27 @@ abbr[title] { text-decoration: underline dotted; cursor: help; }
 /* The status line under the search doubles as the place a refused action is
    reported, so it needs to read as a message rather than as a caption. */
 .hint.warned { color: var(--warn); font-weight: 600; }
+
+/* ---- Data page ------------------------------------------------------
+   Downloads, the columns disclosure and the process list. The same three
+   blocks appear on every Public Works Data page; see alignment.md. */
+.columns { margin: 1rem 0 1.5rem; }
+.columns > summary { cursor: pointer; font-weight: 600; font-size: .95rem; }
+.columns[open] > summary { margin-bottom: .75rem; }
+.data-note { font-size: .85rem; color: var(--ink-faint); margin-top: .75rem; }
+
+.process { list-style: none; margin: 1rem 0 0; padding: 0; counter-reset: step; max-width: var(--measure); }
+.process > li { position: relative; counter-increment: step; padding: 0 0 1.25rem 2.6rem; }
+.process > li::before {
+  content: counter(step); position: absolute; left: 0; top: 0;
+  width: 1.6rem; height: 1.6rem; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--accent); color: var(--paper);
+  font-size: .8rem; font-weight: 700;
+}
+.process > li:not(:last-child)::after {
+  content: ""; position: absolute; left: .8rem; top: 1.9rem; bottom: .25rem;
+  border-left: 2px solid var(--rule-strong);
+}
+.process h3 { margin: 0 0 .2rem; font-size: 1rem; }
+.process p { margin: 0; color: var(--ink-soft); }

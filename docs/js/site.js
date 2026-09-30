@@ -239,7 +239,7 @@
     { href: 'index.html',   nav: 'Find a school' },
     { href: 'browse.html',  nav: 'Browse' },
     { href: 'compare.html', nav: 'Compare' },
-    { href: 'method.html',  nav: 'Method' },
+    { href: 'data.html',    nav: 'Data' },
     { href: 'about.html',   nav: 'About' }
   ];
 
@@ -283,7 +283,7 @@
       foot.className = 'footer footer-compact';
       foot.innerHTML =
         '<p class="footer-links">' +
-          '<a href="method.html">Method</a> · <a href="about.html">About</a> · ' +
+          '<a href="data.html">Data</a> · <a href="about.html">About</a> · ' +
           '<a href="https://github.com/jaramana/schools.publicworks.nyc">Source on GitHub</a> · ' +
           '<a href="https://github.com/jaramana/schools.publicworks.nyc/issues">Report an error</a>' +
         '</p>' + colophon + portfolio;
@@ -296,10 +296,10 @@
             '<li><a href="browse.html">Browse by borough and district</a></li>' +
             '<li><a href="compare.html">Compare schools</a></li>' +
           '</ul></div>' +
-          // Pages, not sections. Four entries that all opened method.html at
+          // Pages, not sections. Four entries that all opened one page at
           // a different anchor read as four destinations and were one.
           '<div><h4>Reference</h4><ul>' +
-            '<li><a href="method.html">Method</a></li>' +
+            '<li><a href="data.html">Data</a></li>' +
             '<li><a href="about.html">About</a></li>' +
           '</ul></div>' +
           '<div><h4>Sources</h4><ul>' +
@@ -366,7 +366,7 @@
       html: '<p><strong>Some sources have not been refreshed.</strong> ' +
             escapeHtml(names) + '. The values shown are still the ones last ' +
             'published, but they may no longer be current. ' +
-            '<a href="method.html#sources">See source freshness</a>.</p>'
+            '<a href="data.html#sources">See source freshness</a>.</p>'
     });
     main.parentNode.insertBefore(box, main.nextSibling);
   }

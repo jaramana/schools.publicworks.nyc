@@ -1,4 +1,4 @@
-/* The data page: downloads, source coverage and freshness, data dictionary.
+/* The Data page: downloads, source coverage and freshness, columns.
    ------------------------------------------------------------------
    Everything shown here is read from the same status and sources files the
    pipeline writes, so the page cannot claim a freshness the build did not
@@ -15,73 +15,26 @@
     return (n / (1024 * 1024)).toFixed(1) + ' MB';
   }
 
-  function renderCounts(status) {
-    var host = document.getElementById('counts');
-    host.innerHTML = '';
-    var c = status.counts;
-    [
-      ['Schools', SF.fmt.count(c.schools), SF.fmt.count(c.schools_open) + ' currently open'],
-      ['Measures', SF.fmt.count(c.metrics), 'each with a definition and a period'],
-      ['Published values', SF.fmt.count(c.observations_reported),
-       'out of ' + SF.fmt.count(c.observations) + ' rows'],
-      ['Programs', SF.fmt.count(c.programs), 'from the Fall 2025 directories']
-    ].forEach(function (row) {
-      var block = SF.el('div', { class: 'fact' });
-      block.appendChild(SF.el('dt', { text: row[0] }));
-      var dd = SF.el('dd', { class: 'big', text: row[1] });
-      dd.appendChild(SF.el('span', { class: 'note', text: row[2] }));
-      block.appendChild(dd);
-      host.appendChild(block);
-    });
-  }
-
   function renderDownloads(status) {
     var host = document.getElementById('download-list');
     host.innerHTML = '';
-    var files = [
+    [
+      {
+        href: 'downloads/' + status.downloads.zip,
+        title: 'CSV files',
+        text: 'Every row, in normalized tables for analysis. One ZIP.'
+      },
       {
         href: 'downloads/' + status.downloads.xlsx,
         title: 'Excel workbook',
-        text: 'Five sheets: schools, headline measures across every year, ' +
-              'programs and admissions, the data dictionary, and the sources ' +
-              'with their coverage.'
-      },
-      {
-        href: 'downloads/' + status.downloads.zip,
-        title: 'CSV archive',
-        text: 'Normalized tables for analysis, including every published value ' +
-              'for every year. Join on the DBN.'
+        text: 'Schools, headline measures, programs, columns and sources, in five sheets.'
       }
-    ];
-    // A table, the shape every site in the suite uses for its downloads. The
-    // same three columns carry these two files and The Pay Gap's nineteen.
-    var wrap = SF.el('div', { class: 'table-wrap' });
-    var table = SF.el('table');
-    var thead = SF.el('thead');
-    var hrow = SF.el('tr');
-    ['Dataset', 'What it contains', 'File'].forEach(function (label) {
-      var th = SF.el('th', { text: label });
-      th.setAttribute('scope', 'col');
-      hrow.appendChild(th);
+    ].forEach(function (f) {
+      var a = SF.el('a', { class: 'download', href: f.href, download: '' });
+      a.appendChild(SF.el('h3', { text: f.title }));
+      a.appendChild(SF.el('p', { text: f.text }));
+      host.appendChild(a);
     });
-    thead.appendChild(hrow);
-    table.appendChild(thead);
-
-    var tbody = SF.el('tbody');
-    files.forEach(function (f) {
-      var tr = SF.el('tr');
-      var name = SF.el('td', { class: 'name' });
-      name.appendChild(SF.el('a', { href: f.href, text: f.title }));
-      var desc = SF.el('td', { class: 'wrap-cell' });
-      desc.appendChild(SF.el('span', { class: 'muted', text: f.text }));
-      var file = SF.el('td');
-      file.appendChild(SF.el('code', { text: f.href.split('/').pop() }));
-      tr.append(name, desc, file);
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    wrap.appendChild(table);
-    host.appendChild(wrap);
   }
 
   function renderSources(sources, status) {
@@ -202,15 +155,14 @@
   document.addEventListener('DOMContentLoaded', function () {
     Promise.all([SF.load('status.json'), SF.load('sources.json')])
       .then(function (both) {
-        renderCounts(both[0]);
         renderDownloads(both[0]);
         renderSources(both[1], both[0]);
         renderDictionary();
-        // The browser jumped to #downloads before the source table above it
-        // existed. Every row that table added moved the target, so re-apply
-        // the hash now that the page is built.
+        // The browser jumped to the anchor before the tables above it
+        // existed. Every row they added moved the target, so re-apply the
+        // hash now that the page is built.
         restoreHash();
       })
-      .catch(function (err) { SF.fail(document.getElementById('counts'), err); });
+      .catch(function (err) { SF.fail(document.getElementById('download-list'), err); });
   });
 })();

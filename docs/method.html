@@ -4,11 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Method — Schools Finder</title>
-<meta name="description" content="How the data gets from the City to this site, how to read a figure, and how to download it.">
+<meta name="robots" content="noindex">
+<!-- Method and Data were the same page in practice. It is called Data now.
+     This stub stays because links to method.html and its anchors are already
+     out in the world. -->
+<link rel="canonical" href="data.html">
+<noscript><meta http-equiv="refresh" content="0; url=data.html"></noscript>
+<script>
+  (function () {
+    var moved = {
+      '#bands': '#figures', '#comparing': '#figures',
+      '#not-included': '#limits', '#dictionary': '#downloads'
+    };
+    var h = location.hash;
+    location.replace('data.html' + (moved[h] || h));
+  })();
+</script>
 <link rel="stylesheet" href="css/site.css">
 <script src="js/site.js" defer></script>
-<script src="js/table.js" defer></script>
-<script src="js/data.js" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -16,151 +29,8 @@
 
 <main id="main">
   <section class="wrap console">
-    <h1 class="console-h1">Method</h1>
-    <p class="console-sub">
-      How the data gets from the City to this site, how to read a figure, and
-      how to download it.
-    </p>
-    <p class="statusline mono" data-status></p>
-  </section>
-
-  <section class="wrap prose method">
-    <!-- Five steps, each one feeding the next. -->
-    <h2 id="process">From source to page</h2>
-    <ol class="waterfall">
-      <li style="--step: 0">
-        <h3>Collect</h3>
-        <p>
-          Every morning the site downloads seven public sources from New York
-          City Public Schools, NYC Open Data and the City's geocoder. The
-          reporting period is read from inside each file.
-        </p>
-      </li>
-      <li style="--step: 1">
-        <h3>Match</h3>
-        <p>
-          Every row is matched to a school by its DBN, the ID every City school
-          has. Never by name, because each file spells names differently.
-        </p>
-      </li>
-      <li style="--step: 2">
-        <h3>Check</h3>
-        <p>
-          Each figure keeps its year, unit and status. A figure the source did
-          not publish stays blank. The build stops if a source changes shape or
-          loses schools, rows or locations.
-        </p>
-      </li>
-      <li style="--step: 3">
-        <h3>Place</h3>
-        <p>
-          Each school gets a point from the City's school point file, then the
-          high school directory, then the geocoder. A school none of them has
-          stays off the map.
-        </p>
-      </li>
-      <li style="--step: 4">
-        <h3>Publish</h3>
-        <p>
-          The same checked tables write every page and every download, so they
-          cannot disagree. A late source puts a warning on every page.
-        </p>
-      </li>
-    </ol>
-
-    <h2 id="sources">Sources</h2>
-    <div id="source-table"></div>
-
-    <h2 id="bands">Reading a figure</h2>
-    <ul>
-      <li>
-        For about one figure in six, the City publishes a score from 1 to 5
-        against a group of similar schools. Those figures get a colored band
-        with the score inside: 4 and up, 3 to 4, 2 to 3, under 2. The grouping
-        is this site's only judgment. No score, no color.
-      </li>
-      <li>
-        A band describes one measure in one year. It is not a rating of the
-        school, and the site has no overall score or ranking.
-      </li>
-      <li>
-        Every figure in a measure comes from the same year. A student group with
-        no figure that year shows as not reported.
-      </li>
-      <li>
-        A blank is never a zero. <strong>Not reported</strong>: the source
-        published nothing. <strong>Withheld</strong>: the group is too small to
-        publish. <strong>Does not apply</strong>: the measure is left off.
-      </li>
-      <li>
-        A school is <strong>open</strong> if it is in the latest enrollment
-        snapshot or a current directory. No source publishes a status, so a new
-        school can be labeled wrongly.
-      </li>
-      <li>
-        Admissions figures are per program and describe the Fall 2025 season
-        only.
-      </li>
-    </ul>
-
-    <h2 id="comparing">Comparing with care</h2>
-    <ul>
-      <li>Schools report in different years. Each comparison row shows its year.</li>
-      <li>2019-20 and 2020-21 reflect the pandemic: testing was canceled or thin.</li>
-      <li>Some measures changed definition in 2018-19 and appear as separate series.</li>
-      <li>A school with grades 6 to 12 files two reports, shown as two rows.</li>
-      <li>A percentage of 12 students is less stable than one of 900. Group sizes are shown where published.</li>
-      <li>Sorting the comparison table orders one measure. It is not a ranking.</li>
-    </ul>
-
-    <h2 id="not-included">Not included</h2>
-    <ul>
-      <li>Overall scores, ranks or recommendations.</li>
-      <li>Address search, school zones or commute times.</li>
-      <li>Survey results, SHSAT figures and specialized high school admissions.</li>
-      <li>Charter schools outside the City's own reporting.</li>
-    </ul>
-
-    <h2 id="downloads">Downloads</h2>
-    <dl class="facts" id="counts"></dl>
-    <div class="downloads" id="download-list"></div>
-    <p>
-      Join on <code>dbn</code>. An empty value is never a zero; the
-      <code>status</code> column says why it is empty. Percentages are
-      proportions from 0 to 1. The CSV archive has every row; the workbook's
-      history sheet has a headline set, because Excel stops near one million
-      rows.
-    </p>
-    <p>
-      The JSON files the pages read are open too, with no key. Their paths are
-      stable.
-    </p>
-    <pre class="code-block"><code>data/search-index.json      every school, with coordinates
-data/districts.json         school district outlines, GeoJSON
-data/metrics.json           every measure and its unit
-data/sources.json           every source, period and limit
-data/status.json            build date, periods and counts
-data/schools/{DBN}.json     one school: every series and program</code></pre>
-
-    <h2 id="dictionary">Dictionary</h2>
-    <dl class="glossary">
-      <dt>DBN</dt>
-      <dd>District, borough and school number, such as <code>02M475</code>.</dd>
-      <dt>Comparison group</dt>
-      <dd>Schools the City finds similar for one measure. The City publishes the group's average, not its members.</dd>
-      <dt>Score out of 5</dt>
-      <dd>The City's rating of one measure against the comparison group.</dd>
-      <dt>Withheld</dt>
-      <dd>Calculated but not published, to protect a small group of students.</dd>
-      <dt>Economic Need Index</dt>
-      <dd>The City's estimate of the share of students facing economic hardship, from benefit and housing records.</dd>
-      <dt>Screened, zoned, open</dt>
-      <dd>Admissions methods, set per program. Screened uses grades or other criteria; zoned favors students in the zone; open has no academic requirement.</dd>
-    </dl>
-    <details class="dict-more">
-      <summary>Every measure, its unit and who reports it</summary>
-      <div id="dict-table"></div>
-    </details>
+    <h1 class="console-h1">This page has moved</h1>
+    <p class="console-sub">Method is now <a href="data.html">Data</a>.</p>
   </section>
 </main>
 

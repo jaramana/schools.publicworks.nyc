@@ -830,7 +830,7 @@
   }
 
   // Said once per profile, beside the first band, rather than only on the
-  // method page. Three of the four reviewers asked what the comparison group
+  // Data page. Three of the four reviewers asked what the comparison group
   // was and none of them found out without leaving the page.
   function bandExplainer() {
     return SF.el('p', {
@@ -839,7 +839,7 @@
             'out of 5, against a comparison group of schools the City considers ' +
             'similar to this one. The City chooses the group and publishes the ' +
             'score; this site groups the score into four bands and shows the ' +
-            'number inside each one. <a href="method.html#bands">How to read a ' +
+            'number inside each one. <a href="data.html#figures">How to read a ' +
             'band</a>.'
     });
   }
@@ -889,7 +889,7 @@
       }));
 
       // Explain the bands once, at the first section that has one, rather than
-      // repeating it or leaving it only on the method page.
+      // repeating it or leaving it only on the Data page.
       if (!explained && bases.some(function (b) {
         return b.primaries.some(function (p) { return p.read.band; }) ||
                b.groups.some(function (g) { return g.read.band; });
