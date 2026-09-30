@@ -11,53 +11,66 @@
 <script src="js/map.js" defer></script>
 <script src="js/browse.js" defer></script>
 </head>
-<body>
+<body class="app-page">
 <a class="skip" href="#main">Skip to content</a>
 <header data-chrome="masthead"></header>
 
-<main id="main">
-  <section class="wrap console compact">
-    <h1 class="console-h1">Browse schools</h1>
-    <p class="console-sub">
-      Filter by borough, district, type or grade. The list stays alphabetical,
-      so nothing here implies a preference, and every filter is in the address,
-      so a narrowed list is a link you can send.
-    </p>
-    <div class="search-shell" id="browse-search"></div>
-    <p class="statusline mono" data-status></p>
-  </section>
+<!-- On a wide screen the page does not scroll. The rail on the left holds
+     the filters and the list and scrolls on its own. The map fills the rest.
+     A school picked in either one is selected in both.
+     On a narrow screen the rail is the page, and the map opens full screen
+     from the floating button. -->
+<main id="main" class="browse-app">
+  <aside class="rail" aria-label="Schools">
+    <div class="rail-head">
+      <h1 class="rail-title">Browse schools</h1>
+      <p class="rail-sub">
+        Alphabetical and never ranked. Every filter is in the address, so a
+        narrowed list is a link you can send.
+      </p>
+    </div>
 
-  <section class="wrap">
-    <div class="controls" id="filters" role="group" aria-label="Filter schools"></div>
-    <p class="count" id="school-count" role="status">Loading schools…</p>
-
-    <!-- On a wide screen the list and a pinned map sit side by side. On a
-         narrow one the map opens full screen from the floating button. -->
-    <div class="browse-results" id="results">
-      <div class="results-list" id="list-panel">
-        <ul class="school-grid" id="school-list"></ul>
-        <button class="pill" type="button" id="show-more" hidden>Show more</button>
-      </div>
-      <div class="results-map" id="map-panel" hidden>
-        <div class="map-bar" id="map-bar">
-          <span class="map-bar-summary" id="map-bar-summary"></span>
-          <button class="pill" type="button" id="map-filters">Filters</button>
-        </div>
-        <div class="map-frame" id="school-map" role="region"
-             aria-label="Map of the schools that match the filters"></div>
-        <p class="map-note" id="map-note" hidden></p>
-        <p class="map-note">
-          Lines are school districts, not attendance zones. A zoned school
-          depends on the home address; check
-          <a href="https://www.myschools.nyc/">MySchools</a>.
-        </p>
+    <!-- Search, filters and the count stay pinned while the list scrolls. -->
+    <div class="rail-tools">
+      <div class="search-shell" id="browse-search"></div>
+      <div class="chips" id="filters" role="group" aria-label="Filter schools"></div>
+      <div class="rail-status">
+        <p class="count" id="school-count" role="status">Loading schools…</p>
+        <button class="text-button" type="button" id="clear-filters" hidden>Clear filters</button>
       </div>
     </div>
 
-    <button class="float-toggle" type="button" id="float-toggle" hidden></button>
-  </section>
-</main>
+    <div class="rail-scroll" id="list-panel">
+      <ul class="school-rows" id="school-list"></ul>
+      <button class="pill" type="button" id="show-more" hidden>Show more</button>
+      <p class="statusline mono" data-status></p>
+      <footer data-chrome="footer" data-compact></footer>
+    </div>
 
-<footer data-chrome="footer"></footer>
+    <!-- The comparison basket, pinned to the foot of the rail once a school
+         is in it. It opens upward into the list of names. -->
+    <div class="tray" id="compare-tray" hidden>
+      <div class="tray-list" id="tray-list" hidden></div>
+      <div class="tray-bar">
+        <button class="tray-toggle" type="button" id="tray-toggle"
+                aria-expanded="false" aria-controls="tray-list"></button>
+        <a class="pill pill-go" id="tray-compare" href="compare.html">Compare →</a>
+      </div>
+    </div>
+  </aside>
+
+  <div class="results-map" id="map-panel" hidden>
+    <div class="map-bar" id="map-bar">
+      <span class="map-bar-summary" id="map-bar-summary"></span>
+      <button class="pill" type="button" id="map-filters">Filters</button>
+    </div>
+    <div class="map-stage">
+      <div class="map-frame" id="school-map" role="region"
+           aria-label="Map of the schools that match the filters"></div>
+    </div>
+  </div>
+
+  <button class="float-toggle" type="button" id="float-toggle" hidden></button>
+</main>
 </body>
 </html>

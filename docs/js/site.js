@@ -194,8 +194,44 @@
     },
     set: function (key, value) {
       try { localStorage.setItem('sf-' + key, JSON.stringify(value)); } catch (e) {}
+      announce(key);
     }
   };
+
+  // Anything showing the basket listens for `sf-store`. A change made in
+  // another tab arrives as a `storage` event and is passed on the same way.
+  function announce(key) {
+    document.dispatchEvent(new CustomEvent('sf-store', { detail: { key: key } }));
+  }
+  window.addEventListener('storage', function (ev) {
+    if (ev.key && ev.key.indexOf('sf-') === 0) announce(ev.key.slice(3));
+  });
+
+  // ---- Comparison basket --------------------------------------------
+
+  // The schools in the comparison, drawn the same way on Browse and on a
+  // profile: a name, a remove button, and a way to empty the list.
+  // `names` maps a DBN to a school name. `nameFor(dbn, label)` returns the
+  // element that shows one name, so each page decides what a name does.
+  function basketList(names, nameFor) {
+    var ul = el('ul');
+    store.get('compare', []).forEach(function (dbn) {
+      var label = names[dbn] || dbn;
+      var remove = el('button', { type: 'button', class: 'tray-remove',
+        'aria-label': 'Remove ' + label + ' from the comparison', text: '×' });
+      remove.addEventListener('click', function () {
+        store.set('compare', store.get('compare', []).filter(function (d) { return d !== dbn; }));
+      });
+      ul.appendChild(el('li', { class: 'tray-item' }, [nameFor(dbn, label), remove]));
+    });
+    var clear = el('button', { type: 'button', class: 'text-button', text: 'Clear comparison' });
+    clear.addEventListener('click', function () { store.set('compare', []); });
+    return el('div', {}, [ul, el('div', { class: 'tray-foot' }, [clear])]);
+  }
+
+  function compareHref() {
+    return 'compare.html?schools=' + store.get('compare', []).join(',');
+  }
 
   // ---- Chrome -----------------------------------------------------
 
@@ -225,8 +261,33 @@
         '</div>';
     }
 
+    // The disclaimer, word for word as it appears in the home page banner.
+    // One sentence, in one place in the source of each project, so the two
+    // can never drift apart. Only the agency changes between projects.
+    var colophon =
+      '<p class="colophon"><strong>This is not an official product.</strong> ' +
+        'It is an independent initiative, not affiliated with, endorsed by, ' +
+        'or produced by <a href="https://www.schools.nyc.gov/">New York City ' +
+        'Public Schools</a> or the City of New York. Please refer to them ' +
+        'for authoritative information.</p>';
+    // The portfolio mark, below everything and outside the columns. It is
+    // a filing cabinet, not a section of this site, so it is announced
+    // once at the foot rather than filed among the site's own pages.
+    var portfolio =
+      '<p class="portfolio">A <a href="https://publicworks.nyc/">publicworks.nyc</a> project.</p>';
+
     var foot = document.querySelector('[data-chrome="footer"]');
-    if (foot) {
+    // Browse keeps its footer at the end of the list rail, where the four
+    // link columns do not fit. The masthead covers the site's own pages.
+    if (foot && foot.hasAttribute('data-compact')) {
+      foot.className = 'footer footer-compact';
+      foot.innerHTML =
+        '<p class="footer-links">' +
+          '<a href="method.html">Method</a> · <a href="about.html">About</a> · ' +
+          '<a href="https://github.com/jaramana/schools.publicworks.nyc">Source on GitHub</a> · ' +
+          '<a href="https://github.com/jaramana/schools.publicworks.nyc/issues">Report an error</a>' +
+        '</p>' + colophon + portfolio;
+    } else if (foot) {
       foot.className = 'footer';
       foot.innerHTML =
         '<div class="wrap"><div class="footer-grid">' +
@@ -253,18 +314,7 @@
             '<li><a href="https://github.com/jaramana/schools.publicworks.nyc/issues">Report an error</a></li>' +
           '</ul></div>' +
         '</div>' +
-        // The disclaimer, word for word as it appears in the home page banner.
-        // One sentence, in one place in the source of each project, so the two
-        // can never drift apart. Only the agency changes between projects.
-        '<p class="colophon"><strong>This is not an official product.</strong> ' +
-          'It is an independent initiative, not affiliated with, endorsed by, ' +
-          'or produced by <a href="https://www.schools.nyc.gov/">New York City ' +
-          'Public Schools</a> or the City of New York. Please refer to them ' +
-          'for authoritative information.</p>' +
-        // The portfolio mark, below everything and outside the columns. It is
-        // a filing cabinet, not a section of this site, so it is announced
-        // once at the foot rather than filed among the site's own pages.
-        '<p class="portfolio">A <a href="https://publicworks.nyc/">publicworks.nyc</a> project.</p>' +
+        colophon + portfolio +
         '</div>';
     }
   }
@@ -333,6 +383,7 @@
     bandElement: bandElement, BAND_LABEL: BAND_LABEL, BAND_SHORT: BAND_SHORT,
     ABSENCE: ABSENCE, ABSENCE_DETAIL: ABSENCE_DETAIL,
     load: load, fail: fail, escapeHtml: escapeHtml,
-    param: param, setParam: setParam, store: store, el: el
+    param: param, setParam: setParam, store: store, el: el,
+    basketList: basketList, compareHref: compareHref
   };
 })();

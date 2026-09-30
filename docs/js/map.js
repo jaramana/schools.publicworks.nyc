@@ -4,11 +4,14 @@
    is about 800 KB, so it loads only when a map is about to be shown. A
    reader who never opens a map never downloads it.
 
+   The basemap is OpenFreeMap's Positron, trimmed and recolored here before
+   the map first draws. The city's land is a shade lighter than everything
+   around it, and place names outside the city are dropped, so New Jersey
+   and Long Island recede without a mask laid over the map.
+
    Layer order, bottom to top:
-     basemap  ·  district fill and lines  ·  school points
-     ·  basemap labels  ·  the fade outside the city  ·  district numbers
-   Labels sit above the data so street and place names stay readable, and
-   the fade sits above the labels so New Jersey and Long Island recede.
+     surroundings  ·  city land  ·  water, parks, roads  ·  district fill
+     and lines  ·  school points  ·  labels  ·  district numbers
 
    Changes ease rather than jump: points and district fills fade, the
    camera glides, and the hovered school grows in as an HTML marker,
@@ -18,7 +21,7 @@
 (function () {
   'use strict';
 
-  // OpenFreeMap's Positron: an open vector basemap with no key and no usage cap.
+  // OpenFreeMap: open vector tiles with no key and no usage cap.
   var STYLE = 'https://tiles.openfreemap.org/styles/positron';
   var FONT = ['Noto Sans Bold'];
 
@@ -33,15 +36,34 @@
 
   // Green is the schools. Districts are a quiet slate violet: distinct from
   // the green, calmer than a saturated second hue, and clear of the site's
-  // orange-red warning color.
+  // orange-red warning color. The basemap stays in cool greys.
   var COLORS = {
     point: '#14634a',
     halo: '#ffffff',
     district: '#6d6a8f',
     chosenFill: '#dedcec',
     number: '#55527a',
-    paper: '#f7f8f8'
+    land: '#fbfbfa',
+    surroundings: '#e8eaea',
+    water: '#d3dce0',
+    waterText: '#687f8c',
+    park: '#edf1ec',
+    building: '#f0f0ed',
+    buildingEdge: '#e2e3e0',
+    place: '#474d52',
+    neighborhood: '#626970'
   };
+
+  // Positron layers this map has no use for: land cover, footpaths, rail,
+  // airports, road shields, admin lines that compete with the district
+  // lines, and state and country names.
+  var DROP = /^(landcover_|landuse_|aeroway|airport|railway|boundary_|highway_path|highway-name-path|highway-shield|road_shield|label_state|label_country)/;
+  var PLACES = /^label_(other|village|town|city)/;
+
+  // At city scale the highways barely show, so the roads beyond the city do
+  // not outdraw the schools. They reach full strength by street scale.
+  var roadFill = ['interpolate', ['linear'], ['zoom'], 10, '#eef0f0', 12.5, '#ffffff'];
+  var roadEdge = ['interpolate', ['linear'], ['zoom'], 10, '#dfe2e2', 12.5, '#d5d5d5'];
 
   var reduced = window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -74,6 +96,64 @@
     container.appendChild(SF.el('p', { text: why + ' The list and the address still work.' }));
   }
 
+  // The city as one MultiPolygon, from the merged outline in districts.json.
+  function cityShape(geo) {
+    return { type: 'MultiPolygon',
+             coordinates: (geo.outline || []).map(function (ring) { return [ring]; }) };
+  }
+
+  function restyle(style, geo) {
+    var city = geo && geo.outline ? cityShape(geo) : null;
+    var paint = {
+      background: { 'background-color': city ? COLORS.surroundings : COLORS.land },
+      water: { 'fill-color': COLORS.water },
+      waterway: { 'line-color': COLORS.water },
+      park: { 'fill-color': COLORS.park },
+      building: { 'fill-color': COLORS.building, 'fill-outline-color': COLORS.buildingEdge },
+      highway_motorway_inner: { 'line-color': roadFill },
+      highway_motorway_bridge_inner: { 'line-color': roadFill },
+      highway_major_inner: { 'line-color': roadFill },
+      highway_motorway_casing: { 'line-color': roadEdge },
+      highway_motorway_bridge_casing: { 'line-color': roadEdge },
+      highway_major_casing: { 'line-color': roadEdge },
+      water_name_point_label: { 'text-color': COLORS.waterText },
+      water_name_line_label: { 'text-color': COLORS.waterText },
+      waterway_line_label: { 'text-color': COLORS.waterText }
+    };
+
+    style.layers = style.layers.filter(function (l) { return !DROP.test(l.id); });
+    style.layers.forEach(function (l) {
+      Object.assign(l.paint = l.paint || {}, paint[l.id] || {});
+      if (PLACES.test(l.id)) {
+        l.paint['text-color'] = l.id === 'label_other' ? COLORS.neighborhood : COLORS.place;
+        if (city) l.filter = ['all', l.filter || true, ['within', city]];
+      }
+    });
+
+    if (city) {
+      style.sources.city = { type: 'geojson', data: city };
+      style.layers.splice(1, 0, { id: 'city', type: 'fill', source: 'city',
+                                  paint: { 'fill-color': COLORS.land } });
+    }
+    return style;
+  }
+
+  // The finished style, built once per page. If OpenFreeMap's style cannot be
+  // fetched here, MapLibre is handed its address and tries on its own.
+  var styled = null;
+
+  function basemap() {
+    if (styled) return styled;
+    var district = SF.load('districts.json').catch(function () { return null; });
+    styled = fetch(STYLE)
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (style) {
+        return district.then(function (geo) { return restyle(style, geo); });
+      })
+      .catch(function () { return STYLE; });
+    return styled;
+  }
+
   // Resolves with a map whose style has loaded, or null when the browser
   // cannot draw one. The reason is written into the container.
   //
@@ -81,13 +161,16 @@
   // always moves the page. It zooms with the buttons, a double click or a
   // pinch. Pass { scrollZoom: true } only for a map pinned to its own
   // frame, where the wheel has nothing else to do.
-  function create(container, options) {
-    return load().then(function (maplibregl) {
+  //
+  // `extras.note` is a few words set before the credits in the map corner.
+  function create(container, options, extras) {
+    return Promise.all([load(), basemap()]).then(function (got) {
+      var maplibregl = got[0];
       var map;
       try {
         map = new maplibregl.Map(Object.assign({
           container: container,
-          style: STYLE,
+          style: got[1],
           center: [-73.95, 40.70],
           zoom: 9.3,
           minZoom: 8.5,
@@ -106,7 +189,8 @@
       }
       map.touchZoomRotate.disableRotation();
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-left');
-      container.appendChild(SF.el('div', { class: 'map-attrib', html: ATTRIBUTION }));
+      var note = extras && extras.note ? SF.escapeHtml(extras.note) + ' · ' : '';
+      container.appendChild(SF.el('div', { class: 'map-attrib', html: note + ATTRIBUTION }));
 
       // A map built while hidden and shown later must follow its container.
       if ('ResizeObserver' in window) {
@@ -132,7 +216,7 @@
     return ['case', ['==', ['get', 'district'], code || '-'], on, 0];
   }
 
-  // Districts, the fade outside the city, and district numbers.
+  // District fill, lines and numbers.
   function addDistricts(map, chosen) {
     return SF.load('districts.json').then(function (geo) {
       var below = firstLabelLayer(map);
@@ -143,22 +227,13 @@
                  'fill-opacity': chosenOpacity(chosen, 0.45),
                  'fill-opacity-transition': FADE } }, below);
       map.addLayer({ id: 'district-line', type: 'line', source: 'districts',
-        paint: { 'line-color': COLORS.district, 'line-opacity': 0.55,
-                 'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1, 14, 2] } }, below);
+        paint: { 'line-color': COLORS.district, 'line-opacity': 0.35,
+                 'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1.5, 14, 3] } }, below);
       map.addLayer({ id: 'district-chosen', type: 'line', source: 'districts',
-        paint: { 'line-color': COLORS.district, 'line-width': 2.5,
-                 'line-opacity': chosenOpacity(chosen, 1),
+        paint: { 'line-color': COLORS.district,
+                 'line-width': ['interpolate', ['linear'], ['zoom'], 9, 2.5, 14, 4],
+                 'line-opacity': chosenOpacity(chosen, 0.75),
                  'line-opacity-transition': FADE } }, below);
-
-      // The city outline is a hole in one world-sized polygon, so the city
-      // stays at full strength and everything else fades. The outline is
-      // merged in advance: districts as separate holes share edges, and
-      // shared-edge holes leave slivers of fade across the city.
-      var world = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];
-      map.addSource('outside', { type: 'geojson',
-        data: { type: 'Polygon', coordinates: [world].concat(geo.outline || []) } });
-      map.addLayer({ id: 'outside', type: 'fill', source: 'outside',
-        paint: { 'fill-color': COLORS.paper, 'fill-opacity': 0.78 } });
 
       // Numbers crowd each other at city scale, so they appear on zooming in.
       map.addSource('district-labels', { type: 'geojson', data: {
@@ -183,7 +258,7 @@
       map.setPaintProperty('district-fill', 'fill-opacity', chosenOpacity(code, 0.45));
     }
     if (map.getLayer('district-chosen')) {
-      map.setPaintProperty('district-chosen', 'line-opacity', chosenOpacity(code, 1));
+      map.setPaintProperty('district-chosen', 'line-opacity', chosenOpacity(code, 0.75));
     }
   }
 
@@ -227,21 +302,24 @@
                                           essential: false }, options || {}));
   }
 
-  // One marker per map marks the school in focus. CSS grows it in.
+  // HTML markers, one of each kind per map. 'select' marks the chosen
+  // school and CSS grows it in; 'hover' is a lighter ring for a preview.
   var markers = typeof WeakMap === 'function' ? new WeakMap() : null;
 
-  function focus(map, lngLat) {
+  function focus(map, lngLat, kind) {
     if (!markers) return;
-    var marker = markers.get(map);
+    kind = kind || 'select';
+    var own = markers.get(map) || {};
+    markers.set(map, own);
+    var marker = own[kind];
     if (!lngLat) {
       if (marker) marker.getElement().classList.remove('is-on');
       return;
     }
     if (!marker) {
-      var dot = SF.el('div', { class: 'map-focus' });
+      var dot = SF.el('div', { class: kind === 'hover' ? 'map-hover' : 'map-focus' });
       dot.setAttribute('aria-hidden', 'true');
-      marker = new maplibregl.Marker({ element: dot }).setLngLat(lngLat).addTo(map);
-      markers.set(map, marker);
+      marker = own[kind] = new maplibregl.Marker({ element: dot }).setLngLat(lngLat).addTo(map);
     }
     var el = marker.getElement();
     el.classList.remove('is-on');

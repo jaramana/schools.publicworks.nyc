@@ -92,10 +92,7 @@
     var tools = document.getElementById('chosen-tools');
     tools.innerHTML = '';
     if (chosen.length) {
-      var clear = SF.el('button', {
-        class: 'pill', type: 'button',
-        text: chosen.length === 1 ? 'Remove this school' : 'Clear all ' + chosen.length + ' schools'
-      });
+      var clear = SF.el('button', { class: 'text-button', type: 'button', text: 'Clear comparison' });
       clear.addEventListener('click', clearAll);
       tools.appendChild(clear);
     }
@@ -115,7 +112,7 @@
     } else if (chosen.length >= maxSchools) {
       note.textContent = maxSchools + ' schools is the limit. Remove one to add another.';
     } else {
-      note.textContent = chosen.length + ' of up to ' + maxSchools + ' schools.' +
+      note.textContent = 'Comparing ' + chosen.length + ' of ' + maxSchools + '.' +
         (chosen.length === 1 ? ' Add one more to compare them.' : '');
     }
   }

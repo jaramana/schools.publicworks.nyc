@@ -17,35 +17,28 @@ period for each figure and definitions in the measure details.
 | [GeoSearch](https://geosearch.planninglabs.nyc/) | Coordinates for schools missing from the point file | Address lookup |
 | [School Districts](https://data.cityofnewyork.us/d/8ugf-3d8u), `8ugf-3d8u` | District outlines on the map | Updated May 2026 |
 
-The current periods are in `docs/data/status.json`. The dated
-[source manifest](research/source-manifest.md) records the original survey and
-rejected sources; it is not updated with each build.
+The current periods are in `docs/data/status.json`.
 
 ## Method and limits
 
-- Sources are joined by DBN, the school's identifier, never by name. A school
-  serving several grade spans can have more than one quality-report type for the
-  same year.
-- A reported zero, a withheld value, an unreported value and a measure that does
-  not apply are distinct. Published bounds such as “Above 95%” stay as bounds
-  rather than becoming missing values.
-- A comparison shows each figure's reporting year, including when years differ
-  between schools. Scores and comparison-group averages come from the City where
-  available; the site does not calculate an overall score.
-- Open or former status is inferred from recent source appearances, not taken from
-  a published status field.
-- Survey and school-climate results, SHSAT figures and some specialized admissions
-  measures are not included. About 400 open schools have no address in the
-  available directories.
+- Sources are joined by DBN, the school's identifier, never by name.
+- A blank is never a zero. Not reported, withheld and does not apply are kept
+  apart. Published bounds such as "Above 95%" stay as bounds.
+- Every figure in a measure comes from one school year. Comparisons show each
+  figure's year, including when schools differ.
+- Scores and comparison-group averages come from the City. The site groups the
+  City's 1 to 5 score into four bands and calculates no overall score.
+- Open or former status is inferred from recent source appearances. No source
+  publishes it.
 - Coordinates come from the school point file first, then the high school
-  directory, then the geocoder. The point file is a dated snapshot, so a school
-  that opened after it falls back. The map draws every school alike and does not
-  show school zones.
+  directory, then the geocoder. The map draws every school alike and shows
+  district lines, not school zones.
+- Survey results, SHSAT figures and specialized admissions measures are not
+  included. About 400 open schools have no address in the directories.
 
-The [method page](https://schools.publicworks.nyc/method.html) explains the
-measures and missing-data states. The
-[data page](https://schools.publicworks.nyc/data.html) provides an Excel workbook
-and normalized CSV tables made from the same validated data as the site.
+The [method page](https://schools.publicworks.nyc/method.html) shows the
+process step by step, the sources, the dictionary and the downloads: an Excel
+workbook and CSV tables built from the same validated data as the site.
 
 ## Updates
 
@@ -55,8 +48,18 @@ and the date of the last published build. That date does not advance when a run
 finds no data changes; check the Actions history to confirm that refreshes are
 still running. A stopped workflow cannot update the site's stale-source warning.
 
-The Python pipeline in `run.py` uses cached downloads on later runs. Source URLs
-and validation limits are set in `pipeline/00_config.py`.
+To build locally:
+
+```bash
+python -m venv .venv
+.venv/bin/pip install pandas requests openpyxl XlsxWriter
+.venv/bin/python run.py
+```
+
+The first run downloads about 230 MB and takes about five minutes; later runs
+use the caches in `data-raw/`. Source URLs, thresholds and display rules are set
+in `pipeline/00_config.py`. To preview the site, run `python3 tools/serve.py`
+and open http://localhost:8787.
 
 District outlines change rarely, so the daily run does not fetch them. Run
 `python tools/fetch_districts.py` when NYC Open Data publishes new ones.
@@ -66,7 +69,8 @@ District outlines change rarely, so the daily run does not fetch them. Run
 Data pipeline: Python, `pandas`, `requests`, `openpyxl` and `XlsxWriter`
 prepare and validate the data. Website: static HTML, CSS and JavaScript,
 served from GitHub Pages. MapLibre GL is included with the site for maps, over
-the OpenFreeMap Positron basemap. Claude was used in development.
+the OpenFreeMap Positron basemap, restyled in the browser. Claude was used in
+development.
 
 ## License and reuse
 

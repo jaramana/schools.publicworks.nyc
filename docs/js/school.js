@@ -1015,6 +1015,13 @@
 
   // ---- Comparison basket ------------------------------------------------
 
+  // The same basket as Browse's tray. Beside the add button, "Comparing 3
+  // of 12" opens a list of the schools already chosen, so a reader always
+  // sees what is on the list. Names come from the search index, fetched on
+  // first opening to keep it off the profile's critical path.
+  var basketOpen = false;
+  var basketNames = null;
+
   function renderCompareButton(school) {
     var host = document.getElementById('compare-action');
     host.innerHTML = '';
@@ -1025,9 +1032,9 @@
     var message = SF.el('span', { class: 'count', role: 'status' });
 
     var button = SF.el('button', {
-      class: 'pill', type: 'button',
+      class: 'pill pill-check', type: 'button',
       'aria-pressed': inBasket ? 'true' : 'false',
-      text: inBasket ? 'In your comparison' : 'Add to comparison'
+      text: inBasket ? '✓ In comparison' : 'Add to comparison'
     });
     button.addEventListener('click', function () {
       var current = SF.store.get('compare', []);
@@ -1042,18 +1049,77 @@
         current.splice(at, 1);
       }
       SF.store.set('compare', current);
-      renderCompareButton(school);
     });
     host.appendChild(button);
 
+    if (!basket.length) basketOpen = false;
     if (basket.length) {
-      host.appendChild(SF.el('a', {
-        class: 'pill',
-        href: 'compare.html?schools=' + basket.join(','),
-        text: 'Compare ' + basket.length + (basket.length === 1 ? ' school' : ' schools')
-      }));
+      var pop = SF.el('div', { class: 'basket-pop' });
+      var toggle = SF.el('button', {
+        type: 'button', class: 'tray-toggle', id: 'basket-toggle',
+        'aria-expanded': String(basketOpen), 'aria-controls': 'basket-menu'
+      }, [document.createTextNode('Comparing '),
+          SF.el('b', { text: String(basket.length) }),
+          document.createTextNode(' of ' + limit + ' '),
+          SF.el('span', { class: 'chev', 'aria-hidden': 'true', text: '▼' })]);
+      toggle.addEventListener('click', function () {
+        basketOpen = !basketOpen;
+        renderCompareButton(school);
+        if (basketOpen) document.getElementById('basket-toggle').focus();
+      });
+      pop.appendChild(toggle);
+
+      if (basketOpen) {
+        var menu = SF.el('div', { class: 'basket-menu tray-list', id: 'basket-menu' });
+        if (!basketNames) {
+          menu.appendChild(SF.el('p', { class: 'count', text: 'Loading names…' }));
+          SFSearch.data().then(function (rows) {
+            basketNames = {};
+            rows.forEach(function (r) { basketNames[r.dbn] = r.name; });
+            renderCompareButton(school);
+          });
+        } else {
+          // This school is marked rather than linked; the others open their
+          // own profiles.
+          menu.appendChild(SF.basketList(basketNames, function (dbn, label) {
+            if (dbn === school.dbn) {
+              return SF.el('span', { class: 'tray-name is-here' }, [
+                document.createTextNode(label),
+                SF.el('span', { class: 'here-tag', text: 'This school' })
+              ]);
+            }
+            return SF.el('a', { class: 'tray-name', href: 'school.html?dbn=' + encodeURIComponent(dbn),
+                                text: label });
+          }));
+        }
+        pop.appendChild(menu);
+      }
+      host.appendChild(pop);
+
+      host.appendChild(SF.el('a', { class: 'pill pill-go', href: SF.compareHref(), text: 'Compare →' }));
     }
     host.appendChild(message);
+  }
+
+  // The list closes on Escape or a click elsewhere, and follows changes made
+  // in the list itself or in another tab.
+  function watchBasket(school) {
+    document.addEventListener('sf-store', function (ev) {
+      if (ev.detail.key === 'compare') renderCompareButton(school);
+    });
+    document.addEventListener('mousedown', function (ev) {
+      if (basketOpen && !ev.target.closest('.basket-pop')) {
+        basketOpen = false;
+        renderCompareButton(school);
+      }
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && basketOpen) {
+        basketOpen = false;
+        renderCompareButton(school);
+        document.getElementById('basket-toggle').focus();
+      }
+    });
   }
 
   // ---- Entry point --------------------------------------------------------
@@ -1096,6 +1162,7 @@
       renderLocator(payload.school);
       renderOverview(payload.school);
       renderCompareButton(payload.school);
+      watchBasket(payload.school);
       renderPrograms(payload);
       renderMetrics(payload, metrics);
     }).catch(function (err) {

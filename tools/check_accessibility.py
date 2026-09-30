@@ -3,8 +3,7 @@
 This is the machine half of the accessibility work. It catches the failures a
 script can see: contrast against the palette, missing labels and landmarks,
 heading order, and image and table semantics. A manual keyboard and screen
-reader pass is still needed for the rest, and is recorded in
-research/accessibility.md.
+reader pass is still needed for the rest.
 
     .venv/bin/python tools/check_accessibility.py
 
