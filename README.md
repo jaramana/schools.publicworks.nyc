@@ -25,8 +25,17 @@ The current periods are in `docs/data/status.json`.
 - Sources are joined by DBN, the school's identifier, never by name.
 - A blank is never a zero. Not reported, withheld and does not apply are kept
   apart. Published bounds such as "Above 95%" stay as bounds.
-- Every figure in a measure comes from one school year. Comparisons show each
-  figure's year, including when schools differ.
+- Not reported means schools of the same type publish the measure and this
+  school has no figure. The peer files in `docs/data/peers/` decide. A measure
+  no school of the type publishes, or one for a grade the school does not
+  serve, is left off the profile and reads Does not apply in Compare.
+- The export marks a measure in `metrics.json` when at least 20 district
+  schools have a figure and no charter school does. A charter school's
+  profile gives that as the reason.
+- A profile holds every current measure to its source's newest year for that
+  school and names the year once, beside the source. A measure with no figure
+  that year reads not reported, and earlier years are in the opened row.
+  Compare shows each figure's year when schools differ.
 - Scores, ratings and averages come from the City. The site groups the City's
   1 to 5 measure score into four bands, shows the City's ratings and Impact and
   Performance scores as published, and calculates no overall score.

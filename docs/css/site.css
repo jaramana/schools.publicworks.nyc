@@ -34,6 +34,8 @@
   --on-accent:    #ffffff;
   --accent-soft:  #e3efea;
   --accent-ink:   #0d4b38;
+  /* The mark for this school in every chart. */
+  --mark:         var(--accent);
   --warn:         #9c3d16;
   --warn-soft:    #fbe9e0;
 
@@ -216,6 +218,23 @@ main { padding-bottom: 5rem; }
 }
 
 .nav { display: flex; gap: .15rem; flex-wrap: wrap; margin-left: auto; align-items: center; }
+
+/* A profile's school name, shown once its heading has scrolled under the
+   masthead. Desktop only, where the masthead stays on screen. It fills the
+   space between the wordmark and the nav, so it never moves either. */
+.masthead-school { display: none; }
+@media (min-width: 60rem) and (hover: hover) {
+  .masthead-school {
+    display: block; flex: 1 1 0; min-width: 0;
+    font-size: .95rem; font-weight: 600; color: var(--ink-soft);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    opacity: 0; transform: translateY(3px); pointer-events: none;
+    transition: opacity .18s ease, transform .18s ease;
+  }
+  .masthead-school::before { content: "/"; margin-right: .85rem; color: var(--rule-strong); font-weight: 400; }
+  .masthead-school.shown { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .masthead-school { transition: none; transform: none; } }
 .nav a {
   color: var(--ink-soft); text-decoration: none;
   padding: .35rem .6rem; border-radius: 6px;
@@ -824,8 +843,8 @@ body.map-full .map-stage { flex: 1; }
 .own-words { margin: 0; }
 .own-words blockquote { margin: 0; }
 .own-words blockquote p {
-  margin: 0; max-width: 40rem; font-family: var(--serif);
-  font-size: clamp(1.1rem, 1.7vw, 1.25rem); line-height: 1.62; color: var(--ink);
+  margin: 0; max-width: 38rem; font-family: var(--serif);
+  font-size: clamp(1rem, 1.25vw, 1.08rem); line-height: 1.6; color: var(--ink);
   text-wrap: pretty; hanging-punctuation: first last;
 }
 .q-open, .q-close { color: var(--accent); }
@@ -835,7 +854,7 @@ body.map-full .map-stage { flex: 1; }
 .own-words figcaption a { color: inherit; }
 /* The clamp clips, so the box widens leftward to keep the hung quote mark. */
 .own-words.clamped blockquote {
-  max-height: 12rem; overflow: hidden; margin-left: -.75rem; padding-left: .75rem;
+  max-height: 10rem; overflow: hidden; margin-left: -.75rem; padding-left: .75rem;
   -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent);
   mask-image: linear-gradient(to bottom, #000 58%, transparent);
 }
@@ -945,7 +964,7 @@ body.map-full .map-stage { flex: 1; }
 /* One column. The name and its year read left; the value and the peer
    picture sit at fixed positions, so the eye runs down two straight edges. */
 
-.mlist { list-style: none; padding: 0; margin: .5rem 0 0; max-width: 60rem; border-bottom: 1px solid var(--rule); }
+.mlist { list-style: none; padding: 0; margin: .5rem 0 0; border-bottom: 1px solid var(--rule); }
 .mrow, .mblock { border-top: 1px solid var(--rule); }
 .mrow-btn {
   all: unset; box-sizing: border-box; cursor: pointer;
@@ -963,20 +982,19 @@ body.map-full .map-stage { flex: 1; }
 .mrow-value .m-value { font-size: 1.35rem; }
 .mrow-peer { grid-area: peer; display: flex; justify-content: flex-end; align-items: center; min-height: 28px; }
 .mrow-chev {
-  grid-area: chev; justify-self: center; width: .5rem; height: .5rem;
+  grid-area: chev; justify-self: end; margin-right: .12rem; width: .5rem; height: .5rem;
   border-right: 2px solid var(--ink-faint); border-bottom: 2px solid var(--ink-faint);
   transform: translateY(-25%) rotate(45deg); transition: transform .15s ease;
 }
 .mrow-btn[aria-expanded="true"] .mrow-chev { transform: translateY(25%) rotate(-135deg); }
 .mrow-btn[aria-expanded="true"] .mrow-label { color: var(--accent-ink); }
 .mrow > .m-def { margin: -.55rem 0 .85rem; }
-.mrow > .rating-scale { margin: -.4rem 0 1.05rem; }
 .mrow-panel { padding: .25rem 0 2rem; }
 
 .peer-strip { display: block; overflow: visible; }
 .peer-strip rect { fill: #8a9196; fill-opacity: .4; }
 .peer-strip rect.over { fill-opacity: .65; }
-.peer-strip .here { stroke: var(--accent); stroke-width: 2.5; }
+.peer-strip .here { stroke: var(--mark); stroke-width: 2.5; }
 
 @media (max-width: 40rem) {
   .mrow-btn {
@@ -999,9 +1017,9 @@ body.map-full .map-stage { flex: 1; }
 .peer-chart .bar.over { fill-opacity: .62; }
 .peer-chart .bar.hot { fill-opacity: .85; }
 .peer-chart .axis { stroke: var(--rule-strong); }
-.peer-chart .tick, .trend-chart .tick { font: 11px var(--mono); fill: var(--ink-faint); }
-.peer-chart .here { stroke: var(--accent); stroke-width: 2.5; }
-.peer-chart .here-dot { fill: var(--accent); stroke: var(--paper); stroke-width: 2; }
+.peer-chart .tick { font: 11px var(--mono); fill: var(--ink-faint); }
+.peer-chart .here { stroke: var(--mark); stroke-width: 2.5; }
+.peer-chart .here-dot { fill: var(--mark); stroke: var(--paper); stroke-width: 2; }
 .peer-chart .here-label {
   font: 700 12px var(--sans); fill: var(--ink);
   paint-order: stroke; stroke: var(--paper); stroke-width: 4px; stroke-linejoin: round;
@@ -1011,15 +1029,6 @@ body.map-full .map-stage { flex: 1; }
   font: 600 11px var(--sans); fill: var(--ink-soft);
   paint-order: stroke; stroke: var(--paper); stroke-width: 4px; stroke-linejoin: round;
 }
-.trend-chart .grid { stroke: var(--rule); }
-.trend-chart .own-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.trend-chart .cmp-line { fill: none; stroke: var(--ink-faint); stroke-width: 1.5; stroke-dasharray: 4 3; }
-.trend-chart .pt { fill: var(--accent); stroke: var(--paper); stroke-width: 2; }
-.trend-chart .crosshair { stroke: var(--ink-faint); stroke-width: 1; }
-.legend { display: flex; flex-wrap: wrap; gap: .3rem 1.25rem; font-size: .8rem; color: var(--ink-soft); margin: .55rem 0 0; max-width: none; }
-.legend .key { display: inline-flex; align-items: center; gap: .45rem; }
-.legend .sw-line { width: 1.2rem; border-top: 2px solid var(--accent); }
-.legend .sw-dash { width: 1.2rem; border-top: 2px dashed var(--ink-faint); }
 .mx .m-facts-label { margin-top: 0; }
 
 /* ---- Shares of a whole --------------------------------------------- */
@@ -1031,15 +1040,24 @@ body.map-full .map-stage { flex: 1; }
 }
 .mblock-head .mrow-label { margin: 0; letter-spacing: 0; }
 .mblock-head .m-meta { margin: 0; }
-.comp-list { list-style: none; padding: 0; margin: 0; max-width: 42rem; }
+/* A share row uses the measure row's columns. Values line up with values,
+   and the bar sits where the peer picture does. */
+.comp-list { list-style: none; padding: 0; margin: 0; }
 .comp-row {
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(4rem, 11rem) 5.5rem;
-  gap: 1rem; align-items: center; padding: .28rem 0; font-size: .93rem;
+  display: grid; grid-template-columns: minmax(0, 1fr) 5.5rem 8.25rem 1rem;
+  grid-template-areas: "name value bar ."; column-gap: 1.5rem;
+  align-items: center; padding: .28rem 0; font-size: .93rem;
 }
-.comp-name { color: var(--ink-soft); }
-.comp-bar { height: 8px; background: var(--paper-sunken); border-radius: 4px; overflow: hidden; }
+.comp-name { grid-area: name; color: var(--ink-soft); }
+.comp-bar { grid-area: bar; height: 8px; background: var(--paper-sunken); border-radius: 4px; overflow: hidden; }
 .comp-bar > span { display: block; height: 100%; background: var(--accent); opacity: .6; border-radius: 4px; }
-.comp-value { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.comp-value { grid-area: value; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+@media (max-width: 40rem) {
+  .comp-row {
+    grid-template-columns: minmax(0, 1fr) minmax(3rem, 6rem) 4.5rem;
+    grid-template-areas: "name bar value"; column-gap: 1rem;
+  }
+}
 .comp-value.absent { font-weight: 500; color: var(--ink-faint); font-size: .85rem; }
 
 /* Stacked bars for the nearby comparison. Each race keeps one slot and one
@@ -1103,7 +1121,7 @@ body.map-full .map-stage { flex: 1; }
 .impact-chart .tick { font: 11px var(--mono); fill: var(--ink-faint); }
 .impact-chart .axis-title { font: 600 12px var(--sans); fill: var(--ink-soft); }
 .impact-chart .dots circle { fill: #8a9196; fill-opacity: .42; }
-.impact-chart .here { fill: var(--accent); stroke: var(--paper-raised); stroke-width: 2; }
+.impact-chart .here { fill: var(--mark); stroke: var(--paper-raised); stroke-width: 2; }
 .impact-chart .here-label {
   font: 700 12px var(--sans); fill: var(--ink);
   paint-order: stroke; stroke: var(--paper-raised); stroke-width: 3px; stroke-linejoin: round;
@@ -1463,11 +1481,59 @@ main.is-loading .statusline { visibility: hidden; }
   .tab { border-bottom-color: Canvas; }
   .tab[aria-selected="true"] { border-bottom-color: Highlight; }
   .peer-strip rect, .peer-chart .bar { fill: GrayText; fill-opacity: 1; forced-color-adjust: none; }
-  .peer-strip .here, .peer-chart .here, .trend-chart .own-line { stroke: Highlight; }
-  .peer-chart .here-dot, .trend-chart .pt { fill: Highlight; stroke: Canvas; }
-  .peer-chart .cmp, .trend-chart .cmp-line { stroke: CanvasText; }
+  .peer-strip .here, .peer-chart .here { stroke: Highlight; }
+  .peer-chart .here-dot { fill: Highlight; stroke: Canvas; }
+  .peer-chart .cmp { stroke: CanvasText; }
   .peer-chart .here-label, .peer-chart .cmp-label { fill: CanvasText; stroke: Canvas; }
-  .peer-chart .tick, .trend-chart .tick { fill: CanvasText; }
-  .trend-chart .grid, .peer-chart .axis { stroke: GrayText; }
-  .legend .sw-line { border-top-color: Highlight; }
+  .peer-chart .tick { fill: CanvasText; }
+  .peer-chart .axis { stroke: GrayText; }
+}
+
+/* ---- The City's ratings -------------------------------------------- */
+/* The three ratings share one scale. Its four steps are named once above
+   the rows, and each row's track marks the school's score with a dot. */
+
+.rs-track {
+  position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px;
+  width: 100%; height: 8px;
+}
+.rs-seg { background: var(--paper-sunken); border-radius: 2px; }
+.rs-seg.on { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.rs-dot {
+  position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px;
+  border-radius: 50%; background: var(--mark); box-shadow: 0 0 0 2px var(--paper);
+}
+.mrow.rated .mrow-btn {
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 22rem) 8rem 1rem;
+  grid-template-areas: "label scale value chev" "meta scale value chev";
+}
+.mrow.rated .rs-track { grid-area: scale; align-self: center; }
+.rs-axis {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, 22rem) 8rem 1rem;
+  column-gap: 1.5rem; padding: .9rem 0 .35rem; border-top: 1px solid var(--rule);
+}
+.rs-axis-steps { grid-column: 2; display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
+.rs-axis-steps span { font-size: .74rem; color: var(--ink-faint); line-height: 1.25; }
+.rs-axis-steps b { font-family: var(--mono); font-weight: 600; margin-right: .25rem; }
+.rs-axis + .mrow { border-top: 0; }
+@media (max-width: 40rem) {
+  .mrow.rated .mrow-btn {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "label value" "meta meta" "scale scale";
+  }
+  .mrow.rated .rs-track { margin-top: .5rem; }
+  .rs-axis { grid-template-columns: 1fr; }
+  .rs-axis-steps { grid-column: 1; }
+}
+@media (forced-colors: active) {
+  .rs-seg, .rs-bar { forced-color-adjust: none; background: Canvas; box-shadow: inset 0 0 0 1px GrayText; }
+  .rs-seg.on, .rs-step.on .rs-bar { box-shadow: inset 0 0 0 2px CanvasText; }
+  .rs-dot, .rs-mark { forced-color-adjust: none; background: Highlight; box-shadow: 0 0 0 2px Canvas; }
+}
+
+/* A figure from before its source's current year carries its year. */
+.m-year-tag {
+  display: inline-block; margin-left: .45rem; padding: .05rem .4rem; border-radius: 4px;
+  font: 600 .72rem var(--mono); color: var(--ink-soft); background: var(--paper-sunken);
+  vertical-align: .2em;
 }

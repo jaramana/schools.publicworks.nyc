@@ -25,7 +25,11 @@
     },
     index100: function (v) { return isBlank(v) ? null : Number(v).toFixed(1); },
     scale: function (v) { return isBlank(v) ? null : Number(v).toFixed(2); },
-    percentile: function (v) { return isBlank(v) ? null : Math.round(v) + 'th'; },
+    percentile: function (v) {
+      if (isBlank(v)) return null;
+      var n = Math.round(v), teen = n % 100 >= 11 && n % 100 <= 13;
+      return n + (teen ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' })[n % 10] || 'th');
+    },
     number: function (v) {
       if (isBlank(v)) return null;
       var n = Number(v);
@@ -146,6 +150,8 @@
     suppressed: 'Withheld',
     censored: 'Above or below a bound',   // replaced by the source's own text
     not_applicable: 'Does not apply',
+    unpublished: 'Not reported',
+    charter: 'Not reported',
     unknown: 'Not reported'
   };
 
@@ -153,8 +159,81 @@
     missing: 'The source published no value for this school and year.',
     suppressed: 'The source withheld this value because too few students are in the group. It is not a zero.',
     censored: 'The source published a bound rather than an exact figure, to avoid identifying students at the extremes.',
-    not_applicable: 'This measure is not published for this type of school.'
+    not_applicable: 'This measure is not published for this type of school.',
+    unpublished: 'Published for other schools of this type, not for this one.',
+    charter: 'No charter school has a published value for this measure.'
   };
+
+  // ---- Why a value is missing ------------------------------------
+
+  // A school with no value for a measure falls in one of five cases, each an
+  // ABSENCE key, so the profile and Compare say the same thing:
+  //
+  //   not_applicable  another report type, a grade outside the school's span,
+  //                   or a measure no school of its type publishes
+  //   charter         no charter school has a value for it
+  //   unpublished     schools of the same type publish it, this one does not
+  //   missing         the school has no type to compare with
+  //   unknown         the peer file did not load, so the cases blur
+
+  var REPORT_LABEL = {
+    EMS: 'elementary and middle grades',
+    HS: 'high school grades',
+    HST: 'transfer school report',
+    EC: 'early childhood report',
+    D75: 'District 75 report',
+    YABC: 'Young Adult Borough Center report'
+  };
+
+  function reportTypesOf(school) {
+    return (school.report_types || school.report_type || '').split('|').filter(Boolean);
+  }
+
+  function appliesTo(metric, school) {
+    var mine = reportTypesOf(school);
+    if (!mine.length) return true;
+    return (metric.applies_to || []).some(function (r) { return mine.indexOf(r) !== -1; });
+  }
+
+  function isCharter(school) {
+    return parseInt(school.district, 10) === 84;
+  }
+
+  // "3K-5", "PK-8", "K to 6", "6-12" as [lowest, highest], with pre-K and
+  // kindergarten as 0. Null when the span is written another way.
+  function gradeSpan(grades) {
+    var m = /^\s*(3K|PK|K|\d+)\s*(?:-|to)\s*(\d+)\s*$/i.exec(grades || '');
+    if (!m) return null;
+    return [/K/i.test(m[1]) ? 0 : parseInt(m[1], 10), parseInt(m[2], 10)];
+  }
+
+  // The peer file a reading is drawn against. A school that files two
+  // reports has a type in each.
+  function peerSlug(metric, school, peerTypes, report) {
+    var types = peerTypes || {};
+    if (metric.source_id === 'demographics') return types[''] || null;
+    if (!report) {
+      report = reportTypesOf(school).filter(function (r) {
+        return (metric.applies_to || []).indexOf(r) !== -1;
+      })[0];
+    }
+    return types[report] || types[''] || null;
+  }
+
+  function absenceOf(metricId, metric, school, peerTypes, peers) {
+    if (!appliesTo(metric, school)) return 'not_applicable';
+    if (metric.theme === 'grade') {
+      var span = gradeSpan(school.grades);
+      var grade = /(\d+)/.exec(metric.subgroup || '');
+      if (span && grade && (+grade[1] < span[0] || +grade[1] > span[1])) return 'not_applicable';
+    }
+    var slug = peerSlug(metric, school, peerTypes);
+    var file = slug && peers ? peers[slug] : null;
+    if (file && file.metrics && !file.metrics[metricId]) return 'not_applicable';
+    if (metric.charters === false && isCharter(school)) return 'charter';
+    if (!slug) return 'missing';
+    return file && file.metrics ? 'unpublished' : 'unknown';
+  }
 
   // ---- Data -------------------------------------------------------
 
@@ -397,6 +476,8 @@
     scaleSpoken: scaleSpoken,
     bandElement: bandElement, BAND_LABEL: BAND_LABEL, BAND_SHORT: BAND_SHORT,
     ABSENCE: ABSENCE, ABSENCE_DETAIL: ABSENCE_DETAIL,
+    REPORT_LABEL: REPORT_LABEL, reportTypesOf: reportTypesOf, appliesTo: appliesTo,
+    isCharter: isCharter, peerSlug: peerSlug, absenceOf: absenceOf,
     load: load, fail: fail, escapeHtml: escapeHtml,
     param: param, setParam: setParam, store: store, el: el,
     basketList: basketList, compareHref: compareHref

@@ -15,6 +15,7 @@
 
   var chosen = [];
   var loaded = {};
+  var peers = {};           // peer files by slug, for saying why a value is missing
   var metrics = null;
   var picked = [];          // metric ids shown as columns
   var maxSchools = 12;
@@ -30,6 +31,7 @@
   // the schools group, and the same figure twice is just noise.
   var DEFAULT_MEASURES = [
     'qr_impact', 'qr_performance',
+    'qr_rating_instruction', 'qr_rating_climate', 'qr_rating_families',
     'demo_economic_need_index',
     'attendance_k8_all', 'attendance_hs_all',
     'chronic_absent_ems_all', 'chronic_absent_hs_all',
@@ -509,8 +511,8 @@
         var tr = SF.el('tr');
         tr.appendChild(labelCell(main, sub.join(' · ')));
         if (ghost) tr.appendChild(SF.el('td', { class: 'ghost' }));
-        points.forEach(function (point) {
-          tr.appendChild(valueCell(point, metric, sharedYear));
+        points.forEach(function (point, i) {
+          tr.appendChild(valueCell(point, metric, sharedYear, payloads[i], id));
         });
         body.appendChild(tr);
       });
@@ -531,20 +533,18 @@
   // An absence is written out, never left as a blank cell. A silent empty cell
   // reads as nothing at all rather than as a gap in the data, and it hides the
   // difference between a figure the City withheld and one it never published.
-  function valueCell(point, metric, sharedYear) {
+  function valueCell(point, metric, sharedYear, payload, metricId) {
     var td = SF.el('td', { class: 'num' });
 
     if (!point || point.status) {
-      var reason = point ? (SF.ABSENCE[point.status] || SF.ABSENCE.missing)
-                         : SF.ABSENCE.not_applicable;
+      // The same reason the school's profile gives for the gap.
+      var status = point ? point.status
+        : SF.absenceOf(metricId, metric, payload.school, payload.peer_types, peers);
+      var reason = SF.ABSENCE[status] || SF.ABSENCE.missing;
       td.className = 'num muted';
       td.textContent = reason;
       td.setAttribute('aria-label', reason);
-      if (point && SF.ABSENCE_DETAIL[point.status]) {
-        td.title = SF.ABSENCE_DETAIL[point.status];
-      } else if (!point) {
-        td.title = 'This measure is not published for this school.';
-      }
+      if (SF.ABSENCE_DETAIL[status]) td.title = SF.ABSENCE_DETAIL[status];
       return td;
     }
 
@@ -564,6 +564,12 @@
     // exactly when it needs noticing. Otherwise the row header says it once.
     if (!sharedYear) {
       td.appendChild(SF.el('span', { class: 'period', text: point.year }));
+    }
+    // A school with two reports shows the one this figure comes from.
+    var series = (payload.series || {})[metricId];
+    if (series && series.rt && SF.reportTypesOf(payload.school).length > 1) {
+      td.appendChild(SF.el('span', { class: 'period',
+        text: SF.REPORT_LABEL[payload.school.report_type] || payload.school.report_type }));
     }
     return td;
   }
@@ -662,11 +668,6 @@
     });
     host.appendChild(copy);
     host.appendChild(said);
-
-    host.appendChild(SF.el('span', {
-      class: 'count',
-      text: 'Your shortlist is also remembered in this browser.'
-    }));
     return host;
   }
 
@@ -684,6 +685,23 @@
         chosen = chosen.filter(function (d) { return d !== dbn; });
         return null;
       });
+    })).then(loadPeers);
+  }
+
+  // The peer files tell a measure the school's type never has from one this
+  // school did not report. A file that fails to load costs only that wording.
+  function loadPeers() {
+    var slugs = [];
+    loadedPayloads().forEach(function (p) {
+      Object.keys(p.peer_types || {}).forEach(function (k) {
+        var slug = p.peer_types[k];
+        if (slug && !peers[slug] && slugs.indexOf(slug) === -1) slugs.push(slug);
+      });
+    });
+    return Promise.all(slugs.map(function (slug) {
+      return SF.load('peers/' + slug + '.json')
+        .then(function (file) { peers[slug] = file; })
+        .catch(function () {});
     }));
   }
 

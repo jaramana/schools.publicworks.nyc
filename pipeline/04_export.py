@@ -136,7 +136,28 @@ def build_search_index(schools, staging):
     return rows
 
 
-def build_metrics_json(metrics, staging):
+CHARTER_GAP_MIN = 20
+
+
+def charter_gaps(observations):
+    """Measures district schools report and no charter school does.
+
+    A profile reads such a measure at a charter school as not reported, with
+    that reason, rather than as a gap in one school's data.
+    """
+    numeric = (observations["status"] == cfg.STATUS_OK) & observations["value"].notna()
+    bounded = observations["bound"].fillna("").str.len() > 0
+    reported = observations[numeric | bounded]
+    charter = reported["dbn"].str.startswith("84")
+    with_charters = set(reported.loc[charter, "metric_id"])
+    district = reported[~charter].groupby("metric_id")["dbn"].nunique()
+    gaps = {m for m, n in district.items()
+            if n >= CHARTER_GAP_MIN and m not in with_charters}
+    log(f"charter gaps: {len(gaps)} measures have no charter school value")
+    return gaps
+
+
+def build_metrics_json(metrics, staging, gaps):
     payload = {}
     for _, metric in metrics.iterrows():
         payload[metric["metric_id"]] = {
@@ -176,8 +197,10 @@ def build_metrics_json(metrics, staging):
             "rated": str(metric.get("rated")).lower() == "true" or None,
             # A line printed under the measure's card.
             "card_note": clean(metric.get("card_note")),
-            # The source reports on district-run schools only.
-            "charters": (False if cfg.SOURCES.get(metric["source_id"], {})
+            # The source reports on district-run schools only, or no charter
+            # school has a value for this measure.
+            "charters": (False if metric["metric_id"] in gaps
+                         or cfg.SOURCES.get(metric["source_id"], {})
                          .get("covers_charters", True) is False else None),
         }
         payload[metric["metric_id"]].update({k: v for k, v in extra.items() if v is not None})
@@ -732,7 +755,7 @@ def main():
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     build_search_index(tables["schools"], staging)
-    build_metrics_json(tables["metrics"], staging)
+    build_metrics_json(tables["metrics"], staging, charter_gaps(tables["observations"]))
     points = impact_points(tables["observations"], tables["report_types"])
     types = peer_types(tables["schools"], tables["report_types"])
     build_school_files(tables["schools"], tables["observations"], tables["programs"],

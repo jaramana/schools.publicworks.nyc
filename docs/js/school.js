@@ -22,14 +22,7 @@
 (function () {
   'use strict';
 
-  var REPORT_LABEL = {
-    EMS: 'elementary and middle grades',
-    HS: 'high school grades',
-    HST: 'transfer school report',
-    EC: 'early childhood report',
-    D75: 'District 75 report',
-    YABC: 'Young Adult Borough Center report'
-  };
+  var REPORT_LABEL = SF.REPORT_LABEL;
 
   var state = { payload: null, metrics: null, sources: {}, periods: {}, peers: {} };
 
@@ -186,6 +179,24 @@
     var link = document.getElementById('back-link');
     link.href = saved.replace(/^.*\//, '');
     link.textContent = '← Back to browse';
+  }
+
+  // Once the page's own heading scrolls under the masthead, the masthead
+  // carries the school's name, so no chart or row has to repeat it. It
+  // repeats the heading, so assistive technology skips it.
+  function stickyName(school) {
+    var inner = document.querySelector('.masthead-inner');
+    var heading = document.querySelector('#school-head h1');
+    if (!inner || !heading || !('IntersectionObserver' in window)) return;
+    var name = SF.el('span', { class: 'masthead-school', 'aria-hidden': 'true',
+                               text: school.name || school.dbn });
+    inner.insertBefore(name, inner.querySelector('.nav'));
+    var masthead = document.querySelector('.masthead');
+    new IntersectionObserver(function (entries) {
+      var e = entries[0];
+      name.classList.toggle('shown', !e.isIntersecting && e.boundingClientRect.top < 0);
+    }, { rootMargin: '-' + Math.round(masthead ? masthead.offsetHeight : 0) + 'px 0px 0px 0px' })
+      .observe(heading);
   }
 
   function renderHead(school) {
@@ -430,10 +441,11 @@
       if (seenTitle[title]) return;
       seenTitle[title] = true;
       var credit = String(s.agency).split(',')[0] +
-        (/data\.cityofnewyork\.us/.test(s.url) ? ', NYC Open Data ' + s.dataset_id : '');
+        (/data\.cityofnewyork\.us/.test(s.url) ? ', NYC Open Data\u00a0' + s.dataset_id : '');
       var group = groups.filter(function (g) { return g.credit === credit; })[0];
       if (!group) groups.push(group = { credit: credit, links: [] });
-      group.links.push({ href: s.url, text: title });
+      group.links.push({ href: s.url, text: title,
+        year: view.model ? view.model.anchors[id] : null });
     });
     if (!groups.length) return null;
 
@@ -445,6 +457,7 @@
       g.links.forEach(function (link, j) {
         if (j) line.appendChild(document.createTextNode(j === g.links.length - 1 ? ' and ' : ', '));
         line.appendChild(SF.el('a', { href: link.href, text: link.text }));
+        if (link.year) line.appendChild(document.createTextNode(' ' + link.year));
       });
       line.appendChild(document.createTextNode(', ' + g.credit));
     });
@@ -466,10 +479,9 @@
     var shown = SF.formatValue(read.value, metric.format);
     var scale = SF.scaleOf(metric.format);
     if (read.text) {
-      // A framework rating leads with the City's word. The score it was set
-      // from sits beside it, with no band of this site's own.
+      // A framework rating shows the City's word. The score it was set from
+      // is in the line under the name, with no band of this site's own.
       wrapper.appendChild(SF.el('span', { class: 'm-value', text: read.text }));
-      wrapper.appendChild(SF.el('span', { class: 'm-scale', text: shown + ' ' + scale }));
       wrapper.setAttribute('aria-label', read.text + ', ' + SF.scaleSpoken(shown, metric.format));
       return wrapper;
     }
@@ -497,11 +509,11 @@
     var meta = SF.el('span', { class: 'm-meta' });
     var bits = [];
     if (read.absent && read.bound) {
-      bits.push(read.year, SF.ABSENCE_DETAIL.censored);
+      bits.push(SF.ABSENCE_DETAIL.censored);
     } else if (read.absent) {
       bits.push(SF.ABSENCE_DETAIL[read.status] || SF.ABSENCE_DETAIL.missing);
     } else {
-      bits.push(read.year);
+      if (read.text) bits.push(SF.formatValue(read.value, metric.format) + ' of 4.99');
       if (!SF.isBlank(read.n) && metric.source_id !== 'demographics') {
         bits.push(SF.fmt.count(read.n) + ' students');
       }
@@ -570,17 +582,7 @@
   // carries no score. A school files up to two reports, and each reading is
   // drawn against the type it has in that report.
   function peerSlugFor(entry) {
-    var types = state.payload.peer_types || {};
-    if (entry.metric.source_id === 'demographics') return types[''] || null;
-    var report = entry.report;
-    if (!report) {
-      var school = state.payload.school;
-      var mine = (school.report_types || school.report_type || '').split('|');
-      report = mine.filter(function (r) {
-        return (entry.metric.applies_to || []).indexOf(r) !== -1;
-      })[0];
-    }
-    return types[report] || types[''] || null;
+    return SF.peerSlug(entry.metric, state.payload.school, state.payload.peer_types, entry.report);
   }
 
   function peerOf(entry) {
@@ -660,7 +662,7 @@
       'aria-label': 'Histogram of ' + total + ' ' + noun + ' by ' + (metric.base_label || metric.label) +
         ', ' + p.y + ', from ' + fmt(p.lo) + ' to ' + fmt(p.hi) +
         (p.over ? ', with ' + p.over.n + ' published as ' + p.over.label.toLowerCase() : '') +
-        '. This school: ' + readingText(read, metric) + '.'
+        '. ' + schoolName() + ': ' + readingText(read, metric) + '.'
     });
     svg.appendChild(svgEl('line', { class: 'axis', x1: pad.l, x2: W - pad.r, y1: base, y2: base }));
 
@@ -705,7 +707,7 @@
     svg.appendChild(svgEl('circle', { class: 'here-dot', cx: hx, cy: top - 12, r: 4.5 }));
     var hAnchor = hx > W * 0.66 ? 'end' : 'start';
     svg.appendChild(svgEl('text', { class: 'here-label', x: hx + (hAnchor === 'end' ? -9 : 9), y: top - 8,
-      'text-anchor': hAnchor }, 'This school, ' + readingText(read, metric)));
+      'text-anchor': hAnchor }, readingText(read, metric)));
 
     var wrap = SF.el('div', { class: 'chart-wrap' });
     var tip = SF.el('div', { class: 'chart-tip', hidden: '' });
@@ -733,148 +735,12 @@
       hot = null;
     });
 
-    var notes = ['Each bar counts schools by their published value.',
-      'The green line is this school.'];
-    if (!read.absent && !SF.isBlank(read.comparison)) {
-      notes.push('The dashed line is the City’s ' +
-        (metric.comparison_label || 'similar schools').toLowerCase() + ' figure for this school.');
-    }
+    // The marks label themselves, so the caption keeps only facts the
+    // picture does not show.
+    var notes = [];
     if (!SF.isBlank(p.md)) notes.push('Half of these schools are above ' + fmt(p.md) + '.');
     if (metric.lower_is_better) notes.push('Lower is better for this measure.');
-    figure.appendChild(SF.el('figcaption', { text: notes.join(' ') }));
-    return figure;
-  }
-
-  // Round tick steps: 1, 2, 2.5 or 5 times a power of ten.
-  function niceTicks(lo, hi, count) {
-    var raw = (hi - lo) / Math.max(1, count);
-    var power = Math.pow(10, Math.floor(Math.log10(raw || 1)));
-    var step = [1, 2, 2.5, 5, 10].map(function (m) { return m * power; })
-      .filter(function (s) { return s >= raw; })[0] || power * 10;
-    var ticks = [];
-    for (var t = Math.ceil(lo / step) * step; t <= hi + step * 1e-6; t += step) {
-      ticks.push(Math.round(t / step) * step);
-    }
-    return { ticks: ticks, step: step };
-  }
-
-  function tickText(value, step, metric) {
-    if (metric.format === 'pct_unit') {
-      return (value * 100).toFixed(step * 100 < 1 ? 1 : 0) + '%';
-    }
-    var places = step >= 1 ? 0 : step >= 0.1 ? 1 : 2;
-    return Number(value).toFixed(places);
-  }
-
-  // The measure year by year, with the City's comparison where it publishes
-  // one. A year with no figure breaks the line rather than bridging it.
-  function trendChart(entry, width) {
-    var s = entry.series, metric = entry.metric;
-    if (!s) return null;
-    var own = [], cmp = [];
-    s.y.forEach(function (y, i) {
-      own.push(SF.isBlank(s.v[i]) ? null : s.v[i]);
-      cmp.push(s.c && !SF.isBlank(s.c[i]) && !SF.isBlank(s.v[i]) ? s.c[i] : null);
-    });
-    var points = own.filter(function (v) { return v !== null; });
-    if (points.length < 2) return null;
-    var hasCmp = cmp.filter(function (v) { return v !== null; }).length > 1;
-
-    var all = points.concat(cmp.filter(function (v) { return v !== null; }));
-    var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
-    var padv = Math.max((hi - lo) * 0.15, metric.format === 'pct_unit' ? 0.02 : Math.abs(hi) * 0.02 || 0.1);
-    lo -= padv; hi += padv;
-    if (metric.format === 'pct_unit') {
-      // A percentage axis spans at least 25 points, so a small change does
-      // not read as a cliff.
-      var mid = (lo + hi) / 2;
-      if (hi - lo < 0.25) { lo = mid - 0.125; hi = mid + 0.125; }
-      if (lo < 0) { hi -= lo; lo = 0; }
-      if (hi > 1 && Math.max.apply(null, all) <= 1) { lo = Math.max(0, lo - (hi - 1)); hi = 1; }
-    }
-    var scale = niceTicks(lo, hi, 4);
-    lo = Math.min(lo, scale.ticks[0]); hi = Math.max(hi, scale.ticks[scale.ticks.length - 1]);
-
-    var W = Math.max(300, Math.min(720, width || 640)), H = 190;
-    var pad = { t: 14, r: 14, b: 28, l: 48 };
-    var n = Math.max(1, s.y.length - 1);
-    var X = function (i) { return pad.l + i / n * (W - pad.l - pad.r); };
-    var Y = function (v) { return H - pad.b - (v - lo) / (hi - lo) * (H - pad.t - pad.b); };
-
-    var figure = SF.el('figure', { class: 'mx-chart' });
-    figure.appendChild(SF.el('p', { class: 'mx-chart-title', text: 'Over time' }));
-    var svg = svgEl('svg', {
-      class: 'trend-chart', viewBox: '0 0 ' + W + ' ' + H, role: 'img',
-      'aria-label': 'Line chart of this school’s figure by school year, ' + s.y[0] + ' to ' +
-        s.y[s.y.length - 1] + (hasCmp ? ', with the City’s comparison figure' : '') +
-        '. The values are listed under Every year.'
-    });
-    scale.ticks.forEach(function (t) {
-      if (t < lo - 1e-9 || t > hi + 1e-9) return;
-      svg.appendChild(svgEl('line', { class: 'grid', x1: pad.l, x2: W - pad.r, y1: Y(t), y2: Y(t) }));
-      svg.appendChild(svgEl('text', { class: 'tick', x: pad.l - 8, y: Y(t) + 4, 'text-anchor': 'end' },
-        tickText(t, scale.step, metric)));
-    });
-    var every = s.y.length > 8 ? 3 : s.y.length > 5 ? 2 : 1;
-    s.y.forEach(function (y, i) {
-      if ((s.y.length - 1 - i) % every) return;
-      svg.appendChild(svgEl('text', { class: 'tick', x: X(i), y: H - 8, 'text-anchor': 'middle' }, y));
-    });
-
-    function path(values) {
-      var d = '', pen = false;
-      values.forEach(function (v, i) {
-        if (v === null) { pen = false; return; }
-        d += (pen ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1);
-        pen = true;
-      });
-      return d;
-    }
-    if (hasCmp) svg.appendChild(svgEl('path', { class: 'cmp-line', d: path(cmp) }));
-    svg.appendChild(svgEl('path', { class: 'own-line', d: path(own) }));
-    own.forEach(function (v, i) {
-      if (v !== null) svg.appendChild(svgEl('circle', { class: 'pt', cx: X(i), cy: Y(v), r: 4 }));
-    });
-    var cross = svgEl('line', { class: 'crosshair', y1: pad.t, y2: H - pad.b, visibility: 'hidden' });
-    svg.appendChild(cross);
-
-    var wrap = SF.el('div', { class: 'chart-wrap' });
-    var tip = SF.el('div', { class: 'chart-tip', hidden: '' });
-    wrap.appendChild(svg);
-    wrap.appendChild(tip);
-    figure.appendChild(wrap);
-
-    svg.addEventListener('pointermove', function (ev) {
-      var box = svg.getBoundingClientRect();
-      var px = (ev.clientX - box.left) * (W / box.width);
-      var i = Math.max(0, Math.min(n, Math.round((px - pad.l) / (W - pad.l - pad.r) * n)));
-      var parts = [s.y[i], 'This school ' + (own[i] === null
-        ? (SF.ABSENCE[s.st ? s.st[i] : 'missing'] || SF.ABSENCE.missing)
-        : SF.formatValue(own[i], metric.format))];
-      if (hasCmp && cmp[i] !== null) {
-        parts.push((metric.comparison_label || 'Similar schools') + ' ' + SF.formatValue(cmp[i], metric.format));
-      }
-      tip.textContent = parts.join(' · ');
-      tip.hidden = false;
-      cross.setAttribute('x1', X(i));
-      cross.setAttribute('x2', X(i));
-      cross.setAttribute('visibility', 'visible');
-      tip.style.left = (X(i) * box.width / W) + 'px';
-      tip.style.top = (pad.t * box.height / H) + 'px';
-    });
-    svg.addEventListener('pointerleave', function () {
-      tip.hidden = true;
-      cross.setAttribute('visibility', 'hidden');
-    });
-
-    var legend = SF.el('p', { class: 'legend' });
-    legend.appendChild(SF.el('span', { class: 'key' }, [SF.el('span', { class: 'sw-line' }),
-      document.createTextNode('This school')]));
-    if (hasCmp) {
-      legend.appendChild(SF.el('span', { class: 'key' }, [SF.el('span', { class: 'sw-dash' }),
-        document.createTextNode('City’s ' + (metric.comparison_label || 'similar schools').toLowerCase() + ' figure')]));
-    }
-    figure.appendChild(legend);
+    if (notes.length) figure.appendChild(SF.el('figcaption', { text: notes.join(' ') }));
     return figure;
   }
 
@@ -884,10 +750,9 @@
     var metric = entry.metric, read = entry.read;
     var box = SF.el('div', { class: 'mx' });
 
+    if (read.text && !read.absent) box.appendChild(ratingScale(read));
     var peer = peerOf(entry);
     if (peer) box.appendChild(peerChart(peer, entry, width));
-    var trend = trendChart(entry, width);
-    if (trend) box.appendChild(trend);
 
     var rows = SF.el('dl', { class: 'm-facts' });
     function row(term, value, cls) {
@@ -951,7 +816,7 @@
       box.appendChild(years);
     }
 
-    if (primary && base.groups.length) {
+    if (primary && base.groups.length && !base.unreported) {
       var groups = SF.el('div', { class: 'mx-groups' });
       groups.appendChild(SF.el('p', { class: 'm-facts-label',
         text: 'By student group' + (base.year ? ', ' + base.year : '') }));
@@ -1083,23 +948,35 @@
     var label = o.label || base.label;
     if (o.scope) label += ', ' + o.scope;
     button.appendChild(SF.el('span', { class: 'mrow-label', text: label }));
-    var groups = o.primary && base.groups.length
+    var groups = o.primary && base.groups.length && !base.unreported
       ? base.groups.length + (base.groups.length === 1 ? ' student group' : ' student groups')
       : null;
     button.appendChild(rowMeta(entry.read, entry.metric, groups));
     var value = valueNode(entry.read, entry.metric);
     value.classList.add('mrow-value');
+    // A figure from before its source's current year says which year.
+    var said = !entry.read.absent || entry.read.bound;
+    if (said && entry.read.year && !yearIsAnchor(entry.read, entry.metric)) {
+      value.appendChild(SF.el('span', { class: 'm-year-tag', text: entry.read.year }));
+    }
     button.appendChild(value);
-    var slot = SF.el('span', { class: 'mrow-peer' });
-    var peer = o.older ? null : peerOf(entry);
-    if (peer) slot.appendChild(peerStrip(peer));
-    button.appendChild(slot);
+    if (entry.metric.rated) {
+      // The City's ratings share one scale, labeled once above them.
+      item.classList.add('rated');
+      button.appendChild(entry.read.absent
+        ? SF.el('span', { class: 'rs-track', 'aria-hidden': 'true' })
+        : scaleTrack(entry.read));
+    } else {
+      var slot = SF.el('span', { class: 'mrow-peer' });
+      var peer = o.older ? null : peerOf(entry);
+      if (peer) slot.appendChild(peerStrip(peer));
+      button.appendChild(slot);
+    }
     button.appendChild(SF.el('span', { class: 'mrow-chev', 'aria-hidden': 'true' }));
     item.appendChild(button);
 
     var definition = definitionOf(entry.metricId);
     if (definition) item.appendChild(SF.el('p', { class: 'm-def', text: definition }));
-    if (entry.read.text && !entry.read.absent) item.appendChild(ratingScale(entry.read));
 
     var panel = SF.el('div', { class: 'mrow-panel', id: id, hidden: '' });
     item.appendChild(panel);
@@ -1136,6 +1013,7 @@
       year = said ? said.read.year : null;
     }
     var from = sourceIdsOf(base.groups).map(function (id) { return SOURCE_SHORT[id]; }).filter(Boolean);
+    if (yearIsAnchor({ year: year }, base.groups[0].metric)) year = null;
     head.appendChild(SF.el('span', { class: 'm-meta',
       text: [year, from.length === 1 ? from[0] : null].filter(Boolean).join(' · ') }));
     item.appendChild(head);
@@ -1173,6 +1051,8 @@
   // of public school students living nearby and of its district or borough.
   // Stacked bars show the comparison at a glance; the table under them holds
   // the exact shares and is what a screen reader reads.
+  var NEARBY_LABEL = 'Compared with students living nearby';
+
   var PIVOT_COLUMNS = [
     ['school', 'This school'],
     ['nearby', 'Living nearby'],
@@ -1204,7 +1084,7 @@
     item.setAttribute('data-metric', base.groups[0].metricId);
     var head = SF.el('div', { class: 'mblock-head' });
     head.appendChild(SF.el('h4', { class: 'mrow-label',
-      text: hasNearby ? 'Compared with students living nearby' : 'Compared with the borough' }));
+      text: hasNearby ? NEARBY_LABEL : 'Compared with the borough' }));
     item.appendChild(head);
 
     scopes.forEach(function (scope) {
@@ -1296,12 +1176,6 @@
 
   // ---- Assembling the sections ------------------------------------------
 
-  function appliesToSchool(metric, school) {
-    var mine = (school.report_types || school.report_type || '').split('|');
-    if (!mine.length || !mine[0]) return true;
-    return (metric.applies_to || []).some(function (r) { return mine.indexOf(r) !== -1; });
-  }
-
   function metric_base(metric, metricId) {
     return metric.base_id || (metric.category + ':' + metricId);
   }
@@ -1320,9 +1194,9 @@
 
   function collectBases(payload, metrics) {
     var series = payload.series || {};
+    var school = payload.school;
     var bases = {};
     var absent = {};
-    var notApplicable = {};
 
     // First pass: every measure the source said anything about for this school.
     //
@@ -1335,23 +1209,22 @@
     Object.keys(metrics).forEach(function (metricId) {
       var raw = series[metricId];
       if (!raw) return;                     // nothing at all: handled below
+      var metric = metrics[metricId];
       var parts = splitByReport(raw);
 
-      var key = metric_base(metrics[metricId], metricId);
-      var base = bases[key] || (bases[key] = newBase(key, metrics[metricId]));
-      if (metrics[metricId].headline) base.headline = true;
-      base.themeRank = Math.min(base.themeRank, metrics[metricId].theme_rank);
+      var key = metric_base(metric, metricId);
+      var base = bases[key] || (bases[key] = newBase(key, metric));
+      if (metric.headline) base.headline = true;
+      base.themeRank = Math.min(base.themeRank, metric.theme_rank);
 
+      var group = metric.subgroup && metric.theme !== 'all';
+      var sole = group ? null : soleReport(metric, school);
       parts.forEach(function (p) {
         var entry = {
-          metricId: metricId, metric: metrics[metricId],
-          series: p.series, read: reading(p.series), scope: p.scope, report: p.report
+          metricId: metricId, metric: metric, series: p.series, read: reading(p.series),
+          scope: p.scope || (sole && (REPORT_LABEL[sole] || sole)), report: p.report || sole
         };
-        if (metrics[metricId].subgroup && metrics[metricId].theme !== 'all') {
-          base.groups.push(entry);
-        } else {
-          base.primaries.push(entry);
-        }
+        (group ? base.groups : base.primaries).push(entry);
       });
     });
 
@@ -1359,40 +1232,75 @@
     //
     // A student group that belongs to a card already on the page is listed
     // there as not reported, so the list of groups is the same list for every
-    // school and a gap is never left to inference. Anything else goes to the
-    // collapsed note at the end of its section.
+    // school and a gap is never left to inference.
+    //
+    // Any other measure that schools of the same type publish gets a row of
+    // its own that says not reported, in the place it always has. A measure
+    // no school of this type publishes, such as an 8th-grade figure at a K-5
+    // school, does not fit the school and is left out. If the peer file fails
+    // to load, the measure goes to the note at the end of its section. A
+    // measure no charter school has a value for says so.
+    var reportedKeys = Object.keys(bases);
     Object.keys(metrics).forEach(function (metricId) {
       var metric = metrics[metricId];
       if (series[metricId]) return;
-      if (!appliesToSchool(metric, payload.school)) return;
+      if (!SF.appliesTo(metric, school)) return;
 
-      // A City file that covers district-run schools only does not apply to
-      // a charter school, which is different from not reporting.
-      if (metric.charters === false && isCharter(payload.school)) {
-        (notApplicable[metric.category] = notApplicable[metric.category] || [])
+      var key = metric_base(metric, metricId);
+      var group = metric.subgroup && metric.theme !== 'all';
+      if (group && reportedKeys.indexOf(key) !== -1) {
+        if (!groupFits(metricId, metric, school)) return;
+        var charter = metric.charters === false && SF.isCharter(school);
+        bases[key].groups.push(notReported(metricId, metric, charter ? 'charter' : 'missing', null));
+        return;
+      }
+
+      var why = SF.absenceOf(metricId, metric, school, payload.peer_types, state.peers);
+      if (why === 'not_applicable') return;
+      if (why === 'unknown') {
+        (absent[metric.category] = absent[metric.category] || [])
           .push(metric.label || metricId);
         return;
       }
 
-      var key = metric_base(metric, metricId);
-      if (metric.subgroup && metric.theme !== 'all' && bases[key]) {
-        bases[key].groups.push({
-          metricId: metricId, metric: metric, series: null,
-          read: { absent: true, status: 'missing', bound: null, year: null },
-          scope: null
-        });
-        return;
+      var base = bases[key];
+      if (!base) {
+        base = bases[key] = newBase(key, metric);
+        base.unreported = true;
       }
-      (absent[metric.category] = absent[metric.category] || [])
-        .push(metric.label || metricId);
+      if (metric.headline) base.headline = true;
+      base.themeRank = Math.min(base.themeRank, metric.theme_rank);
+      base[group ? 'groups' : 'primaries'].push(notReported(metricId, metric, why,
+        group ? null : soleReport(metric, school)));
     });
 
     Object.keys(bases).forEach(function (key) { alignToOneYear(bases[key]); });
-    return { bases: bases, absent: absent, notApplicable: notApplicable };
+    return { bases: bases, absent: absent };
   }
 
-  function isCharter(school) {
-    return parseInt(school.district, 10) === 84;
+  function notReported(metricId, metric, status, report) {
+    return {
+      metricId: metricId, metric: metric, series: null,
+      read: { absent: true, status: status, bound: null, year: null },
+      scope: report ? REPORT_LABEL[report] || report : null, report: report
+    };
+  }
+
+  // At a school that files two reports, a measure published for only one of
+  // them is labeled with that report. Null otherwise.
+  function soleReport(metric, school) {
+    var mine = SF.reportTypesOf(school);
+    if (mine.length < 2) return null;
+    var fits = mine.filter(function (r) { return (metric.applies_to || []).indexOf(r) !== -1; });
+    return fits.length === 1 ? fits[0] : null;
+  }
+
+  // A grade outside the school's span, or a survey its type never takes,
+  // is left out of a measure's list of groups. Student groups always stay.
+  function groupFits(metricId, metric, school) {
+    if (metric.theme !== 'grade' && metric.theme !== 'respondents') return true;
+    return SF.absenceOf(metricId, metric, school, state.payload.peer_types, state.peers) !==
+      'not_applicable';
   }
 
   // Put every reading in a card on the same school year.
@@ -1476,14 +1384,6 @@
 
   // ---- Quality report ratings -------------------------------------------
 
-  function ratingsNote() {
-    return SF.el('p', {
-      class: 'section-note',
-      text: 'The City’s own scores and ratings, as published. This site adds no ' +
-            'score or rating of its own.'
-    });
-  }
-
   // Impact and Performance are read against a midpoint the reader cannot
   // guess, so each says what it compares beside the number.
   function definitionOf(metricId) {
@@ -1510,7 +1410,7 @@
     var scale = SF.el('div', {
       class: 'rating-scale', role: 'img',
       'aria-label': 'The City’s scale runs from 1.00 to 4.99. 1 is Needs Improvement, ' +
-                    '2 Fair, 3 Good and 4 Excellent. This school: ' +
+                    '2 Fair, 3 Good and 4 Excellent. ' + schoolName() + ': ' +
                     score.toFixed(2) + ', ' + read.text + '.'
     });
     RATING_STEPS.forEach(function (step) {
@@ -1531,7 +1431,31 @@
     return scale;
   }
 
+  // The City's four steps as a compact track, with this school's score as a
+  // dot. The row's word says the step, so the track is hidden from assistive
+  // technology.
+  function scaleTrack(read) {
+    var score = Number(read.value);
+    var track = SF.el('span', { class: 'rs-track', 'aria-hidden': 'true' });
+    RATING_STEPS.forEach(function (step) {
+      track.appendChild(SF.el('span', { class: 'rs-seg' + (Math.floor(score) === step[0] ? ' on' : '') }));
+    });
+    var at = Math.max(0, Math.min(100, (score - 1) / 3.99 * 100));
+    track.appendChild(SF.el('span', { class: 'rs-dot', style: 'left:' + at.toFixed(1) + '%' }));
+    return track;
+  }
+
   var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function schoolName() {
+    return (state.payload && state.payload.school.name) || 'This school';
+  }
+
+  // Text cut to roughly `room` pixels at `charWidth` per character.
+  function fitText(text, room, charWidth) {
+    var most = Math.max(4, Math.floor(room / charWidth));
+    return text.length <= most ? text : text.slice(0, most - 1).trim() + '…';
+  }
 
   function svgEl(tag, attrs, text) {
     var node = document.createElementNS(SVG_NS, tag);
@@ -1606,7 +1530,7 @@
     var chart = svgEl('svg', {
       viewBox: '0 0 ' + W + ' ' + H, role: 'img',
       'aria-label': 'Impact Score against Performance Score for ' + count + ' ' + kind +
-        ', ' + data.year + '. This school: Performance ' + fmt(point.performance) +
+        ', ' + data.year + '. ' + schoolName() + ': Performance ' + fmt(point.performance) +
         ', Impact ' + fmt(point.impact) + '.'
     });
 
@@ -1636,9 +1560,13 @@
 
     var hx = x(point.performance), hy = y(point.impact);
     chart.appendChild(svgEl('circle', { class: 'here', cx: hx, cy: hy, r: 5.5 }));
-    var right = hx < W - pad.right - 90;
+    // The school's name beside its dot, on the side with more room, cut to
+    // fit when it is long.
+    var roomRight = W - pad.right - hx - 10, roomLeft = hx - pad.left - 10;
+    var right = roomRight >= roomLeft;
     chart.appendChild(svgEl('text', { class: 'here-label', x: hx + (right ? 10 : -10),
-      y: hy + 4, 'text-anchor': right ? 'start' : 'end' }, 'This school'));
+      y: hy + 4, 'text-anchor': right ? 'start' : 'end' },
+      fitText(schoolName(), right ? roomRight : roomLeft, 6.6)));
 
     var ring = svgEl('circle', { class: 'hover-ring', r: 7, visibility: 'hidden' });
     chart.appendChild(ring);
@@ -1667,7 +1595,7 @@
       for (var j = 0; j < count; j++) {
         if (group.performance[j] === best.p && group.impact[j] === best.i) same++;
       }
-      tip.textContent = (best.here ? 'This school · ' :
+      tip.textContent = (best.here ? schoolName() + ' · ' :
                          (same > 1 ? same + ' schools · ' : '')) +
         'Performance ' + fmt(best.p) + ' · Impact ' + fmt(best.i);
       tip.hidden = false;
@@ -1697,6 +1625,7 @@
   // when this school has something in it.
   var TABS = [
     { id: 'overview', label: 'Overview' },
+    { id: 'admissions', label: 'Admissions' },
     { id: 'ratings', label: 'Ratings', cats: ['ratings'] },
     { id: 'students', label: 'Students', cats: ['demographics'] },
     { id: 'attendance', label: 'Attendance', cats: ['attendance'] },
@@ -1705,8 +1634,7 @@
     { id: 'tests', label: 'Tests', cats: ['state_tests', 'alt_assessments', 'regents', 'growth'] },
     { id: 'courses', label: 'Courses', cats: ['coursework'] },
     { id: 'graduation', label: 'Graduation', cats: ['graduation', 'college'] },
-    { id: 'support', label: 'Support', cats: ['student_support', 'other'] },
-    { id: 'admissions', label: 'Admissions' }
+    { id: 'support', label: 'Support', cats: ['student_support', 'other'] }
   ];
 
   var view = { tabs: [], current: null, panels: {}, buttons: {}, rendered: {}, home: {}, model: null };
@@ -1748,8 +1676,53 @@
     return [].concat.apply([], bases.map(function (b) { return b.primaries.concat(b.groups); }));
   }
 
+  // The newest year with a figure for this school, per source. A source's
+  // year is said once, in its citation, rather than on every row.
+  function sourceYears(bases) {
+    var years = {};
+    Object.keys(bases).forEach(function (key) {
+      var base = bases[key];
+      base.primaries.concat(base.groups).forEach(function (e) {
+        var s = e.series;
+        if (!s) return;
+        for (var i = s.y.length - 1; i >= 0; i--) {
+          if (!SF.isBlank(s.v[i]) || (s.bd && s.bd[i])) {
+            var src = e.metric.source_id;
+            if (!years[src] || s.y[i] > years[src]) years[src] = s.y[i];
+            return;
+          }
+        }
+      });
+    });
+    return years;
+  }
+
+  function yearIsAnchor(read, metric) {
+    if (!view.model || !read) return false;
+    return read.year === view.model.anchors[metric.source_id];
+  }
+
+  // Every current measure reads its source's newest year for this school, so
+  // a tab reads as one year. An earlier figure waits in the opened row.
+  function holdToSourceYear(bases, anchors, from) {
+    Object.keys(bases).forEach(function (key) {
+      var base = bases[key];
+      if (isOlder(base, from)) return;
+      var first = base.primaries[0] || base.groups[0];
+      var year = first && anchors[first.metric.source_id];
+      if (!year) return;
+      base.year = year;
+      base.primaries.concat(base.groups).forEach(function (e) {
+        if (e.series) e.read = reading(e.series, year);
+        else e.read.year = year;
+      });
+    });
+  }
+
   function buildModel(payload, metrics) {
     var collected = collectBases(payload, metrics);
+    var anchors = sourceYears(collected.bases);
+    holdToSourceYear(collected.bases, anchors, currentFrom());
     var labels = {};
     Object.keys(metrics).forEach(function (id) {
       labels[metrics[id].category] = metrics[id].category_label;
@@ -1761,15 +1734,18 @@
     });
     Object.keys(byCategory).forEach(function (c) { byCategory[c].sort(baseOrder); });
     return {
-      collected: collected, byCategory: byCategory, labels: labels,
+      collected: collected, byCategory: byCategory, labels: labels, anchors: anchors,
       from: currentFrom(), glance: glanceEntries(collected.bases)
     };
   }
 
+  function hasReported(model, category) {
+    return (model.byCategory[category] || []).some(function (b) { return !b.unreported; });
+  }
+
   function hasContent(model, category) {
     return (model.byCategory[category] || []).length ||
-           (model.collected.absent[category] || []).length ||
-           (model.collected.notApplicable[category] || []).length;
+           (model.collected.absent[category] || []).length;
   }
 
   function tabCount(model, tab) {
@@ -1790,7 +1766,7 @@
     var tabs = TABS.filter(function (t) {
       if (t.id === 'overview') return model.glance.length >= 2;
       if (t.id === 'admissions') return (payload.programs || []).length > 0;
-      return t.cats.some(function (c) { return (model.byCategory[c] || []).length; });
+      return t.cats.some(function (c) { return hasReported(model, c); });
     });
     var unpublished = TABS.filter(function (t) {
       return t.cats && tabs.indexOf(t) === -1 && t.cats.some(function (c) { return hasContent(model, c); });
@@ -1882,7 +1858,8 @@
     var list = SF.el('ul');
     topics.forEach(function (t) {
       t.cats.forEach(function (c) {
-        (model.collected.absent[c] || []).concat(model.collected.notApplicable[c] || [])
+        (model.byCategory[c] || []).map(function (b) { return b.label; })
+          .concat(model.collected.absent[c] || [])
           .sort().forEach(function (name) { list.appendChild(SF.el('li', { text: name })); });
       });
     });
@@ -1978,8 +1955,7 @@
     var cited = sourceLine(sourceIdsOf(glance.map(function (g) { return g.entry; })));
     if (cited) panel.appendChild(cited);
     panel.appendChild(SF.el('p', { class: 'panel-note',
-      text: 'The measures asked about most, each with its own school year. Every ' +
-            'other measure is in the topic tabs.' }));
+      text: 'The measures asked about most. Every other measure is in the topic tabs.' }));
     var list = SF.el('ul', { class: 'mlist' });
     glance.forEach(function (g) {
       list.appendChild(measureRow(g.entry, g.base, { label: g.label, scope: g.scope, primary: g.primary }));
@@ -1988,6 +1964,13 @@
   }
 
   function appendBase(base, list, older) {
+    if (base.unreported && !base.primaries.length &&
+        (base.key === 'demographics:nearby' || isComposition(base))) {
+      list.appendChild(measureRow(base.groups[0], base, {
+        label: base.key === 'demographics:nearby' ? NEARBY_LABEL : base.label, older: older
+      }));
+      return;
+    }
     if (base.key === 'demographics:nearby') {
       list.appendChild(nearbyCard(base, SF.el('li', { class: 'mblock' })));
       return;
@@ -2007,24 +1990,37 @@
     });
   }
 
+  function ratingAxis() {
+    var axis = SF.el('li', { class: 'rs-axis', 'aria-hidden': 'true' });
+    var steps = SF.el('span', { class: 'rs-axis-steps' });
+    RATING_STEPS.forEach(function (step) {
+      var cell = SF.el('span');
+      cell.appendChild(SF.el('b', { text: String(step[0]) }));
+      cell.appendChild(document.createTextNode(step[1]));
+      steps.appendChild(cell);
+    });
+    axis.appendChild(steps);
+    return axis;
+  }
+
   function renderCategory(category, host) {
     var model = view.model;
     var bases = model.byCategory[category] || [];
     var current = bases.filter(function (b) { return !isOlder(b, model.from); });
     var older = bases.filter(function (b) { return isOlder(b, model.from); });
     var missing = model.collected.absent[category] || [];
-    var notApplicable = model.collected.notApplicable[category] || [];
 
     var section = SF.el('section', { class: 'panel-section', 'aria-labelledby': 'h-' + category });
     section.appendChild(SF.el('h3', { class: 'panel-title', id: 'h-' + category,
       text: model.labels[category] || category }));
     var cited = sourceLine(sourceIdsOf(entriesOf(bases)));
     if (cited) section.appendChild(cited);
-    if (category === 'ratings' && bases.length) section.appendChild(ratingsNote());
 
     if (current.length) {
       var list = SF.el('ul', { class: 'mlist' });
       current.forEach(function (b) { appendBase(b, list, false); });
+      var firstRated = list.querySelector('.rated');
+      if (firstRated) list.insertBefore(ratingAxis(), firstRated);
       section.appendChild(list);
     }
     if (category === 'ratings') renderImpactCharts(state.payload, section);
@@ -2054,18 +2050,6 @@
       missing.sort().forEach(function (name) { ul.appendChild(SF.el('li', { text: name })); });
       note.appendChild(ul);
       section.appendChild(note);
-    }
-    if (notApplicable.length) {
-      var none = SF.el('details', { class: 'section-note' });
-      none.appendChild(SF.el('summary', {
-        text: notApplicable.length + ' further ' +
-              (notApplicable.length === 1 ? 'measure does' : 'measures do') +
-              ' not apply to charter schools'
-      }));
-      var items = SF.el('ul');
-      notApplicable.sort().forEach(function (name) { items.appendChild(SF.el('li', { text: name })); });
-      none.appendChild(items);
-      section.appendChild(none);
     }
     host.appendChild(section);
   }
@@ -2108,7 +2092,7 @@
               text: (label + ' ' + tab.label + ' ' + (model.labels[c] || '')).toLowerCase() });
           };
           if (base.key === 'demographics:nearby') {
-            add('Compared with students living nearby', base.groups[0].metricId);
+            add(NEARBY_LABEL, base.groups[0].metricId);
           } else if (isComposition(base)) {
             add(base.label, base.groups[0].metricId);
           } else if (!base.primaries.length) {
@@ -2417,6 +2401,7 @@
       (loaded[3] || []).forEach(function (s) { state.sources[s.source_id] = s; });
       state.periods = (loaded[4] && loaded[4].periods) || {};
       renderHead(payload.school);
+      stickyName(payload.school);
       renderBack();
       renderFacts(payload.school);
       renderLocator(payload.school);
