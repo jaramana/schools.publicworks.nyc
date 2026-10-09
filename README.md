@@ -11,6 +11,7 @@ period for each figure and definitions in the measure details.
 | Source | Used for | Latest published period |
 | --- | --- | --- |
 | [School Quality Reports](https://data.cityofnewyork.us/d/dnpx-dfnc), `dnpx-dfnc` | Attendance, performance and other reported measures | Through 2024–25 |
+| [School Quality Report results](https://infohub.nyced.org/reports/students-and-schools/school-quality/school-quality-reports-and-resources) | The City's ratings, Impact and Performance scores, survey results, staff, IEP services, nearby-student comparison and advanced courses | 2023–24 and 2024–25 |
 | [Demographic Snapshot](https://infohub.nyced.org/reports/school-quality/information-and-data-overview) | Enrollment and demographics | Through 2025–26 |
 | [NYC Public Schools directory data](https://infohub.nyced.org/reports/admissions-and-enrollment/directory-data) | Addresses, grades, programs and admissions information | Fall 2025 |
 | [School Point Locations](https://data.cityofnewyork.us/d/jfju-ynrr), `jfju-ynrr` | School coordinates | August 2024 snapshot |
@@ -26,15 +27,19 @@ The current periods are in `docs/data/status.json`.
   apart. Published bounds such as "Above 95%" stay as bounds.
 - Every figure in a measure comes from one school year. Comparisons show each
   figure's year, including when schools differ.
-- Scores and comparison-group averages come from the City. The site groups the
-  City's 1 to 5 score into four bands and calculates no overall score.
+- Scores, ratings and averages come from the City. The site groups the City's
+  1 to 5 measure score into four bands, shows the City's ratings and Impact and
+  Performance scores as published, and calculates no overall score.
+- Each profile shows where a figure falls among schools of the same type that
+  year. The build counts schools by value in 24 equal steps for each measure's
+  two newest years, in `docs/data/peers/`. The counts name no school.
 - Open or former status is inferred from recent source appearances. No source
   publishes it.
 - Coordinates come from the school point file first, then the high school
   directory, then the geocoder. The map draws every school alike and shows
   district lines, not school zones.
-- Survey results, SHSAT figures and specialized admissions measures are not
-  included. About 400 open schools have no address in the directories.
+- SHSAT figures, specialized admissions measures, suspensions and budgets are
+  not included. About 400 open schools have no address in the directories.
 
 The [Data page](https://schools.publicworks.nyc/data.html) shows the process
 step by step, the sources, the column definitions and the downloads. The downloads
@@ -57,7 +62,7 @@ python -m venv .venv
 .venv/bin/python run.py
 ```
 
-The first run downloads about 230 MB and takes about five minutes; later runs
+The first run downloads about 245 MB and takes about five minutes; later runs
 use the caches in `data-raw/`. Source URLs, thresholds and display rules are set
 in `pipeline/00_config.py`. To preview the site, run `python3 tools/serve.py`
 and open http://localhost:8787.

@@ -66,6 +66,10 @@ def load_tables():
             if column in frame.columns:
                 frame[column] = pd.to_numeric(frame[column], errors="coerce")
         tables[name] = frame
+    path = cfg.BUILD / "report_types.csv"
+    tables["report_types"] = (pd.read_csv(path, dtype=str) if path.exists()
+                              else pd.DataFrame(columns=["dbn", "school_year",
+                                                         "report_type", "school_type"]))
     return tables
 
 
@@ -161,19 +165,176 @@ def build_metrics_json(metrics, staging):
             "comparability_note": clean(metric.get("comparability_note")),
             "source_id": clean(metric["source_id"]),
         }
+        # Optional fields, carried only where set, to keep the file small.
+        extra = {
+            # What the comparison value is, where it is not the City's
+            # comparison group of similar schools.
+            "comparison_label": clean(metric.get("comparison_label")),
+            # The column of the nearby-students table this metric fills.
+            "pivot": clean(metric.get("pivot")),
+            # The value is a score with the City's rating word beside it.
+            "rated": str(metric.get("rated")).lower() == "true" or None,
+            # A line printed under the measure's card.
+            "card_note": clean(metric.get("card_note")),
+            # The source reports on district-run schools only.
+            "charters": (False if cfg.SOURCES.get(metric["source_id"], {})
+                         .get("covers_charters", True) is False else None),
+        }
+        payload[metric["metric_id"]].update({k: v for k, v in extra.items() if v is not None})
     write_json(staging / "metrics.json", payload)
     size = (staging / "metrics.json").stat().st_size
     log(f"metric manifest: {len(payload):,} metrics, {size / 1024:.0f} KB")
     return payload
 
 
-def build_school_files(schools, observations, programs, priorities, staging):
+def impact_points(observations, report_types):
+    """Impact and Performance in the newest year, one row per school and report.
+
+    Each row carries the school's type within that report. A school serving
+    grades 6 to 12 is Middle in one report and High School in the other, and
+    the City scales both scores within each type.
+    """
+    wanted = observations[observations["metric_id"].isin(["qr_impact", "qr_performance"])
+                          & (observations["status"] == cfg.STATUS_OK)]
+    if wanted.empty:
+        return pd.DataFrame()
+    year = wanted["school_year"].max()
+    wide = (wanted[wanted["school_year"] == year]
+            .pivot_table(index=["dbn", "report_type"], columns="metric_id",
+                         values="value", aggfunc="first")
+            .dropna().reset_index())
+    types = report_types[report_types["school_year"] == year]
+    wide = wide.merge(types[["dbn", "report_type", "school_type"]],
+                      on=["dbn", "report_type"], how="left")
+    wide["school_year"] = year
+    return wide
+
+
+def build_impact_json(points, staging):
+    """Every school's Impact and Performance, by school type, for one chart.
+
+    A profile loads this only when the chart scrolls into view. Points carry
+    no DBN, because the chart shows where one school sits among its type and
+    the profile already holds that school's own point.
+    """
+    if points.empty:
+        return
+    groups = []
+    for (report_type, school_type), rows in points.groupby(["report_type", "school_type"]):
+        groups.append({
+            "report_type": report_type,
+            "school_type": school_type,
+            "performance": [clean(v) for v in rows["qr_performance"]],
+            "impact": [clean(v) for v in rows["qr_impact"]],
+        })
+    year = points["school_year"].iloc[0]
+    write_json(staging / "impact.json", {"year": year, "median": 0.5, "groups": groups})
+    size = (staging / "impact.json").stat().st_size
+    log(f"impact chart: {len(points):,} points in {len(groups)} school types, {size / 1024:.0f} KB")
+
+
+PEER_BINS = 24
+PEER_MIN_SCHOOLS = 20
+PEER_YEARS = 2
+
+
+def peer_slug(school_type):
+    return "".join(c if c.isalnum() else "-" for c in str(school_type).lower()).strip("-")
+
+
+def peer_types(schools, report_types):
+    """Each school's type within each report it files, in the newest year.
+
+    A school serving grades 6 to 12 is Middle in one report and High School in
+    the other, as in the Impact chart. Demographic measures carry no report,
+    so they use the school's own type, keyed by an empty report.
+    """
+    newest = (report_types.sort_values("school_year")
+              .drop_duplicates(["dbn", "report_type"], keep="last"))
+    types = {}
+    for _, row in newest.iterrows():
+        if pd.notna(row["school_type"]):
+            types.setdefault(row["dbn"], {})[row["report_type"]] = row["school_type"]
+    for _, row in schools.iterrows():
+        if pd.notna(row.get("school_type")):
+            types.setdefault(row["dbn"], {})[""] = row["school_type"]
+    return types
+
+
+def build_peer_files(observations, types, staging):
+    """Every school's value for each measure, binned, by school type.
+
+    One file per type, holding a histogram per measure for each of its two
+    newest years, since charter reports often run a year behind. A profile
+    draws where its own value falls among schools of the same type that year.
+    The bins carry counts only, never a DBN, and nothing here is a score.
+    """
+    numeric = (observations["status"] == cfg.STATUS_OK) & observations["value"].notna()
+    # A school published only as "Above 95%" is still a school at the top of
+    # the range. It is counted in a bar of its own rather than dropped.
+    bounded = observations["bound"].fillna("").str.match(r"^Above \d+(\.\d+)?%$")
+    reported = observations[numeric | bounded].copy()
+    years = reported.groupby("metric_id")["school_year"].transform(
+        lambda y: y.isin(sorted(y.unique())[-PEER_YEARS:]))
+    reported = reported[years.astype(bool)]
+    reported["report_key"] = reported["report_type"].fillna("")
+    reported["school_type"] = [types.get(d, {}).get(r) for d, r
+                               in zip(reported["dbn"], reported["report_key"])]
+    reported = reported[reported["school_type"].notna()]
+
+    out_dir = staging / "peers"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    total, files = 0, 0
+    for school_type, rows in reported.groupby("school_type"):
+        payload = {}
+        for (metric_id, year), group in rows.groupby(["metric_id", "school_year"]):
+            # One value per school. A school cannot appear twice in a type.
+            group = group.drop_duplicates("dbn")
+            values = group["value"].dropna().astype(float)
+            above = group[group["value"].isna()]["bound"]
+            if len(values) + len(above) < PEER_MIN_SCHOOLS or values.empty:
+                continue
+            low, high = float(values.min()), float(values.max())
+            width = (high - low) / PEER_BINS or 1.0
+            counts = [0] * PEER_BINS
+            for v in values:
+                counts[min(PEER_BINS - 1, int((v - low) / width))] += 1
+            entry = {"y": year, "lo": clean(low), "hi": clean(high),
+                     "n": int(len(values)), "h": counts}
+            # Every bounded school sits above every numeric one, so the median
+            # of the whole type can stand the bound in for them.
+            whole = list(values)
+            if len(above):
+                at = float(above.iloc[0][6:-1]) / 100
+                entry["over"] = {"label": above.iloc[0], "at": at, "n": int(len(above))}
+                whole += [at] * len(above)
+            median = float(pd.Series(whole).median())
+            entry["md"] = clean(median) if not len(above) or median < at else None
+            payload.setdefault(metric_id, {})[year] = entry
+        if payload:
+            path = out_dir / f"{peer_slug(school_type)}.json"
+            write_json(path, {"school_type": school_type, "bins": PEER_BINS, "metrics": payload})
+            total += path.stat().st_size
+            files += 1
+    log(f"peer histograms: {files} school types, {total / 1024:.0f} KB total")
+
+
+def build_school_files(schools, observations, programs, priorities, staging, points, types):
     """One file per school, holding only what that profile shows."""
     published = observations[observations["status"].isin(cfg.SITE["site_statuses"])]
     by_school = dict(tuple(published.groupby("dbn")))
     programs_by_school = dict(tuple(programs.groupby("dbn"))) if len(programs) else {}
     priorities_by_school = (dict(tuple(priorities.groupby("dbn")))
                             if len(priorities) else {})
+
+    # This school's own point on the Impact and Performance chart, per report.
+    chart_points = {}
+    for _, row in points.iterrows():
+        chart_points.setdefault(row["dbn"], []).append({
+            "year": row["school_year"], "report_type": row["report_type"],
+            "school_type": clean(row["school_type"]),
+            "impact": clean(row["qr_impact"]), "performance": clean(row["qr_performance"]),
+        })
 
     out_dir = staging / "schools"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -182,6 +343,11 @@ def build_school_files(schools, observations, programs, priorities, staging):
     for _, school in schools.iterrows():
         dbn = school["dbn"]
         payload = {"school": school_record(school), "series": {}, "programs": []}
+        if dbn in chart_points:
+            payload["impact_chart"] = chart_points[dbn]
+        # Which peer file each of this school's readings is drawn against.
+        if dbn in types:
+            payload["peer_types"] = {k: peer_slug(v) for k, v in types[dbn].items()}
 
         subset = by_school.get(dbn)
         if subset is not None:
@@ -213,6 +379,9 @@ def build_school_files(schools, observations, programs, priorities, staging):
                     series["bd"] = [clean(v) for v in rows["bound"]]
                 if rows["comparison"].notna().any():
                     series["c"] = [clean(v) for v in rows["comparison"]]
+                # The City's rating word, beside the score it was set from.
+                if "text" in rows.columns and rows["text"].notna().any():
+                    series["t"] = [clean(v) for v in rows["text"]]
                 if rows["source_score"].notna().any():
                     series["s"] = [clean(v) for v in rows["source_score"]]
                     # The band is banded here rather than in the browser, so
@@ -315,6 +484,8 @@ def build_status_json(tables, sources_payload, staging, validation):
             "demographic_themes": dict(cfg.DEMOGRAPHIC_THEMES),
             "category_order": cfg.CATEGORY_ORDER,
             "theme_order": cfg.SUBGROUP_THEME_ORDER,
+            "glance": cfg.GLANCE,
+            "rating_max": cfg.RATING_RANGE[1],
             "max_compare": cfg.SITE["max_compare"],
         },
         "validation": {
@@ -362,10 +533,11 @@ def data_dictionary(tables):
         ("report_type", "Which quality report the value came from. A school with middle and high school grades reports the same metric in both, for different students. Empty for demographic figures, which are one per school.", "text"),
         ("value", "The published value, in the metric's own unit. Empty means no value, never zero.", "varies"),
         ("n", "Number of students the value is calculated over.", "count"),
-        ("comparison", "The source's own comparison group average, where it publishes one.", "varies"),
+        ("comparison", "The source's own comparison group average, where it publishes one. For survey percent positive it is the City average for the school's report type.", "varies"),
         ("source_score", "The source's own score for this metric, where it publishes one.", "varies"),
         ("status", "reported, suppressed, censored, or missing. Suppressed means withheld to protect a small group. Censored means the source published a bound instead of a number.", "text"),
         ("bound", "The bound the source published in place of a number, such as \"Above 95%\". Present only where status is censored.", "text"),
+        ("text", "The City's rating word, such as Good, published beside a framework rating score. The first digit of the score sets the word.", "text"),
         ("source_id", "Which source the row came from.", "text"),
     ]
     for field, description, unit in observation_fields:
@@ -401,7 +573,7 @@ def write_workbook(tables, dictionary, staging):
 
     headline = observations[observations["metric_id"].isin(cfg.HEADLINE_METRICS)].copy()
     headline = headline[["dbn", "school_year", "metric_id", "report_type", "value",
-                         "n", "comparison", "source_score", "status", "source_id"]]
+                         "n", "comparison", "source_score", "text", "status", "source_id"]]
     headline = headline.rename(columns={"comparison": "comparison_group_average"})
 
     programs = tables["programs"]
@@ -466,7 +638,12 @@ kind of absence it is:
 
   reported     the source published a value
   suppressed   the source withheld the value to protect a small group
+  censored     the source published a bound, such as "Above 95%", in bound
   missing      the source published no value
+
+Framework ratings carry the City's word in the text column and its 1.00 to
+4.99 score in value. Comparison holds the City's comparison group average,
+except for survey percent positive, where it holds the City average.
 
 A metric that does not apply to a school type is absent from these files
 entirely rather than present and empty. metrics.csv states which report types
@@ -507,14 +684,16 @@ def publish(staging):
     cfg.DOWNLOADS.mkdir(parents=True, exist_ok=True)
 
     # Profiles first, into a fresh directory, so a school that closed and lost
-    # its file does not linger as a stale page.
-    staged_schools = staging / "schools"
-    if staged_schools.exists():
-        if cfg.SITE_SCHOOLS.exists():
-            shutil.rmtree(cfg.SITE_SCHOOLS)
-        shutil.move(str(staged_schools), str(cfg.SITE_SCHOOLS))
+    # its file does not linger as a stale page. Peer files follow the same rule.
+    for folder, served in [("schools", cfg.SITE_SCHOOLS), ("peers", cfg.SITE_DATA / "peers")]:
+        staged = staging / folder
+        if staged.exists():
+            if served.exists():
+                shutil.rmtree(served)
+            shutil.move(str(staged), str(served))
 
-    for name in ["search-index.json", "metrics.json", "sources.json", "status.json"]:
+    for name in ["search-index.json", "metrics.json", "sources.json", "status.json",
+                 "impact.json"]:
         source = staging / name
         if source.exists():
             shutil.move(str(source), str(cfg.SITE_DATA / name))
@@ -554,8 +733,12 @@ def main():
 
     build_search_index(tables["schools"], staging)
     build_metrics_json(tables["metrics"], staging)
+    points = impact_points(tables["observations"], tables["report_types"])
+    types = peer_types(tables["schools"], tables["report_types"])
     build_school_files(tables["schools"], tables["observations"], tables["programs"],
-                       tables["program_priorities"], staging)
+                       tables["program_priorities"], staging, points, types)
+    build_impact_json(points, staging)
+    build_peer_files(tables["observations"], types, staging)
     sources_payload = build_sources_json(tables["sources"], staging)
     build_status_json(tables, sources_payload, staging, validation)
 

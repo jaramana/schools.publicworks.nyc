@@ -35,6 +35,14 @@
     count: function (v) {
       return isBlank(v) ? null : Math.round(Number(v)).toLocaleString('en-US');
     },
+    // Impact and Performance, and the City's 1.00 to 4.99 rating scores.
+    twoPlaces: function (v) { return isBlank(v) ? null : Number(v).toFixed(2); },
+    years: function (v) {
+      if (isBlank(v)) return null;
+      var n = Math.round(Number(v));
+      return n + (n === 1 ? ' year' : ' years');
+    },
+    miles: function (v) { return isBlank(v) ? null : Number(v).toFixed(1) + ' mi'; },
     // A school year is stored as "2024-25" and shown that way. Spelling it
     // out as a single year is how a reporting period gets misread.
     year: function (v) { return isBlank(v) ? null : String(v); }
@@ -48,7 +56,11 @@
     percentile: fmt.percentile,
     index_100: fmt.index100,
     number: fmt.number,
-    count: fmt.count
+    count: fmt.count,
+    index_unit: fmt.twoPlaces,
+    rating_score: fmt.twoPlaces,
+    years: fmt.years,
+    miles: fmt.miles
   };
 
   function formatValue(value, format) {
@@ -62,7 +74,8 @@
   var display = {
     scale_max: 4.5, index_max: 100,
     score_bands: [], themes: {}, demographic_themes: {},
-    category_order: [], theme_order: [], max_compare: 12
+    category_order: [], theme_order: [], max_compare: 12,
+    glance: [], rating_max: 4.99
   };
 
   function loadDisplay() {
@@ -81,6 +94,7 @@
   function scaleOf(format) {
     if (format === 'scale') return '/ ' + display.scale_max;
     if (format === 'index_100') return '/ ' + display.index_max;
+    if (format === 'rating_score') return '/ ' + display.rating_max;
     return null;
   }
 
@@ -89,6 +103,7 @@
   function scaleSpoken(value, format) {
     if (format === 'scale') return value + ' out of ' + display.scale_max;
     if (format === 'index_100') return value + ' out of ' + display.index_max;
+    if (format === 'rating_score') return value + ' on a scale from 1 to ' + display.rating_max;
     return null;
   }
 
@@ -291,25 +306,25 @@
       foot.className = 'footer';
       foot.innerHTML =
         '<div class="wrap"><div class="footer-grid">' +
-          '<div><h4>Views</h4><ul>' +
+          '<div><h2 class="footer-head">Views</h2><ul>' +
             '<li><a href="index.html">Search by name or DBN</a></li>' +
             '<li><a href="browse.html">Browse by borough and district</a></li>' +
             '<li><a href="compare.html">Compare schools</a></li>' +
           '</ul></div>' +
           // Pages, not sections. Four entries that all opened one page at
           // a different anchor read as four destinations and were one.
-          '<div><h4>Reference</h4><ul>' +
+          '<div><h2 class="footer-head">Reference</h2><ul>' +
             '<li><a href="data.html">Data</a></li>' +
             '<li><a href="about.html">About</a></li>' +
           '</ul></div>' +
-          '<div><h4>Sources</h4><ul>' +
+          '<div><h2 class="footer-head">Sources</h2><ul>' +
             '<li><a href="https://data.cityofnewyork.us/d/dnpx-dfnc">School Quality Reports</a></li>' +
             '<li><a href="https://infohub.nyced.org/reports/school-quality/information-and-data-overview">Demographic Snapshot</a></li>' +
             '<li><a href="https://infohub.nyced.org/reports/admissions-and-enrollment/directory-data">Directory data</a></li>' +
             '<li><a href="https://www.myschools.nyc/">MySchools</a></li>' +
           '</ul></div>' +
           // Code, not pages. About lives in Reference and was listed twice.
-          '<div><h4>Project</h4><ul>' +
+          '<div><h2 class="footer-head">Project</h2><ul>' +
             '<li><a href="https://github.com/jaramana/schools.publicworks.nyc">Source on GitHub</a></li>' +
             '<li><a href="https://github.com/jaramana/schools.publicworks.nyc/issues">Report an error</a></li>' +
           '</ul></div>' +

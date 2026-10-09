@@ -9,10 +9,12 @@ place instead of halfway through a transform.
 import hashlib
 import importlib
 import json
+import re
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urljoin
 
 import requests
 
@@ -25,6 +27,9 @@ MANIFEST = cfg.BUILD / "fetch-manifest.json"
 # per address during normalization and keeps its own cache.
 FILE_SOURCES = ["sqr", "demographics", "directory_es", "directory_ms", "directory_hs",
                 "school_points"]
+
+# Sources spread over several InfoHub workbooks whose names change each year.
+INFOHUB_SOURCES = ["sqr_results"]
 
 
 def log(message):
@@ -55,6 +60,79 @@ def resolve_attachment(source):
     resolved["url"] = (f"https://{cfg.SOCRATA_DOMAIN}/api/views/{source['dataset_id']}"
                        f"/files/{blob}?download=true&filename={name}")
     return resolved, name
+
+
+def find_infohub_links(source):
+    """Read the file links an InfoHub report page carries for this source.
+
+    Returns {year: {part: url}} for every link matching `finder`. An empty
+    result means the page could not be read or no longer links the files, and
+    the caller falls back to the pinned URLs.
+    """
+    try:
+        response = requests.get(source["page"], timeout=cfg.HTTP_TIMEOUT,
+                                headers={"User-Agent": "Mozilla/5.0 (schools.publicworks.nyc)"})
+        response.raise_for_status()
+    except Exception as error:
+        log(f"{source['source_id']}: could not read {source['page']}: {error}")
+        return {}
+    found = {}
+    for href in re.findall(r'href="([^"]+)"', response.text):
+        match = re.search(source["finder"], href, re.IGNORECASE)
+        if match:
+            year, part = match.group(1), match.group(2).lower()
+            found.setdefault(year, {})[part] = urljoin(source["page"], href)
+    return found
+
+
+def infohub_files(source):
+    """Choose the workbooks to fetch: the newest years, from the page or pinned.
+
+    The page usually links the newest year only. Earlier years come from
+    `pinned`, so a page that drops a year, or cannot be read, still builds.
+    """
+    found = find_infohub_links(source)
+    years = sorted(set(found) | set(source["pinned"]), reverse=True)[:source["years"]]
+    files = []
+    for year in years:
+        for part in source["parts"]:
+            url = found.get(year, {}).get(part)
+            resolved = "page"
+            if not url:
+                if year not in source["pinned"]:
+                    raise RuntimeError(
+                        f"{source['source_id']}: {source['page']} lists {year} but no "
+                        f"{part} workbook, and no pinned URL covers it")
+                url = source["pinned"][year].format(part=part)
+                resolved = "pinned"
+            files.append({"year": year, "part": part, "url": url, "resolved": resolved})
+    newest = years[0] if years else None
+    log(f"{source['source_id']}: newest year {newest}, "
+        f"{sum(f['resolved'] == 'page' for f in files)} links from the page, "
+        f"{sum(f['resolved'] == 'pinned' for f in files)} pinned")
+    return files
+
+
+def fetch_infohub(source, force=False):
+    """Fetch each workbook of a multi-file InfoHub source. Returns manifest records."""
+    records = []
+    for chosen in infohub_files(source):
+        one = dict(source)
+        one["url"] = chosen["url"]
+        one["cache"] = source["cache"].format(year=chosen["year"], part=chosen["part"])
+        target = cfg.RAW / one["cache"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        # A republished file keeps its year but may change its name, so a
+        # cached copy fetched from another address is replaced.
+        previous = target.with_suffix(".url")
+        stale = not previous.exists() or previous.read_text() != chosen["url"]
+        record = download(one, force=force or stale)
+        previous.write_text(chosen["url"])
+        record.update({"year": chosen["year"], "part": chosen["part"],
+                       "resolved": chosen["resolved"]})
+        check_shape(one, record)
+        records.append(record)
+    return records
 
 
 def download(source, force=False):
@@ -158,6 +236,9 @@ def main(force=False):
             record = download(source, force=force)
         check_shape(source, record)
         records.append(record)
+
+    for key in INFOHUB_SOURCES:
+        records.extend(fetch_infohub(cfg.SOURCES[key], force=force))
 
     manifest = {
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),

@@ -29,6 +29,7 @@
   // Total enrollment is not here: the sheet always carries a Students row in
   // the schools group, and the same figure twice is just noise.
   var DEFAULT_MEASURES = [
+    'qr_impact', 'qr_performance',
     'demo_economic_need_index',
     'attendance_k8_all', 'attendance_hs_all',
     'chronic_absent_ems_all', 'chronic_absent_hs_all',
@@ -266,7 +267,8 @@
           year: series.y[i], value: series.v[i],
           n: series.n ? series.n[i] : null,
           score: series.s ? series.s[i] : null,
-          band: series.b ? series.b[i] : null
+          band: series.b ? series.b[i] : null,
+          word: series.t ? series.t[i] : null
         };
       }
       // A bound the source published, such as "Above 95%", is a value for
@@ -546,7 +548,8 @@
       return td;
     }
 
-    var text = point.bound || SF.formatValue(point.value, metric.format);
+    var text = point.bound ||
+      (point.word ? point.word + ' ' : '') + SF.formatValue(point.value, metric.format);
     if (point.band) {
       td.appendChild(SF.el('span', {
         class: 'cell-band band-' + point.band,
@@ -705,7 +708,9 @@
     }).then(function () {
       syncUrl();
       draw();
+      document.getElementById('main').classList.remove('is-loading');
     }).catch(function (err) {
+      document.getElementById('main').classList.remove('is-loading');
       SF.fail(document.getElementById('comparison'), err);
     });
   });

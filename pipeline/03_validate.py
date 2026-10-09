@@ -214,6 +214,77 @@ def check_coverage(tables, report):
                     f"{no_address:,} open schools have no published address")
 
 
+def check_sqr_results(tables, report):
+    """Checks on the quality report workbooks that a shape test cannot make.
+
+    Required columns are matched when the workbooks are read. Here the values
+    are tested: enough schools, the City's four rating words, and ranges that
+    a misread column would break.
+    """
+    obs = tables["observations"]
+    results = obs[obs["source_id"] == "sqr_results"].copy()
+    if results.empty:
+        report.fail("sqr_results.empty", "no rows from the quality report workbooks")
+        return
+    results["number"] = pd.to_numeric(results["value"], errors="coerce")
+    formats = tables["metrics"].set_index("metric_id")["format"]
+    results["format"] = results["metric_id"].map(formats)
+
+    newest = results["school_year"].max()
+    latest = results[results["school_year"] == newest]
+    for report_type, floor in cfg.SOURCES["sqr_results"]["min_dbns"].items():
+        count = latest.loc[latest["report_type"] == report_type, "dbn"].nunique()
+        report.fact(f"sqr_results_{report_type.lower()}_schools_{newest}", count)
+        if count < floor:
+            report.fail("sqr_results.schools",
+                        f"the {newest} {report_type} workbook has {count:,} schools, "
+                        f"below the floor of {floor:,}")
+
+    rated = results[results["text"].notna() & (results["text"] != "")]
+    words = set(cfg.RATING_WORDS.values())
+    unknown = set(rated["text"]) - words
+    if unknown:
+        report.fail("sqr_results.rating_words", f"unrecognised rating words {sorted(unknown)}")
+    # The City sets the word from the first digit of the score, so a mismatch
+    # means a word and a score were read from different rows or columns.
+    expected = rated["number"].map(lambda v: cfg.RATING_WORDS.get(int(v)) if pd.notna(v) else None)
+    mismatched = rated[expected != rated["text"]]
+    if len(mismatched):
+        report.fail("sqr_results.rating_digit",
+                    f"{len(mismatched):,} rating words disagree with their score, for example "
+                    f"{mismatched[['dbn', 'metric_id', 'value', 'text']].head(3).to_dict('records')}")
+    stray = set(rated["metric_id"]) - set(m["metric_id"] for m in cfg.SQR_RESULTS_METRICS
+                                          if m.get("text"))
+    if stray:
+        report.fail("sqr_results.text_metric", f"rating words on unrated metrics {sorted(stray)}")
+
+    def out_of_range(mask, check, what):
+        bad = results[mask]
+        if len(bad):
+            report.fail(check, f"{len(bad):,} {what}, for example "
+                               f"{bad[['dbn', 'metric_id', 'value']].head(3).to_dict('records')}")
+
+    number, fmt = results["number"], results["format"]
+    low, high = cfg.RATING_RANGE
+    out_of_range((fmt == "index_unit") & ((number < 0) | (number > cfg.INDEX_UNIT_MAX)),
+                 "sqr_results.index_range",
+                 f"Impact or Performance values outside 0 to {cfg.INDEX_UNIT_MAX}")
+    out_of_range((fmt == "rating_score") & ((number < low) | (number > high)),
+                 "sqr_results.rating_range", f"rating scores outside {low} to {high}")
+    # The City publishes a few enrollment shares above 100%. Past 1.5 the value
+    # is a misread column, not the City's figure.
+    out_of_range((fmt == "pct_unit") & ((number < 0) | (number > 1.5)),
+                 "sqr_results.pct_range", "percentages outside 0 to 1.5")
+    over = results[(fmt == "pct_unit") & (number > 1)]
+    if len(over):
+        report.warn("sqr_results.pct_over_one",
+                    f"{len(over):,} percentages above 100% as published, for example "
+                    f"{over[['dbn', 'school_year', 'metric_id', 'value']].head(3).to_dict('records')}")
+    averages = pd.to_numeric(results["comparison"], errors="coerce")
+    out_of_range((averages < 0) | (averages > 1), "sqr_results.average_range",
+                  "City averages outside 0 to 1")
+
+
 def check_freshness(tables, report):
     """Freshness comes from the data period, never from the day the job ran."""
     obs = tables["observations"]
@@ -222,23 +293,24 @@ def check_freshness(tables, report):
         periods[source_id] = str(subset["school_year"].max())
     report.fact("latest_periods", periods)
 
-    newest = periods.get("sqr")
-    if newest:
-        # The school year label is "2024-25", and a year's report is published
-        # in the autumn after it ends. Before September the newest report that
-        # can exist covers the year that ended fifteen months ago.
-        now = datetime.now(timezone.utc)
-        expected = now.year - 1 if now.month >= 9 else now.year - 2
-        start = int(str(newest)[:4])
-        behind = expected - start
+    # The school year label is "2024-25", and a year's report is published in
+    # the autumn after it ends. Before September the newest report that can
+    # exist covers the year that ended fifteen months ago.
+    now = datetime.now(timezone.utc)
+    expected = now.year - 1 if now.month >= 9 else now.year - 2
+    for source_id in ("sqr", "sqr_results"):
+        newest = periods.get(source_id)
+        if not newest:
+            continue
+        behind = expected - int(str(newest)[:4])
         if behind >= 2:
-            report.fail("freshness.sqr",
-                        f"the newest quality report period is {newest}, "
+            report.fail(f"freshness.{source_id}",
+                        f"the newest {source_id} period is {newest}, "
                         f"{behind} releases behind the expected {expected}-"
                         f"{str(expected + 1)[-2:]}")
         elif behind == 1:
-            report.warn("freshness.sqr",
-                        f"the newest quality report period is {newest}, "
+            report.warn(f"freshness.{source_id}",
+                        f"the newest {source_id} period is {newest}, "
                         f"one release behind the expected {expected}-"
                         f"{str(expected + 1)[-2:]}")
 
@@ -300,6 +372,7 @@ def main():
     check_references(tables, report)
     check_missing_data_rules(tables, report)
     check_coverage(tables, report)
+    check_sqr_results(tables, report)
     check_freshness(tables, report)
     check_against_published(tables, report)
 

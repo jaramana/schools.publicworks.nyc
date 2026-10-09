@@ -23,6 +23,14 @@
      On a narrow screen the rail is the page, and the map opens full screen
      from the floating button. -->
 <main id="main" class="browse-app">
+<noscript>
+  <div class="wrap"><div class="note-box"><p>
+    <strong>This page needs JavaScript.</strong> It draws each figure from the
+    published data in the browser. The <a href="data.html">Data page</a> has
+    every source and the full download.
+  </p></div></div>
+</noscript>
+
   <aside class="rail" aria-label="Schools">
     <div class="rail-head">
       <h1 class="rail-title">Browse schools</h1>
@@ -67,8 +75,8 @@
       <button class="pill" type="button" id="map-filters">Filters</button>
     </div>
     <div class="map-stage">
-      <div class="map-frame" id="school-map" role="region"
-           aria-label="Map of the schools that match the filters"></div>
+      <section class="map-frame" id="school-map"
+               aria-label="Map of the schools that match the filters"></section>
     </div>
   </div>
 

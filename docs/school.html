@@ -17,39 +17,54 @@
 <a class="skip" href="#main">Skip to content</a>
 <header data-chrome="masthead"></header>
 
-<main id="main">
-  <section class="wrap console">
+<main id="main" class="is-loading">
+<noscript>
+  <div class="wrap"><div class="note-box"><p>
+    <strong>This page needs JavaScript.</strong> It draws each figure from the
+    published data in the browser. The <a href="data.html">Data page</a> has
+    every source and the full download.
+  </p></div></div>
+</noscript>
+
+  <section class="wrap profile-top">
     <p class="crumb"><a id="back-link" href="browse.html">← All schools</a></p>
     <div class="entity-head" id="school-head">
       <p class="kind">Loading</p>
       <h1>School profile</h1>
     </div>
     <div class="table-tools" id="compare-action"></div>
-    <p class="statusline mono" data-status></p>
   </section>
 
-  <section class="wrap">
-    <dl class="facts" id="school-facts"></dl>
-    <div class="locator" id="school-locator" hidden></div>
-    <div id="school-overview" hidden></div>
-    <div id="school-programs" hidden></div>
+  <section class="wrap profile-intro" aria-label="About this school">
+    <div class="intro-grid">
+      <div class="intro-facts">
+        <dl class="fact-list" id="school-facts"></dl>
+        <p class="source-line" id="facts-source" hidden></p>
+      </div>
+      <div class="locator" id="school-locator" hidden></div>
+    </div>
+    <section class="own-words-wrap" id="school-overview" aria-labelledby="own-words-title" hidden></section>
   </section>
 
-  <section class="wrap">
-    <div id="school-metrics"></div>
+  <section class="profile-data" id="school-metrics" aria-labelledby="data-title"></section>
 
+  <section class="wrap profile-foot">
     <div class="note-box">
       <p>
-        <strong>Reading these values.</strong> Each one shows the school year it
-        describes. Where the source publishes a comparison group average, it is
-        the source's own comparison and not a calculation by this site.
+        <strong>Reading these values.</strong> Each figure shows the school year
+        it describes. A comparison such as “5.7 points below similar schools”
+        uses the figure the City publishes for that school, not a calculation
+        by this site. The small bars beside a figure count schools of the same
+        type by their published value that year; this site draws them and adds
+        no score.
         <em>Withheld</em> means too few students were in the group to publish
         safely, which is not a zero. <em>Not reported</em> means the source
         published nothing. A measure that does not apply to this type of school
         is left out rather than shown as missing.
-        See <a href="data.html">Data</a>.
+        See <a href="data.html#figures">Data</a>.
       </p>
     </div>
+    <p class="statusline mono" data-status></p>
   </section>
 
   <section class="wrap">

@@ -45,6 +45,10 @@
         <dd>Schools the City finds similar for one measure. The City publishes the group's average, not its members.</dd>
         <dt>Score out of 5</dt>
         <dd>The City's rating of one measure against the comparison group.</dd>
+        <dt>City average</dt>
+        <dd>The average of all schools filing the same report, published beside survey results.</dd>
+        <dt>Rating</dt>
+        <dd>The City's word for one of three areas, Excellent, Good, Fair or Needs Improvement, with the score it comes from.</dd>
         <dt>Withheld</dt>
         <dd>Calculated but not published, to protect a small group of students.</dd>
         <dt>Economic Need Index</dt>
@@ -72,7 +76,7 @@
       <li>
         <h3>Collect</h3>
         <p>
-          Every morning the site downloads seven public sources from New York
+          Every morning the site downloads eight public sources from New York
           City Public Schools, NYC Open Data and the City's geocoder. The
           reporting period is read from inside each file.
         </p>
@@ -102,6 +106,15 @@
         </p>
       </li>
       <li>
+        <h3>Count</h3>
+        <p>
+          For each figure, the build counts the schools of the same type by
+          their published value, in 24 equal steps, for the two newest years.
+          A profile draws where its school falls among them. The counts name no
+          school and make no score.
+        </p>
+      </li>
+      <li>
         <h3>Place</h3>
         <p>
           Each school gets a point from the City's school point file, then the
@@ -122,6 +135,23 @@
     <ul>
       <li>A band describes one measure in one year. It is not a rating of the
         school, and the site has no overall score or ranking.</li>
+      <li>The bars beside a figure count schools of the same type, as the City
+        types them in its reports, by their value that year. Schools the City
+        publishes only as "Above 95%" have a bar of their own.</li>
+      <li>Impact and Performance are the City's scores from 0 to 1.
+        Performance compares a school's results with the citywide average for
+        its type. Impact compares them with how similar students do across the
+        city. The City centers both on 0.50 within each school type and does
+        not cap them at 1 in its download.</li>
+      <li>The City rates three areas: Instruction and Performance, Safety and
+        School Climate, and Relationships with Families. The first digit of the
+        score, from 1.00 to 4.99, sets the word. The site shows both and adds no
+        band.</li>
+      <li>Survey results are the share of positive answers, beside the City
+        average for the same report. Response rates show how many surveys came
+        back.</li>
+      <li>Advanced course shares by race are each group's share of the students
+        in those courses.</li>
       <li>Every figure in a measure comes from the same year. A student group
         with no figure that year shows as not reported.</li>
       <li>A blank is never a zero. Not reported means the source published
@@ -149,8 +179,13 @@
     <ul>
       <li>The site has no overall scores, ranks or recommendations.</li>
       <li>It has no address search, school zones or commute times.</li>
-      <li>Survey results, SHSAT figures and specialized high school admissions
-        are not included.</li>
+      <li>SHSAT figures, specialized high school admissions, suspensions and
+        school budgets are not included.</li>
+      <li>Ratings, Impact and Performance cover 2023-24 and 2024-25. District 75
+        and early childhood schools do not receive them.</li>
+      <li>The City counts a student as receiving all recommended special
+        education programs when the student's class schedule matches the
+        IEP.</li>
       <li>Charter schools outside the City's own reporting are not
         included.</li>
     </ul>

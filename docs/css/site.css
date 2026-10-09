@@ -74,6 +74,9 @@
           "Helvetica Neue", Arial, sans-serif;
   /* Monospace carries identifiers and readouts: a DBN, a reporting period,
      a count. It is the signal that a thing is a record, not prose. */
+  /* The school's own words, and nothing else, are set in the system serif. */
+  --serif: ui-serif, "New York", "Iowan Old Style", "Apple Garamond", Georgia,
+           Cambria, "Times New Roman", serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
           "Liberation Mono", monospace;
 }
@@ -624,96 +627,53 @@ body.map-full .map-stage { flex: 1; }
   .row-actions, .tray, .tray-toggle b.bump { animation: none; }
 }
 
-.locator { margin: 1.25rem 0 0; }
-.locator .map-frame { height: 15rem; }
-
 /* ---- Profile ----------------------------------------------------- */
 
-.crumb { margin: 0 0 1rem; font-size: .88rem; }
+/* The head: where the school is, then what it is, with room around both. */
+.profile-top { padding: clamp(1.75rem, 4.5vw, 3rem) 0 0; }
+.crumb { margin: 0 0 1.4rem; font-size: .88rem; }
 .crumb a { color: var(--ink-soft); text-decoration: none; }
 .crumb a:hover { color: var(--accent); text-decoration: underline; }
-.entity-head { margin-bottom: 1.25rem; }
+.entity-head { margin-bottom: 0; }
 .entity-head .kind {
   font-size: .74rem; letter-spacing: .1em; text-transform: uppercase;
-  color: var(--ink-faint); margin: 0 0 .25rem;
+  color: var(--ink-faint); margin: 0 0 .55rem;
 }
-.entity-head h1 { margin-bottom: .3rem; }
-.entity-head .where { color: var(--ink-soft); max-width: 46rem; }
+.entity-head h1 {
+  font-size: clamp(1.9rem, 4.2vw, 2.9rem); margin-bottom: .6rem;
+  max-width: 24em; text-wrap: balance;
+}
+.entity-head .where { color: var(--ink-soft); max-width: 46rem; margin: 0; }
+.profile-top .table-tools { margin: 1.4rem 0 0; }
 
-.facts {
-  display: grid; gap: 0; margin: 1.5rem 0 2rem;
-  background: var(--paper-raised); border: 1px solid var(--rule);
-  border-radius: 10px; overflow: hidden;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+/* Facts as one list, label and value, beside the map on a wide screen. */
+.profile-intro { margin-top: clamp(2rem, 4vw, 2.75rem); }
+.intro-grid { display: grid; gap: 2rem 3rem; align-items: start; }
+@media (min-width: 56rem) {
+  .intro-grid { grid-template-columns: minmax(0, 26rem) minmax(0, 1fr); }
 }
-.fact { padding: .9rem 1.1rem; box-shadow: 1px 0 0 var(--rule), 0 1px 0 var(--rule); }
-.fact dt { font-size: .76rem; color: var(--ink-faint); font-weight: 600; margin-bottom: .25rem; }
-.fact dd { margin: 0; font-size: 1.05rem; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
-.fact dd.big { font-size: clamp(1.4rem, 2.6vw, 1.8rem); letter-spacing: -.03em; }
-.fact dd .note { display: block; font-size: .8rem; color: var(--ink-faint); font-weight: 400; }
+.fact-list { margin: 0; border-top: 1px solid var(--rule); }
+.fact-list .fact {
+  display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: 1rem;
+  padding: .62rem 0; border-bottom: 1px solid var(--rule); align-items: baseline;
+}
+.fact-list dt { font-size: .8rem; color: var(--ink-faint); font-weight: 600; margin: 0; }
+.fact-list dd { margin: 0; font-size: .97rem; font-weight: 500; line-height: 1.45; overflow-wrap: anywhere; }
+.fact-list dd .note { color: var(--ink-faint); font-size: .84rem; font-weight: 400; margin-left: .5rem; }
+.intro-facts .source-line { margin: .75rem 0 0; }
+.locator { margin: 0; }
+.locator .map-frame { height: 19.5rem; }
+@media (max-width: 56rem) { .locator .map-frame { height: 15rem; } }
 
-/* At a glance, and the jump list.
-   ------------------------------------------------------------------
-   A profile can run to a hundred and eighty measures. These two blocks are
-   the way in: the handful of measures people actually ask for, then a list
-   of the sections. Neither summarizes anything. */
-
-.glance-grid {
-  display: grid; gap: 0; margin: .75rem 0 1rem; padding: 0; list-style: none;
-  background: var(--paper-raised); border: 1px solid var(--rule);
-  border-radius: 10px; overflow: hidden;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-}
-.glance {
-  padding: .9rem 1.1rem; box-shadow: 1px 0 0 var(--rule), 0 1px 0 var(--rule);
-  display: flex; flex-direction: column; gap: .2rem;
-}
-.glance .g-label { font-size: .8rem; color: var(--ink-faint); font-weight: 600; line-height: 1.3; }
-.glance .m-figure { flex-wrap: wrap; }
-.glance .m-value { font-size: clamp(1.3rem, 2.4vw, 1.6rem); }
-.glance .g-year { font-size: .78rem; color: var(--ink-faint); }
-
-.section-jump {
-  display: flex; flex-wrap: wrap; gap: .35rem;
-  margin: 1.25rem 0 0; padding: .7rem .8rem;
-  background: var(--paper-sunken); border-radius: 9px;
-}
-.section-jump a {
-  font-size: .84rem; text-decoration: none; color: var(--accent-ink);
-  background: var(--paper-raised); border: 1px solid var(--rule);
-  border-radius: 999px; padding: .18rem .7rem;
-}
-.section-jump a:hover { border-color: var(--accent); }
-
-/* Measures.
-   ------------------------------------------------------------------
-   One card per measure, not a table. A school profile is a long list of
-   single numbers, and a table of two useful columns forces a reader to
-   track a header row that has scrolled away. The card puts the value, its
-   scale, its period and its standing against similar schools in one place
-   at one glance, and never scrolls sideways. */
-
-.measure-list { list-style: none; padding: 0; margin: 0; }
-.measure {
-  border-top: 1px solid var(--rule);
-  padding: .85rem 0;
-}
-.measure:first-child { border-top: 0; }
-
-.m-head {
-  display: flex; flex-wrap: wrap; gap: .2rem 1rem;
-  align-items: baseline; justify-content: space-between;
-}
-.m-label { font-weight: 600; flex: 1 1 14rem; min-width: 0; }
+/* A figure and the maximum of its scale, so "3.35" reads as "3.35 of 4.5"
+   without anyone opening a definition. */
 .m-figure { display: flex; align-items: baseline; gap: .45rem; white-space: nowrap; }
 .m-value { font-size: 1.3rem; font-weight: 700; letter-spacing: -.025em; }
-/* The maximum of the scale, printed next to the value, so "3.35" reads as
-   "3.35 of 4.5" without anyone opening a definition. */
 .m-scale { font-size: .9rem; color: var(--ink-faint); font-weight: 500; }
 .m-value.absent { font-size: .95rem; font-weight: 600; color: var(--ink-faint); }
 
-/* The standing band. A tint, the City's own score, and a written label: the
-   color is a shortcut, never the only carrier of the meaning. */
+/* The City's 1 to 5 score in an opened measure. A tint, the score, and a
+   written label: the color is a shortcut, never the only carrier. */
 .band {
   display: inline-flex; align-items: baseline; gap: .4rem;
   border-radius: 6px; padding: .12rem .45rem;
@@ -727,30 +687,28 @@ body.map-full .map-stage { flex: 1; }
 
 .m-meta {
   font-size: .84rem; color: var(--ink-faint);
-  display: flex; flex-wrap: wrap; gap: .1rem .7rem; margin-top: .25rem;
+  display: flex; flex-wrap: wrap; gap: .1rem .5rem; margin-top: .25rem;
 }
 .m-meta .sep { color: var(--rule-strong); }
 
-
-.measure details { margin-top: .45rem; }
-.measure summary {
-  font-size: .82rem; color: var(--accent); cursor: pointer; width: max-content;
-}
-.m-detail {
-  font-size: .86rem; color: var(--ink-soft); margin: .5rem 0 .2rem;
-  padding-left: .9rem; border-left: 2px solid var(--rule); max-width: 46rem;
-}
-.m-detail p { margin: 0 0 .45rem; max-width: none; }
-.m-detail p:last-child { margin-bottom: 0; }
+/* The City's comparison in words. The arrow says which way; the color says
+   whether the City counts that direction as better. */
+.cmp.better { color: var(--band-high-ink); }
+.cmp.worse { color: var(--band-below-ink); }
+.cmp-mark { font-size: .72em; margin-right: .3em; }
 
 /* The panel is a short table of labeled facts. Prose here made a reader
    consume four sentences to reach the one line they opened it for; a label
    column lets them jump straight to it. */
 .m-facts { margin: 0; display: grid; gap: .1rem 0; }
 .m-facts > div {
-  display: grid; grid-template-columns: 8.5rem 1fr; gap: .2rem .9rem;
+  display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: .2rem .9rem;
   padding: .22rem 0; align-items: baseline;
 }
+@media (max-width: 30rem) {
+  .m-facts > div { grid-template-columns: minmax(0, 1fr); gap: .05rem; padding: .35rem 0; }
+}
+.m-facts dd { overflow-wrap: anywhere; }
 .m-facts dt {
   font-size: .74rem; font-weight: 700; letter-spacing: .04em;
   text-transform: uppercase; color: var(--ink-faint);
@@ -759,11 +717,8 @@ body.map-full .map-stage { flex: 1; }
 .m-facts .mono-row dd { font-family: var(--mono); font-size: .82rem; color: var(--ink-soft); }
 .m-facts .careful dd { color: var(--band-below-ink); }
 
-/* Standing sits in the first row, where the band has room to carry its own
-   label instead of floating next to a number it does not belong to. */
+/* The City's score, its band and one plain sentence about what it means. */
 .standing { display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .6rem; }
-.standing .up { color: var(--band-high-ink); font-weight: 600; }
-.standing .down { color: var(--band-low-ink); font-weight: 600; }
 
 .m-facts-label {
   font-size: .74rem; font-weight: 700; letter-spacing: .04em;
@@ -772,8 +727,6 @@ body.map-full .map-stage { flex: 1; }
 }
 
 /* Group breakdowns, under the all-students figure they belong to. */
-.m-groups { margin-top: .5rem; }
-.m-groups > summary { font-size: .82rem; }
 .group-theme {
   font-size: .72rem; font-weight: 700; letter-spacing: .07em;
   text-transform: uppercase; color: var(--ink-faint);
@@ -830,7 +783,7 @@ body.map-full .map-stage { flex: 1; }
   border-left: 3px solid var(--accent-soft);
   border-radius: 0 9px 9px 0; padding: .95rem 1.1rem;
 }
-.program h3 { margin: 0 0 .15rem; font-size: 1rem; }
+.program h4 { margin: 0 0 .15rem; font-size: 1rem; letter-spacing: -.01em; }
 .program .p-code { font-family: var(--mono); font-size: .78rem; color: var(--ink-faint); }
 .program .p-method {
   display: inline-block; margin-top: .35rem;
@@ -849,6 +802,320 @@ body.map-full .map-stage { flex: 1; }
 .p-eligibility { font-size: .87rem; color: var(--ink-soft); margin: .55rem 0 0; max-width: none; }
 
 .section-note { font-size: .88rem; color: var(--ink-faint); margin: .2rem 0 1rem; max-width: 46rem; }
+
+/* Where a section's figures come from, directly under its heading. */
+.source-line {
+  font-size: .8rem; color: var(--ink-faint); margin: .1rem 0 .6rem; max-width: 46rem;
+}
+.source-line a { color: var(--ink-soft); }
+.source-tag {
+  font-size: .68rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  margin-right: .45rem;
+}
+.m-facts .src-col { font-family: var(--mono); font-size: .78rem; color: var(--ink-faint); }
+
+/* The school's own words. A serif voice set apart from the data, curly
+   quotes hung in the margin, and a credit line under it. */
+.own-words-wrap { margin-top: clamp(2.75rem, 5.5vw, 3.75rem); max-width: 44rem; }
+.eyebrow {
+  font-size: .74rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 0 0 1rem;
+}
+.own-words { margin: 0; }
+.own-words blockquote { margin: 0; }
+.own-words blockquote p {
+  margin: 0; max-width: 40rem; font-family: var(--serif);
+  font-size: clamp(1.1rem, 1.7vw, 1.25rem); line-height: 1.62; color: var(--ink);
+  text-wrap: pretty; hanging-punctuation: first last;
+}
+.q-open, .q-close { color: var(--accent); }
+@supports not (hanging-punctuation: first) { .q-open { margin-left: -.42em; } }
+.own-words figcaption { margin-top: 1rem; font-size: .84rem; color: var(--ink-faint); }
+.own-words figcaption::before { content: "\2014\2002"; }
+.own-words figcaption a { color: inherit; }
+/* The clamp clips, so the box widens leftward to keep the hung quote mark. */
+.own-words.clamped blockquote {
+  max-height: 12rem; overflow: hidden; margin-left: -.75rem; padding-left: .75rem;
+  -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent);
+  mask-image: linear-gradient(to bottom, #000 58%, transparent);
+}
+.text-button {
+  font: inherit; font-size: .88rem; font-weight: 600; color: var(--accent);
+  background: none; border: 0; padding: .6rem 0; cursor: pointer;
+  text-decoration: underline; text-underline-offset: .18em; text-decoration-thickness: .07em;
+}
+.text-button:hover { color: var(--accent-ink); }
+
+/* Impact and Performance say what they compare, under the label. */
+.m-def { font-size: .88rem; color: var(--ink-soft); margin: .15rem 0 0; max-width: 40rem; }
+
+/* The City's four rating steps, with this school's score marked. Grey steps
+   and one accent step: the City's words, not a traffic light. */
+.rating-scale {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px;
+  max-width: 30rem; margin: .45rem 0 .1rem;
+}
+.rs-bar {
+  position: relative; display: block; height: 6px;
+  background: var(--paper-sunken); border-radius: 2px;
+}
+.rs-step.on .rs-bar { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.rs-mark {
+  position: absolute; top: 50%; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px;
+  border-radius: 50%; background: var(--accent); border: 2px solid var(--paper-raised);
+}
+.rs-word { display: block; font-size: .74rem; color: var(--ink-faint); margin-top: .3rem; line-height: 1.25; }
+.rs-step.on .rs-word { color: var(--ink); font-weight: 600; }
+.rs-digit { font-family: var(--mono); font-size: .7rem; }
+
+.chart-title { font-size: .95rem; margin: 2rem 0 .3rem; }
+
+/* ---- Statistics: topic tabs ---------------------------------------- */
+
+.profile-data { margin-top: clamp(3.25rem, 6.5vw, 4.75rem); }
+.data-head {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+  gap: 1rem 2.5rem; margin-bottom: 1.25rem;
+}
+.data-title { font-size: clamp(1.35rem, 2.4vw, 1.7rem); margin: 0 0 .4rem; }
+.data-intro { color: var(--ink-soft); margin: 0; font-size: .95rem; max-width: 38rem; }
+
+/* Find a measure. Tabs keep the browser's own find from seeing what is not
+   on screen, so the profile carries its own. */
+.mfind { position: relative; width: min(100%, 20rem); }
+.mfind-input {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: .95rem;
+  padding: .6rem .85rem; border: 1.5px solid var(--control); border-radius: 9px;
+  background: var(--paper-raised); color: var(--ink);
+}
+.mfind-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
+.mfind-results {
+  position: absolute; z-index: 40; top: calc(100% + .35rem); left: 0; right: 0;
+  list-style: none; margin: 0; padding: .3rem; max-height: 22rem; overflow-y: auto;
+  background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.mfind-results button {
+  all: unset; box-sizing: border-box; display: flex; justify-content: space-between;
+  gap: .8rem; width: 100%; padding: .55rem .65rem; border-radius: 7px; cursor: pointer;
+  font-size: .88rem; line-height: 1.35;
+}
+.mfind-results button:hover, .mfind-results button:focus-visible { background: var(--accent-soft); }
+.mfind-results button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.mfind-results .r-tab { color: var(--ink-faint); font-size: .78rem; white-space: nowrap; }
+.mfind-results .r-none { padding: .55rem .65rem; color: var(--ink-faint); font-size: .88rem; }
+
+/* The tab bar stays in reach while a long tab scrolls: under the masthead on
+   a desktop, at the top of the screen elsewhere. */
+.tabbar {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--paper); border-bottom: 1px solid var(--rule);
+}
+@media (min-width: 60rem) and (hover: hover) {
+  .tabbar {
+    top: var(--masthead-h); background: var(--glass);
+    -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  }
+  @media (max-height: 34rem) { .tabbar { top: 0; } }
+  @media (prefers-reduced-transparency: reduce) {
+    .tabbar { background: var(--paper); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  }
+}
+.tablist { display: flex; gap: .15rem; overflow-x: auto; scrollbar-width: none; }
+.tablist::-webkit-scrollbar { display: none; }
+.tab {
+  position: relative; flex: none; display: inline-flex; align-items: baseline; gap: .4rem; min-height: 2.75rem;
+  font: inherit; font-size: .93rem; font-weight: 600; color: var(--ink-soft);
+  background: none; border: 0; border-bottom: 2.5px solid transparent;
+  padding: .8rem .7rem .65rem; cursor: pointer;
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -5px; border-radius: 7px; }
+.tab-count { font: 500 .72rem var(--mono); color: var(--ink-faint); }
+
+.tabpanels { padding-bottom: 1rem; }
+.tabpanel:focus-visible { outline-offset: 6px; }
+.panel-section + .panel-section { margin-top: 3.25rem; }
+.panel-title { font-size: 1.15rem; margin: 2.25rem 0 .35rem; }
+.panel-note { font-size: .92rem; color: var(--ink-soft); margin: 0 0 1rem; max-width: 44rem; }
+.tabpanel .source-line { margin: 0 0 .9rem; }
+
+/* ---- Measure rows -------------------------------------------------- */
+/* One column. The name and its year read left; the value and the peer
+   picture sit at fixed positions, so the eye runs down two straight edges. */
+
+.mlist { list-style: none; padding: 0; margin: .5rem 0 0; max-width: 60rem; border-bottom: 1px solid var(--rule); }
+.mrow, .mblock { border-top: 1px solid var(--rule); }
+.mrow-btn {
+  all: unset; box-sizing: border-box; cursor: pointer;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto 8.25rem 1rem;
+  grid-template-areas: "label value peer chev" "meta value peer chev";
+  column-gap: 1.5rem; row-gap: .2rem; align-items: center;
+  width: calc(100% + 1.2rem); margin: 0 -.6rem; padding: 1rem .6rem;
+  border-radius: 8px;
+}
+.mrow-btn:hover { background: var(--paper-raised); }
+.mrow-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.mrow-label { grid-area: label; align-self: end; font-weight: 600; font-size: 1rem; line-height: 1.35; color: var(--ink); }
+.mrow-btn .m-meta { grid-area: meta; align-self: start; margin: 0; }
+.mrow-value { grid-area: value; justify-self: end; }
+.mrow-value .m-value { font-size: 1.35rem; }
+.mrow-peer { grid-area: peer; display: flex; justify-content: flex-end; align-items: center; min-height: 28px; }
+.mrow-chev {
+  grid-area: chev; justify-self: center; width: .5rem; height: .5rem;
+  border-right: 2px solid var(--ink-faint); border-bottom: 2px solid var(--ink-faint);
+  transform: translateY(-25%) rotate(45deg); transition: transform .15s ease;
+}
+.mrow-btn[aria-expanded="true"] .mrow-chev { transform: translateY(25%) rotate(-135deg); }
+.mrow-btn[aria-expanded="true"] .mrow-label { color: var(--accent-ink); }
+.mrow > .m-def { margin: -.55rem 0 .85rem; }
+.mrow > .rating-scale { margin: -.4rem 0 1.05rem; }
+.mrow-panel { padding: .25rem 0 2rem; }
+
+.peer-strip { display: block; overflow: visible; }
+.peer-strip rect { fill: #8a9196; fill-opacity: .4; }
+.peer-strip rect.over { fill-opacity: .65; }
+.peer-strip .here { stroke: var(--accent); stroke-width: 2.5; }
+
+@media (max-width: 40rem) {
+  .mrow-btn {
+    grid-template-columns: minmax(0, 1fr) auto; column-gap: 1rem;
+    grid-template-areas: "label value" "meta meta" "peer peer";
+  }
+  .mrow-peer { justify-content: flex-start; margin-top: .35rem; }
+  .mrow-chev { display: none; }
+}
+
+/* ---- An opened measure --------------------------------------------- */
+
+.mx { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.9rem; max-width: 46rem; padding-top: .35rem; }
+.mx-chart { margin: 0; }
+.mx-chart-title { font-size: .86rem; font-weight: 700; margin: 0 0 .55rem; max-width: none; }
+.mx-chart .chart-wrap { position: relative; }
+.mx-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.mx-chart figcaption { font-size: .82rem; color: var(--ink-faint); margin-top: .55rem; }
+.peer-chart .bar { fill: #8a9196; fill-opacity: .42; }
+.peer-chart .bar.over { fill-opacity: .62; }
+.peer-chart .bar.hot { fill-opacity: .85; }
+.peer-chart .axis { stroke: var(--rule-strong); }
+.peer-chart .tick, .trend-chart .tick { font: 11px var(--mono); fill: var(--ink-faint); }
+.peer-chart .here { stroke: var(--accent); stroke-width: 2.5; }
+.peer-chart .here-dot { fill: var(--accent); stroke: var(--paper); stroke-width: 2; }
+.peer-chart .here-label {
+  font: 700 12px var(--sans); fill: var(--ink);
+  paint-order: stroke; stroke: var(--paper); stroke-width: 4px; stroke-linejoin: round;
+}
+.peer-chart .cmp { stroke: var(--ink-soft); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.peer-chart .cmp-label {
+  font: 600 11px var(--sans); fill: var(--ink-soft);
+  paint-order: stroke; stroke: var(--paper); stroke-width: 4px; stroke-linejoin: round;
+}
+.trend-chart .grid { stroke: var(--rule); }
+.trend-chart .own-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.trend-chart .cmp-line { fill: none; stroke: var(--ink-faint); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.trend-chart .pt { fill: var(--accent); stroke: var(--paper); stroke-width: 2; }
+.trend-chart .crosshair { stroke: var(--ink-faint); stroke-width: 1; }
+.legend { display: flex; flex-wrap: wrap; gap: .3rem 1.25rem; font-size: .8rem; color: var(--ink-soft); margin: .55rem 0 0; max-width: none; }
+.legend .key { display: inline-flex; align-items: center; gap: .45rem; }
+.legend .sw-line { width: 1.2rem; border-top: 2px solid var(--accent); }
+.legend .sw-dash { width: 1.2rem; border-top: 2px dashed var(--ink-faint); }
+.mx .m-facts-label { margin-top: 0; }
+
+/* ---- Shares of a whole --------------------------------------------- */
+
+.mblock { padding: 1.1rem 0 1.35rem; }
+.mblock-head {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline;
+  gap: .2rem 1rem; margin-bottom: .6rem;
+}
+.mblock-head .mrow-label { margin: 0; letter-spacing: 0; }
+.mblock-head .m-meta { margin: 0; }
+.comp-list { list-style: none; padding: 0; margin: 0; max-width: 42rem; }
+.comp-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(4rem, 11rem) 5.5rem;
+  gap: 1rem; align-items: center; padding: .28rem 0; font-size: .93rem;
+}
+.comp-name { color: var(--ink-soft); }
+.comp-bar { height: 8px; background: var(--paper-sunken); border-radius: 4px; overflow: hidden; }
+.comp-bar > span { display: block; height: 100%; background: var(--accent); opacity: .6; border-radius: 4px; }
+.comp-value { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.comp-value.absent { font-weight: 500; color: var(--ink-faint); font-size: .85rem; }
+
+/* Stacked bars for the nearby comparison. Each race keeps one slot and one
+   color in every bar, with a 2px paper gap between segments. The table under
+   the bars carries the numbers and doubles as the key. */
+.stack { display: grid; gap: .5rem; margin: .3rem 0 1.1rem; max-width: 42rem; }
+.stack-row { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 1rem; align-items: center; font-size: .86rem; color: var(--ink-soft); }
+.stack-bar { display: flex; gap: 2px; height: 16px; }
+.stack-bar .seg { flex-grow: 0; flex-shrink: 1; min-width: 2px; }
+.stack-bar .seg:first-child { border-radius: 4px 0 0 4px; }
+.stack-bar .seg:last-child { border-radius: 0 4px 4px 0; }
+.sw { display: inline-block; width: .65rem; height: .65rem; border-radius: 2px; margin-right: .5rem; vertical-align: -.03rem; }
+.s0 { background: #2a78d6; }
+.s1 { background: #eb6834; }
+.s2 { background: #1baf7a; }
+.s3 { background: #eda100; }
+.s4 { background: #e87ba4; }
+.s5 { background: #008300; }
+@media (forced-colors: active) {
+  .stack-bar .seg, .sw, .comp-bar > span, .peer-strip rect, .peer-chart .bar { forced-color-adjust: none; }
+}
+
+.older { margin: 1.4rem 0 0; }
+.older > summary { cursor: pointer; font-size: .9rem; font-weight: 600; color: var(--ink-soft); padding: .55rem 0; }
+.older > summary:hover { color: var(--ink); }
+
+.profile-foot { margin-top: 3.5rem; }
+.profile-foot .statusline { margin-top: 1rem; }
+
+/* Compared with nearby students. The three columns are read across a row,
+   so this one measure is a small table. */
+.pivot-wrap { overflow-x: auto; margin: .45rem 0 .2rem; }
+.pivot { border-collapse: collapse; width: 100%; max-width: 40rem; font-size: .9rem; }
+.pivot th, .pivot td {
+  padding: .3rem .5rem; border-top: 1px dotted var(--rule);
+  text-align: right; white-space: nowrap;
+}
+.pivot th:first-child { text-align: left; padding-left: 0; white-space: normal; }
+.pivot thead th {
+  font-size: .72rem; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--ink-faint); border-top: 0;
+  white-space: normal; vertical-align: bottom;
+}
+@media (max-width: 26rem) {
+  .pivot th, .pivot td { padding: .3rem .3rem; }
+  .pivot { font-size: .85rem; }
+}
+.pivot tbody th { font-weight: 500; }
+.pivot td { font-weight: 700; font-variant-numeric: tabular-nums; }
+.pivot td.absent { font-weight: 500; color: var(--ink-faint); font-size: .85rem; }
+.card-note { font-size: .84rem; color: var(--ink-faint); margin: .35rem 0 0; max-width: 46rem; }
+
+/* Impact and Performance. Every school of the same type in grey, this one in
+   the accent with a ring of paper so it stays visible inside the cloud. Text
+   wears ink, never the accent. */
+.impact-chart { margin: .5rem 0 1.5rem; max-width: 40rem; }
+.impact-chart .chart-wrap { position: relative; }
+.impact-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.impact-chart .grid { stroke: var(--rule); stroke-width: 1; }
+.impact-chart .mid { stroke: var(--control); stroke-width: 1; }
+.impact-chart .tick { font: 11px var(--mono); fill: var(--ink-faint); }
+.impact-chart .axis-title { font: 600 12px var(--sans); fill: var(--ink-soft); }
+.impact-chart .dots circle { fill: #8a9196; fill-opacity: .42; }
+.impact-chart .here { fill: var(--accent); stroke: var(--paper-raised); stroke-width: 2; }
+.impact-chart .here-label {
+  font: 700 12px var(--sans); fill: var(--ink);
+  paint-order: stroke; stroke: var(--paper-raised); stroke-width: 3px; stroke-linejoin: round;
+}
+.impact-chart .hover-ring { fill: none; stroke: var(--ink); stroke-width: 1.5; pointer-events: none; }
+.chart-tip {
+  position: absolute; transform: translate(-50%, calc(-100% - 12px));
+  background: var(--ink); color: var(--paper-raised); font: 12px var(--mono);
+  padding: .25rem .5rem; border-radius: 4px; white-space: nowrap; pointer-events: none;
+}
+.chart-tip[hidden] { display: none; }
+.impact-chart figcaption { font-size: .84rem; color: var(--ink-faint); margin-top: .5rem; }
 
 /* ---- Cards, notes, tables ---------------------------------------- */
 
@@ -909,13 +1176,15 @@ code {
 /* The chosen schools read as the set filter chips on Browse: tinted, with a
    quiet × to remove. */
 .chosen li {
-  display: flex; align-items: center; gap: .15rem;
+  display: flex; align-items: center; gap: .1rem;
   background: var(--accent-soft); color: var(--accent-ink); font-weight: 600;
-  border-radius: 999px; padding: .28rem .2rem .28rem .8rem; font-size: .86rem;
+  border-radius: 999px; padding: .1rem .15rem .1rem .8rem; font-size: .86rem;
 }
+/* The × is small type in a 28px circle, so it is easy to hit. */
 .chosen button {
+  display: inline-grid; place-items: center; min-width: 28px; min-height: 28px;
   border: 0; background: none; color: var(--accent-ink);
-  border-radius: 999px; padding: 0 .55rem 0 .3rem; cursor: pointer;
+  border-radius: 999px; padding: 0; cursor: pointer;
   font: inherit; font-size: 1rem; line-height: 1;
 }
 .chosen button:hover { color: var(--warn); }
@@ -969,9 +1238,10 @@ code {
 .footer a { color: var(--ink-soft); }
 .footer a:hover { color: var(--accent); }
 .footer-grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
-.footer h4 {
+/* Column titles are h2 for the outline and look like small labels. */
+.footer .footer-head {
   font-size: .75rem; text-transform: uppercase; letter-spacing: .09em;
-  color: var(--ink-faint); margin: 0 0 .5rem;
+  color: var(--ink-faint); margin: 0 0 .5rem; line-height: 1.6;
 }
 .footer ul { list-style: none; padding: 0; margin: 0; }
 .footer li { margin-bottom: .25rem; }
@@ -989,7 +1259,11 @@ code {
 .portfolio a:hover { color: var(--accent); text-decoration: underline; }
 
 @media print {
-  .masthead, .nav, .table-tools, .controls, .float-toggle, #map-panel, .locator { display: none; }
+  .masthead, .nav, .table-tools, .controls, .float-toggle, #map-panel, .locator,
+  .tabbar, .mfind, .mrow-chev, .text-button, #profile-search { display: none; }
+  [role="tabpanel"][hidden] { display: block !important; }
+  .tabpanel + .tabpanel { margin-top: 2rem; }
+  .own-words.clamped blockquote { max-height: none; -webkit-mask-image: none; mask-image: none; }
   body { background: #fff; color: #000; }
   .card, .table-wrap { box-shadow: none; }
 }
@@ -1127,3 +1401,73 @@ abbr[title] { text-decoration: underline dotted; cursor: help; }
 }
 .process h3 { margin: 0 0 .2rem; font-size: 1rem; }
 .process p { margin: 0; color: var(--ink-soft); }
+
+/* ---- Target sizes -------------------------------------------------- */
+/* WCAG 2.5.8 asks for 24 by 24 pixels. These grow the hit area, not the
+   type, where a link or toggle stood alone on a short line. */
+.map-attrib a { display: inline-block; padding-block: 6px; }
+details > summary { min-height: 1.5rem; padding-block: .2rem; }
+.method td a, .method th a, #source-table a { display: inline-block; padding-block: .2rem; }
+/* Focus moving down the list scrolls clear of the pinned comparison tray. */
+:root:has(body.has-tray) { scroll-padding-bottom: 6rem; }
+.spec-sheet .school-head a { display: inline-block; padding-block: .3rem; }
+
+/* ---- Stable first paint -------------------------------------------- */
+/* Containers that script fills keep their filled height from the first
+   paint, so the text under them does not jump when they fill. The heights
+   are what each one measures once filled. The footer starts below the fold,
+   so a short page filling in does not shove it either. */
+body:not(.app-page) main { min-height: calc(100vh - var(--masthead-h)); }
+.search-shell:empty { min-height: 51px; }
+#browse-search:empty { min-height: 42px; }
+#filters:empty { min-height: 71px; }
+#school-list:empty { min-height: 100vh; }
+#boroughs:empty { min-height: 72px; }
+#download-list:empty { min-height: 83px; }
+#source-table:empty { min-height: 1206px; }
+#comparison:empty { min-height: 60vh; }
+.statusline[data-status]:empty { min-height: 1.6em; }
+@media (max-width: 40rem) {
+  .statusline[data-status]:empty { min-height: 4.8em; }
+  #boroughs:empty { min-height: 235px; }
+  #download-list:empty { min-height: 228px; }
+  #source-table:empty { min-height: 1411px; }
+}
+/* The masthead is drawn by script. Until it is, its slot holds the height
+   it will have at that width: one row, or the nav wrapping to two or three. */
+header[data-chrome="masthead"]:empty { display: block; min-height: 52.83px; }
+@media (max-width: 35.45rem) { header[data-chrome="masthead"]:empty { min-height: 104.83px; } }
+@media (max-width: 26.2rem) { header[data-chrome="masthead"]:empty { min-height: 141.45px; } }
+/* A page whose body is all data shows its head at once and the rest when the
+   data has drawn. */
+main.is-loading > section:not(:first-of-type) { display: none; }
+main.is-loading .statusline { visibility: hidden; }
+
+/* Focus and anchors land clear of the sticky tab bar, and of the masthead
+   above it on a desktop. On a short screen, as at 400 per cent zoom, the bar
+   scrolls away like the masthead does. */
+:root:has(.tabbar) { scroll-padding-top: 4rem; }
+@media (min-width: 60rem) and (hover: hover) {
+  :root:has(.tabbar) { scroll-padding-top: calc(var(--masthead-h) + 4rem); }
+}
+@media (max-height: 30rem) {
+  .tabbar { position: static; }
+  :root:has(.tabbar) { scroll-padding-top: 0; }
+}
+
+/* ---- Forced colors ------------------------------------------------- */
+/* In a high-contrast theme the system picks the colors. The selected tab
+   keeps its underline, and the charts draw in system colors so this school
+   stays the one line that stands out. */
+@media (forced-colors: active) {
+  .tab { border-bottom-color: Canvas; }
+  .tab[aria-selected="true"] { border-bottom-color: Highlight; }
+  .peer-strip rect, .peer-chart .bar { fill: GrayText; fill-opacity: 1; forced-color-adjust: none; }
+  .peer-strip .here, .peer-chart .here, .trend-chart .own-line { stroke: Highlight; }
+  .peer-chart .here-dot, .trend-chart .pt { fill: Highlight; stroke: Canvas; }
+  .peer-chart .cmp, .trend-chart .cmp-line { stroke: CanvasText; }
+  .peer-chart .here-label, .peer-chart .cmp-label { fill: CanvasText; stroke: Canvas; }
+  .peer-chart .tick, .trend-chart .tick { fill: CanvasText; }
+  .trend-chart .grid, .peer-chart .axis { stroke: GrayText; }
+  .legend .sw-line { border-top-color: Highlight; }
+}

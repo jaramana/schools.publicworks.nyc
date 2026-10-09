@@ -197,6 +197,8 @@
     var chip = openMenu.chip;
     openMenu.menu.remove();
     openMenu.button.setAttribute('aria-expanded', 'false');
+    // The menu is gone, so the button no longer points at it.
+    openMenu.button.removeAttribute('aria-controls');
     openMenu = null;
     if (refocus) chip.querySelector('.chip-main').focus();
   }
@@ -232,6 +234,7 @@
 
     chip.appendChild(menu);
     button.setAttribute('aria-expanded', 'true');
+    button.setAttribute('aria-controls', menu.id);
     openMenu = { chip: chip, button: button, menu: menu };
 
     // A menu near the rail's right edge opens leftward, so the rail's own
@@ -269,7 +272,7 @@
       var chip = SF.el('div', { class: 'chip' + (set ? ' is-set' : '') });
       var button = SF.el('button', {
         type: 'button', class: 'chip-main', id: 'chip-' + f.key,
-        'aria-haspopup': 'listbox', 'aria-expanded': 'false', 'aria-controls': 'menu-' + f.key,
+        'aria-haspopup': 'listbox', 'aria-expanded': 'false',
         'aria-label': (f.key === 'status' ? 'Status' : f.label) + ': ' +
                       (set ? chipText(f, state) : (f.all || 'Open schools'))
       }, [SF.el('span', { text: chipText(f, state) }),
@@ -399,7 +402,13 @@
     var float = document.getElementById('float-toggle');
     float.hidden = wide.matches;
     float.textContent = mapView() ? 'Show list' : 'Show map';
-    document.body.classList.toggle('map-full', !wide.matches && mapView());
+    var full = !wide.matches && mapView();
+    document.body.classList.toggle('map-full', full);
+    // The full-screen map covers the page, so the page behind it leaves the
+    // tab order until the map closes.
+    document.querySelectorAll('[data-chrome="masthead"], .rail, .skip').forEach(function (el) {
+      if (full) el.setAttribute('inert', ''); else el.removeAttribute('inert');
+    });
 
     document.getElementById('list-panel').hidden = !p.list;
     document.getElementById('map-panel').hidden = !p.map;

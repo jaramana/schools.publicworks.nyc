@@ -703,6 +703,185 @@ def demographic_metrics_frame():
     return pd.DataFrame(rows)
 
 
+# ---- Quality report workbooks ----------------------------------------------
+
+CATEGORY_LABELS = {key: label for _, key, label in cfg.METRIC_CATEGORIES}
+CATEGORY_LABELS.update(cfg.EXTRA_CATEGORIES)
+
+
+def read_workbook_sheet(path, sheet):
+    """One sheet of a quality report workbook, indexed by DBN.
+
+    The header sits below blank rows and beside blank columns, so it is found
+    by the cell that reads DBN rather than by position. Cells are read as
+    published: "N/A" stays text and is classified by workbook_cell.
+    """
+    raw = pd.read_excel(path, sheet_name=sheet, header=None, dtype=object,
+                        keep_default_na=False)
+    header = next((i for i in range(min(len(raw), 15))
+                   if any(str(v).strip() == "DBN" for v in raw.iloc[i])), None)
+    if header is None:
+        raise RuntimeError(f"{path.name}, sheet {sheet}: no header cell reads DBN")
+    columns = [str(v).strip() for v in raw.iloc[header]]
+    frame = raw.iloc[header + 1:, [bool(c) for c in columns]].copy()
+    frame.columns = [c for c in columns if c]
+    frame["DBN"] = frame["DBN"].astype(str).str.strip().str.upper()
+    return frame[frame["DBN"].str.match(DBN_RE)].set_index("DBN")
+
+
+def workbook_cell(value):
+    """Classify one workbook cell. Returns (number, status, bound).
+
+    Percentages arrive as decimals on Summary and as text such as "85%" on
+    Scoring. "N<5" withholds a figure for a small group. "> 95%" is a bound.
+    Blank and "N/A" mean the City reported nothing. Anything else is a new
+    marker, and the build stops rather than guess at it.
+    """
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if pd.isna(value):
+            return None, cfg.STATUS_MISSING, None
+        return float(value), cfg.STATUS_OK, None
+    text = clean_text(value)
+    if text is None:
+        return None, cfg.STATUS_MISSING, None
+    if text.lower().replace(" ", "") in cfg.QR_SUPPRESSED:
+        return None, cfg.STATUS_SUPPRESSED, None
+    bound = cfg.CENSORED_VALUES.get(text.lower())
+    if bound:
+        return None, cfg.STATUS_CENSORED, bound
+    number = to_number(text)
+    if number is None:
+        raise ValueError(text)
+    return (number / 100 if text.endswith("%") else number), cfg.STATUS_OK, None
+
+
+def read_sqr_results(fetch_manifest):
+    """Read every fetched quality report workbook into observation rows.
+
+    Returns the observations and a table of each school's type within each
+    report, which the Impact and Performance chart groups by.
+    """
+    log("reading the quality report workbooks")
+    source = cfg.SOURCES["sqr_results"]
+    files = sorted((r for r in fetch_manifest["sources"] if r["source_id"] == "sqr_results"),
+                   key=lambda r: (r["year"], r["part"]))
+    if not files:
+        raise RuntimeError("sqr_results: the fetch manifest lists no workbooks")
+
+    rows, types, problems, unreadable = [], [], [], set()
+    for record in files:
+        year = school_year_label(record["year"][:4])
+        report_type = source["parts"][record["part"]]
+        label = f"{record['year']}-{record['part']}"
+        sheets = {name: read_workbook_sheet(cfg.ROOT / record["path"], name)
+                  for name in source["sheets"]}
+
+        # Every allowlisted column this report type should carry, matched exactly.
+        for metric in cfg.SQR_RESULTS_METRICS:
+            if report_type not in metric["parts"] or year < metric.get("since", ""):
+                continue
+            for key in ("column", "comparison", "text"):
+                column = metric.get(key)
+                if column and column not in sheets[metric["sheet"]].columns:
+                    problems.append(f"{label} {metric['sheet']}: no column {column!r}")
+
+        summary = sheets["Summary"]
+        types.append(pd.DataFrame({"dbn": summary.index, "school_year": year,
+                                   "report_type": report_type,
+                                   "school_type": summary["School Type"].map(clean_text).values}))
+
+        for metric in cfg.SQR_RESULTS_METRICS:
+            sheet = sheets[metric["sheet"]]
+            if metric["column"] not in sheet.columns:
+                continue
+            comparison = sheet.get(metric.get("comparison")) if metric.get("comparison") else None
+            text = sheet.get(metric.get("text")) if metric.get("text") else None
+            for dbn, cell in sheet[metric["column"]].items():
+                try:
+                    value, status, bound = workbook_cell(cell)
+                    average = workbook_cell(comparison[dbn])[0] if comparison is not None else None
+                except ValueError as error:
+                    unreadable.add(f"{label} {metric['column']!r}: {error}")
+                    continue
+                rows.append({
+                    "dbn": dbn, "school_year": year, "metric_id": metric["metric_id"],
+                    "report_type": report_type, "value": value, "n": None,
+                    "comparison": average, "source_score": None, "bound": bound,
+                    "text": clean_text(text[dbn]) if text is not None else None,
+                    "status": status, "source_id": "sqr_results",
+                })
+
+    if problems or unreadable:
+        raise RuntimeError(
+            "sqr_results: the workbooks changed shape. " +
+            "; ".join(sorted(problems) + sorted(unreadable)[:10]) +
+            f". Check {source['page']}")
+
+    frame = pd.DataFrame(rows)
+    log(f"  {len(files)} workbooks, {len(frame):,} rows, {frame['dbn'].nunique():,} schools")
+    return frame, pd.concat(types, ignore_index=True)
+
+
+def sqr_results_metrics_frame(results):
+    """The allowlisted workbook columns, described like every other metric."""
+    demo_order = [key for key, _ in cfg.DEMOGRAPHIC_THEMES]
+    demo_labels = dict(cfg.DEMOGRAPHIC_THEMES)
+    grouped = dict(tuple(results.groupby("metric_id")))
+    rows = []
+    for metric in cfg.SQR_RESULTS_METRICS:
+        subset = grouped.get(metric["metric_id"], results.iloc[0:0])
+        values = subset.loc[subset["status"] == cfg.STATUS_OK, "value"]
+        category, theme = metric["category"], metric.get("theme")
+        if category == "demographics":
+            # Demographic cards are themed lists, one card per theme.
+            base_label, base_id = demo_labels[theme], f"demographics:{theme}"
+            subgroup = metric.get("subgroup") or metric["column"]
+            theme_rank = demo_order.index(theme)
+        else:
+            base_label = metric.get("base") or metric["column"]
+            base_id = f"{category}:{base_label}"
+            subgroup = metric.get("subgroup")
+            theme_rank = metric.get("rank", cfg.SUBGROUP_THEME_ORDER.index(theme)
+                                    if theme in cfg.SUBGROUP_THEME_ORDER else 99)
+        row = {
+            "metric_id": metric["metric_id"],
+            "label": metric["column"],
+            "source_label": metric["column"],
+            "source_column": f"{metric['sheet']}: {metric['column']}",
+            "rows": int(len(subset)),
+            "reported": int(len(values)),
+            "low": values.min() if len(values) else None,
+            "high": values.max() if len(values) else None,
+            "schools": int(subset["dbn"].nunique()),
+            "with_comparison": int(subset["comparison"].notna().sum()),
+            "applies_to": "|".join(sorted(set(subset["report_type"]))),
+            "school_types": "",
+            "first_year": subset["school_year"].min() if len(subset) else None,
+            "last_year": subset["school_year"].max() if len(subset) else None,
+            "category": category,
+            "category_label": CATEGORY_LABELS[category],
+            "format": metric["format"],
+            "format_source": "declared",
+            "unit": metric.get("unit") or cfg.FORMATS[metric["format"]]["unit"],
+            "base_label": base_label,
+            "base_id": base_id,
+            "subgroup": subgroup,
+            "subgroup_theme": theme,
+            "theme_rank": theme_rank,
+            "lower_is_better": any(re.search(p, metric["metric_id"]) for p in cfg.LOWER_IS_BETTER),
+            "source_id": "sqr_results",
+            "headline": metric["metric_id"] in cfg.HEADLINE_METRICS,
+            "comparability_note": None,
+            "comparison_label": metric.get("comparison_label"),
+            "pivot": metric.get("pivot"),
+            "rated": bool(metric.get("text")),
+            "card_note": metric.get("note"),
+        }
+        row["description"] = describe_metric(row)
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
 # ---- Observations ----------------------------------------------------------
 
 def status_for(value, n):
@@ -854,22 +1033,27 @@ def build_programs(directories):
 
 def build_sources(observations, schools, programs, fetch_manifest):
     """The Sources and Coverage table, with counts measured from the data."""
-    fetched = {r["source_id"]: r for r in fetch_manifest["sources"]}
+    fetched = {}
+    for record in fetch_manifest["sources"]:
+        fetched.setdefault(record["source_id"], []).append(record)
     rows = []
     for key, source in cfg.SOURCES.items():
+        files = fetched.get(key, [])
         record = {
             "source_id": source["source_id"],
             "agency": source["agency"],
             "title": source["title"],
             "dataset_id": source["dataset_id"],
             "url": source["page"],
-            "download_url": source["url"],
+            # A source read from several workbooks lists each address it used.
+            "download_url": (" | ".join(f["url"] for f in files) if len(files) > 1
+                             else source["url"]),
             "retrieval": source["retrieval"],
             "cadence": source["cadence"],
             "grain": source["grain"],
             "limitations": source["limitations"],
-            "retrieved": fetched.get(key, {}).get("retrieved"),
-            "bytes": fetched.get(key, {}).get("bytes"),
+            "retrieved": max((f["retrieved"] for f in files), default=None),
+            "bytes": sum(f["bytes"] for f in files) if files else None,
         }
         subset = observations[observations["source_id"] == source["source_id"]]
         if len(subset):
@@ -889,7 +1073,7 @@ def build_sources(observations, schools, programs, fetch_manifest):
             # The attachment's file name carries its snapshot date, for example
             # SchoolPoints_APS_2024_08_28.zip.
             stamp = re.search(r"(\d{4})_(\d{2})_(\d{2})",
-                              fetched.get(key, {}).get("filename") or "")
+                              (files[0].get("filename") if files else None) or "")
             record["latest_period"] = "-".join(stamp.groups()) if stamp else None
             record["earliest_period"] = record["latest_period"]
         elif key == "geosearch":
@@ -908,6 +1092,7 @@ def main():
 
     sqr = read_sqr()
     demo = read_demographics()
+    results, report_types = read_sqr_results(fetch_manifest)
     log("reading the directories")
     directories = {k: read_directory(k)
                    for k in ("directory_es", "directory_ms", "directory_hs")}
@@ -916,24 +1101,27 @@ def main():
     schools = add_coordinates(schools, directories)
 
     metrics = build_metrics(sqr)
-    metrics = pd.concat([metrics, demographic_metrics_frame()], ignore_index=True)
+    metrics = pd.concat([metrics, demographic_metrics_frame(),
+                         sqr_results_metrics_frame(results)], ignore_index=True)
     metrics["category_rank"] = metrics["category"].map(
         lambda c: cfg.CATEGORY_ORDER.index(c) if c in cfg.CATEGORY_ORDER else 99)
     metrics = metrics.sort_values(["category_rank", "metric_id"]).reset_index(drop=True)
 
-    observations = build_observations(sqr, demo)
+    observations = pd.concat([build_observations(sqr, demo), results], ignore_index=True)
     programs, priorities = build_programs(directories)
     sources = build_sources(observations, schools, programs, fetch_manifest)
 
     for name, frame in [("schools", schools), ("metrics", metrics),
                         ("observations", observations), ("programs", programs),
-                        ("program_priorities", priorities), ("sources", sources)]:
+                        ("program_priorities", priorities), ("sources", sources),
+                        ("report_types", report_types)]:
         path = cfg.BUILD / f"{name}.csv"
         frame.to_csv(path, index=False)
         log(f"wrote {path.relative_to(cfg.ROOT)}: {len(frame):,} rows")
 
     return {"schools": schools, "metrics": metrics, "observations": observations,
-            "programs": programs, "program_priorities": priorities, "sources": sources}
+            "programs": programs, "program_priorities": priorities, "sources": sources,
+            "report_types": report_types}
 
 
 if __name__ == "__main__":

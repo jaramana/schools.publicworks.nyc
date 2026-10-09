@@ -25,6 +25,8 @@ for _d in (RAW, BUILD, STAGING):
 # ---- Sources ---------------------------------------------------------------
 # Each entry carries what the Sources and Coverage sheet has to publish.
 # `url` is what the pipeline fetches. `page` is where a person should look.
+# A source with "covers_charters": False reports on district-run schools only,
+# so its measures read as not applying to a charter school.
 
 SOCRATA_DOMAIN = "data.cityofnewyork.us"
 INFOHUB_DOCS = "https://infohub.nyced.org/docs/default-source/default-document-library"
@@ -55,6 +57,39 @@ SOURCES = {
             "years are much lower because state testing and some reporting were "
             "suspended. A few metric variables were renamed between the 2017 and 2018 "
             "school years and are not comparable across that boundary."
+        ),
+    },
+    # Five workbooks a year, one per report type, laid out alike since the
+    # 2023-24 reports. `01_fetch.py` reads the newest year's links off `page`
+    # and uses `pinned` for any year the page no longer lists.
+    "sqr_results": {
+        "source_id": "sqr_results",
+        "agency": "NYC Public Schools",
+        "title": "School Quality Report results",
+        "dataset_id": "sqr-results",
+        "url": f"{INFOHUB_DOCS}/{{year}}-{{part}}-sqr-results.xlsx",
+        "page": "https://infohub.nyced.org/reports/students-and-schools/school-quality/school-quality-reports-and-resources",
+        "retrieval": "InfoHub Excel workbooks, one per report type and school year",
+        "cadence": "Annual",
+        "grain": "One row per DBN in each workbook. Five workbooks a year, one per report type.",
+        "cache": "sqr_results/{year}-{part}.xlsx",
+        "finder": r"(\d{6})-(ems|hs|hst|d75|ec)-sqr-results[\w-]*\.xlsx",
+        "pinned": {
+            "202425": f"{INFOHUB_DOCS}/202425-{{part}}-sqr-results.xlsx",
+            "202324": f"{INFOHUB_DOCS}/202324-{{part}}-sqr-results.xlsx",
+        },
+        "years": 2,
+        "parts": {"ems": "EMS", "hs": "HS", "hst": "HST", "d75": "D75", "ec": "EC"},
+        "sheets": ["Summary", "Scoring"],
+        # Floors on schools per workbook in the newest year.
+        "min_dbns": {"EMS": 1_200, "HS": 450},
+        "limitations": (
+            "Covers the 2023-24 and 2024-25 reports. Earlier workbooks use a different "
+            "layout. District 75 and early childhood schools get no Impact or "
+            "Performance Score and no ratings. Survey averages are City averages for "
+            "the school's report type, not its comparison group. A student counts as "
+            "receiving all recommended special education programs when the class "
+            "schedule matches the IEP."
         ),
     },
     "demographics": {
@@ -257,11 +292,18 @@ METRIC_CATEGORIES = [
 ]
 METRIC_CATEGORY_FALLBACK = ("other", "Other published measures")
 
+# Categories that only the quality report workbooks fill. Their measures carry
+# a category in SQR_RESULTS_METRICS rather than matching a pattern above.
+EXTRA_CATEGORIES = {
+    "ratings": "Quality report ratings",
+    "staff": "Staff and leadership",
+}
+
 # The order categories appear in a school profile.
 CATEGORY_ORDER = [
-    "demographics", "attendance", "state_tests", "alt_assessments", "regents",
-    "growth", "coursework", "graduation", "college", "climate",
-    "student_support", "other",
+    "ratings", "demographics", "attendance", "climate", "staff",
+    "state_tests", "alt_assessments", "regents", "growth", "coursework",
+    "graduation", "college", "student_support", "other",
 ]
 
 # Display formats. `pct_unit` means a proportion stored as 0 to 1 and shown as a
@@ -302,6 +344,12 @@ FORMATS = {
     "index_100": {"label": "Index", "unit": "index, 0 to 100"},
     "number": {"label": "Number", "unit": "points or count, as published"},
     "count": {"label": "Count", "unit": "number of students"},
+    # The City scales Impact and Performance from 0 to 1 within each school
+    # type, then shifts the median to 0.50. The download is not capped at 1.
+    "index_unit": {"label": "Index", "unit": "index, 0 to 1 with the median at 0.50; can exceed 1"},
+    "rating_score": {"label": "Rating score", "unit": "City score, 1.00 to 4.99"},
+    "years": {"label": "Years", "unit": "years"},
+    "miles": {"label": "Miles", "unit": "miles"},
 }
 
 # Metrics carried into the Excel workbook's Historical Metrics sheet, and
@@ -325,6 +373,22 @@ HEADLINE_METRICS = [
     "rating_mean_mth_all",
     "lre_all",
     "nyseslat_all",
+    "qr_impact",
+    "qr_performance",
+    "qr_teacher_experience",
+    "qr_iep_programs_all",
+]
+
+# The At a glance cards on a profile, in order. Each slot lists the metrics
+# that can fill it, and the first one the school reports is shown. Total
+# enrollment is left out because the facts header already shows it.
+GLANCE = [
+    ["qr_impact"],
+    ["qr_performance"],
+    ["chronic_absent_ems_all", "chronic_absent_hs_all", "chronic_absent_all"],
+    ["qr_teacher_experience"],
+    ["qr_iep_programs_all"],
+    ["demo_economic_need_index"],
 ]
 
 # Variable pairs that look continuous but are not. Published as separate
@@ -389,10 +453,14 @@ SUBGROUP_THEMES = [
     # Grades are read off a comma rather than a dash, so this theme has no
     # names to match. It is here so the label exists for the page.
     ("grade", "By grade", []),
+    # Set by SQR_RESULTS_METRICS rather than matched from a label.
+    ("respondents", "Survey respondents", []),
+    ("iep_delivery", "Programs and services received", []),
 ]
 
 # The order themes appear under a measure.
-SUBGROUP_THEME_ORDER = ["all", "race", "gender", "groups", "setting", "achievement", "grade"]
+SUBGROUP_THEME_ORDER = ["all", "race", "gender", "groups", "setting", "achievement", "grade",
+                        "respondents", "iep_delivery"]
 
 
 # ---- Reading a value -------------------------------------------------------
@@ -414,6 +482,16 @@ SCORE_BANDS = [
     (2.0, "below", "Below the middle of its comparison group"),
     (0.0, "low", "Among the weakest of its comparison group"),
 ]
+
+# The City's words for its three framework ratings. The first digit of the
+# 1.00 to 4.99 score sets the word. The site shows both as published and adds
+# no band of its own.
+RATING_WORDS = {4: "Excellent", 3: "Good", 2: "Fair", 1: "Needs Improvement"}
+RATING_RANGE = (1.0, 4.99)
+
+# Impact and Performance can exceed 1 in the download. A value past this is a
+# misread column, not a strong school.
+INDEX_UNIT_MAX = 1.5
 
 # A handful of measures count something you want less of, so a value above the
 # comparison group average is not the better outcome. Checked before any
@@ -460,14 +538,19 @@ DEMOGRAPHIC_METRICS = [
     ("demo_pct_swd", "% Students with Disabilities", "Students with Disabilities", "pct_unit", "disability"),
 ]
 
-# The order those themes appear, and what each is called on screen.
+# The order those themes appear, and what each is called on screen. The
+# housing, recommendations and nearby themes come from the quality report
+# workbooks, a year behind the snapshot, so each is its own card.
 DEMOGRAPHIC_THEMES = [
     ("enrollment", "Enrollment"),
     ("race", "Race and ethnicity"),
+    ("nearby", "Compared with nearby students"),
     ("gender", "Gender"),
     ("economic", "Economic need"),
+    ("housing", "Temporary housing and public assistance"),
     ("english", "English language learners"),
     ("disability", "Students with disabilities"),
+    ("iep_recs", "Special education recommendations"),
 ]
 
 # Grade columns in the snapshot, in the order a school serves them.
@@ -479,6 +562,173 @@ GRADE_COLUMNS = [
     ("5", "Grade 5"), ("6", "Grade 6"), ("7", "Grade 7"), ("8", "Grade 8"),
     ("9", "Grade 9"), ("10", "Grade 10"), ("11", "Grade 11"), ("12", "Grade 12"),
 ]
+
+
+# ---- Quality report workbooks ----------------------------------------------
+# An allowlist of workbook columns, matched by their exact header. Columns the
+# Open Data table already carries, such as attendance, ENI, ELL and IEP
+# shares, are left out. Labels are the City's own headers.
+#
+# Keys on each entry:
+#   parts       report types whose workbook must carry the column
+#   since       first school year the column exists
+#   base        groups metrics into one card on a profile
+#   subgroup    the row name inside that card
+#   theme       the subgroup theme, or the demographic theme for that category
+#   rank        orders cards within a section
+#   comparison  Scoring column holding the City average for this school type
+#   text        column holding the City's rating word
+#   pivot       column of the nearby-students table
+#   unit        what the value measures, where the format's default would mislead
+#   note        a line printed under the card
+
+ALL_REPORTS = "EMS HS HST D75 EC"
+RATED_REPORTS = "EMS HS HST"
+NEARBY_REPORTS = "EMS HS HST EC"
+COURSE_REPORTS = "HS HST"
+
+QR_RACES = [
+    ("asian", "Asian"), ("black", "Black"), ("hispanic", "Hispanic"),
+    ("native_american", "Native American"),
+    ("pacific", "Native Hawaiian or Pacific Islander"), ("white", "White"),
+]
+
+
+def _qr(metric_id, sheet, column, category, fmt, parts, **extra):
+    return {"metric_id": metric_id, "sheet": sheet, "column": column,
+            "category": category, "format": fmt, "parts": parts.split(), **extra}
+
+
+SQR_RESULTS_METRICS = [
+    _qr("qr_impact", "Summary", "Impact Score", "ratings", "index_unit", RATED_REPORTS, rank=1),
+    _qr("qr_performance", "Summary", "Performance Score", "ratings", "index_unit", RATED_REPORTS, rank=1),
+    _qr("qr_rating_instruction", "Scoring", "Instruction and Performance - Score", "ratings",
+        "rating_score", RATED_REPORTS, base="Instruction and Performance",
+        text="Instruction and Performance - Rating", rank=2),
+    _qr("qr_rating_climate", "Scoring", "Safety and School Climate - Score", "ratings",
+        "rating_score", RATED_REPORTS, base="Safety and School Climate",
+        text="Safety and School Climate - Rating", rank=3),
+    _qr("qr_rating_families", "Scoring", "Relationships with Families - Score", "ratings",
+        "rating_score", RATED_REPORTS, base="Relationships with Families",
+        text="Relationships with Families - Rating", rank=4),
+
+    _qr("qr_principal_years", "Summary", "Years of principal experience at this school",
+        "staff", "years", ALL_REPORTS, rank=1),
+    _qr("qr_teacher_experience", "Summary", "Percent of teachers with 3 or more years of experience",
+        "staff", "pct_unit", ALL_REPORTS, rank=1, unit="share of teachers, 0 to 1"),
+    _qr("qr_teacher_attendance", "Summary", "Teacher Attendance Rate", "staff", "pct_unit",
+        ALL_REPORTS, rank=1, unit="share of teacher days attended, 0 to 1"),
+
+    _qr("qr_pct_temp_housing", "Summary", "Percent in Temp Housing", "demographics", "pct_unit",
+        ALL_REPORTS, theme="housing"),
+    _qr("qr_pct_hra", "Summary", "Percent HRA Eligible", "demographics", "pct_unit",
+        ALL_REPORTS, theme="housing"),
+    _qr("qr_rec_setss", "Summary",
+        "Percentage of students recommended for general ed settings with Special Ed Teacher "
+        "Support Services (SETSS)", "demographics", "pct_unit", ALL_REPORTS, theme="iep_recs"),
+    _qr("qr_rec_ict", "Summary",
+        "Percentage of students recommended for Integrated Co-Teaching (ICT) services",
+        "demographics", "pct_unit", ALL_REPORTS, theme="iep_recs"),
+    _qr("qr_rec_sc", "Summary",
+        "Percentage of students recommended for Special Class (SC) services",
+        "demographics", "pct_unit", ALL_REPORTS, theme="iep_recs"),
+    _qr("qr_nearby_distance", "Summary", "Nearby Student Distance (mi)", "demographics", "miles",
+        NEARBY_REPORTS, theme="nearby", pivot="distance"),
+
+    _qr("qr_adv_any", "Summary", "Percentage of Students Enrolled in Any Advanced Course",
+        "coursework", "pct_unit", COURSE_REPORTS),
+    _qr("qr_adv_ap", "Summary", "Percentage of Students Enrolled in an AP Course",
+        "coursework", "pct_unit", COURSE_REPORTS),
+    _qr("qr_adv_ib", "Summary", "Percentage of Students Enrolled in an IB Course",
+        "coursework", "pct_unit", COURSE_REPORTS),
+    _qr("qr_adv_clep", "Summary",
+        "Percentage of Students Enrolled in a College Level Examination Program (CLEP)",
+        "coursework", "pct_unit", COURSE_REPORTS),
+    _qr("qr_adv_math_science", "Summary",
+        "Percentage of Students Enrolled in an Advanced Math or Science Course",
+        "coursework", "pct_unit", COURSE_REPORTS),
+    _qr("qr_adv_college_prep", "Summary",
+        "Percentage of Students Enrolled in an NYCPS-certified College Preparatory Course",
+        "coursework", "pct_unit", COURSE_REPORTS),
+    _qr("qr_adv_college_credit", "Summary",
+        "Percentage of Students Enrolled in a College Credited Course",
+        "coursework", "pct_unit", COURSE_REPORTS),
+]
+
+# Survey areas, ranked by the rating each one feeds. The City publishes a City
+# average beside each school's percent positive.
+for _key, _area, _rank, _since in [
+    ("instruction", "Instruction/Learning Environment", 1, None),
+    ("iep_satisfaction", "Students with IEPs: IEP Service Satisfaction", 1, "2024-25"),
+    ("advising", "Advising and Planning", 2, None),
+    ("safety", "Safety", 2, None),
+    ("leadership", "School Leadership", 2, None),
+    ("student_support", "Student Support", 2, None),
+    ("teaching", "Teaching Environment", 2, None),
+    ("communication", "Communication", 3, None),
+    ("involvement", "Family Involvement", 3, None),
+    ("trust", "Family-School Trust", 3, None),
+]:
+    SQR_RESULTS_METRICS.append(_qr(
+        f"qr_pp_{_key}", "Scoring", f"{_area} - School Percent Positive", "climate", "pct_unit",
+        ALL_REPORTS, comparison=f"{_area} - City Positive Responses",
+        comparison_label="City average", rank=_rank,
+        unit="share of survey answers that were positive, 0 to 1",
+        **({"since": _since} if _since else {})))
+
+for _key, _who in [("student", "Student"), ("teacher", "Teacher"), ("parent", "Parent")]:
+    SQR_RESULTS_METRICS.append(_qr(
+        f"qr_response_{_key}", "Scoring", f"{_who} Survey Response Rate", "climate", "pct_unit",
+        ALL_REPORTS, base="Survey response rates", subgroup=_who, theme="respondents", rank=4,
+        unit="share of surveys returned, 0 to 1"))
+
+# All, some and none share one card per service type, so the three read in one
+# school year. Card titles are the Educator Guide's headings.
+for _key, _what, _title in [
+    ("programs", "special education programs", "Percent of Students Receiving Special Education Programs"),
+    ("services", "related services", "Percent of Students Receiving Recommended Related Services"),
+]:
+    for _share, _word in [("all", "all"), ("some", "some"), ("none", "no")]:
+        _column = f"Percentage of students with IEPs receiving {_word} recommended {_what}"
+        SQR_RESULTS_METRICS.append(_qr(
+            f"qr_iep_{_key}_{_share}", "Summary", _column, "student_support", "pct_unit",
+            ALL_REPORTS, base=_title, subgroup=_column, theme="iep_delivery", rank=1,
+            unit="share of students with IEPs, 0 to 1"))
+
+QR_COMPOSITION_UNIT = "share of the students in the courses, 0 to 1"
+QR_COMPOSITION_NOTE = (
+    "Each row is one group's share of the students taking these courses, so the rows "
+    "add to about 100%. The school's own shares are under Compared with nearby students."
+)
+
+for _key, _race in QR_RACES:
+    SQR_RESULTS_METRICS += [
+        _qr(f"qr_teacher_pct_{_key}", "Summary", f"Teacher Percent - {_race}", "staff",
+            "pct_unit", ALL_REPORTS, base="Teachers by race and ethnicity",
+            subgroup=_race, theme="race", rank=2, unit="share of teachers, 0 to 1"),
+        _qr(f"qr_student_pct_{_key}", "Summary", f"Student Percent - {_race}", "demographics",
+            "pct_unit", ALL_REPORTS, theme="nearby", subgroup=_race, pivot="school"),
+        _qr(f"qr_nearby_pct_{_key}", "Summary", f"Nearby Student Percent - {_race}",
+            "demographics", "pct_unit", NEARBY_REPORTS, theme="nearby", subgroup=_race,
+            pivot="nearby"),
+        _qr(f"qr_district_pct_{_key}", "Summary", f"District Percent - {_race}", "demographics",
+            "pct_unit", "EMS EC", theme="nearby", subgroup=_race, pivot="district"),
+        _qr(f"qr_borough_pct_{_key}", "Summary", f"Borough Percent - {_race}", "demographics",
+            "pct_unit", "HS HST D75", theme="nearby", subgroup=_race, pivot="borough"),
+        # Each group's share of the students in the courses, not the share of
+        # the group enrolled. The Educator Guide defines it that way.
+        _qr(f"qr_adv_any_{_key}", "Summary",
+            f"Percentage of Students Enrolled in Advanced Courses - {_race}", "coursework",
+            "pct_unit", COURSE_REPORTS, base="Students in Advanced Courses by Racial Subgroup",
+            subgroup=_race, theme="race", unit=QR_COMPOSITION_UNIT, note=QR_COMPOSITION_NOTE),
+        _qr(f"qr_apib_{_key}", "Summary",
+            f"Percentage of Students Enrolled in AP or IB Courses - {_race}", "coursework",
+            "pct_unit", COURSE_REPORTS, base="Students in AP or IB Courses by Racial Subgroup",
+            subgroup=_race, theme="race", unit=QR_COMPOSITION_UNIT, note=QR_COMPOSITION_NOTE),
+    ]
+
+# Workbook markers. "N<5" and "N<15" withhold a figure for a small group.
+QR_SUPPRESSED = {"n<5", "n<15"}
 
 
 # ---- Directory field maps --------------------------------------------------
@@ -593,6 +843,7 @@ STATUS_LABELS = {
 CENSORED_VALUES = {
     "above 95%": "Above 95%",
     "below 5%": "Below 5%",
+    "> 95%": "Above 95%",     # the quality report workbooks' spelling
 }
 
 # A source value that arrives as one of these is a marker, never a number.
@@ -624,6 +875,7 @@ VALIDATION = {
 # against the date the workflow ran.
 STALENESS_DAYS = {
     "sqr": 500,            # annual release, so a year and a half is late
+    "sqr_results": 500,
     "demographics": 500,
     "directory_es": 500,
     "directory_ms": 500,
