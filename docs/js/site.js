@@ -23,6 +23,12 @@
       if (isBlank(v)) return null;
       return (v * 100).toFixed(places === undefined ? 1 : places) + '%';
     },
+    // 2026-10-09 as 9 October 2026.
+    date: function (iso) {
+      return new Intl.DateTimeFormat('en-GB', {
+        day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC'
+      }).format(new Date(iso + 'T00:00:00Z'));
+    },
     index100: function (v) { return isBlank(v) ? null : Number(v).toFixed(1); },
     scale: function (v) { return isBlank(v) ? null : Number(v).toFixed(2); },
     percentile: function (v) {

@@ -1426,8 +1426,11 @@ abbr[title] { text-decoration: underline dotted; cursor: help; }
 .map-attrib a { display: inline-block; padding-block: 6px; }
 details > summary { min-height: 1.5rem; padding-block: .2rem; }
 .method td a, .method th a, #source-table a { display: inline-block; padding-block: .2rem; }
-/* Focus moving down the list scrolls clear of the pinned comparison tray. */
+/* Focus moving down the list scrolls clear of the pinned comparison tray,
+   and of the floating map toggle on a narrow screen. */
 :root:has(body.has-tray) { scroll-padding-bottom: 6rem; }
+:root:has(#float-toggle:not([hidden])) { scroll-padding-bottom: 4.5rem; }
+:root:has(#float-toggle:not([hidden])):has(body.has-tray) { scroll-padding-bottom: 8rem; }
 .spec-sheet .school-head a { display: inline-block; padding-block: .3rem; }
 
 /* ---- Stable first paint -------------------------------------------- */

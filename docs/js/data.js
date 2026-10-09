@@ -156,6 +156,7 @@
     Promise.all([SF.load('status.json'), SF.load('sources.json')])
       .then(function (both) {
         renderDownloads(both[0]);
+        document.getElementById('built').textContent = 'Data built ' + SF.fmt.date(both[0].generated) + '.';
         renderSources(both[1], both[0]);
         renderDictionary();
         // The browser jumped to the anchor before the tables above it
