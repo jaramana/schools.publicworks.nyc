@@ -84,7 +84,7 @@
   var display = {
     scale_max: 4.5, index_max: 100,
     score_bands: [], themes: {}, demographic_themes: {},
-    category_order: [], theme_order: [], max_compare: 12,
+    category_order: [], theme_order: [], max_compare: 5,
     glance: [], rating_max: 4.99
   };
 

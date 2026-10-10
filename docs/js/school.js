@@ -2266,7 +2266,7 @@
     host.innerHTML = '';
     var basket = SF.store.get('compare', []);
     var inBasket = basket.indexOf(school.dbn) !== -1;
-    var limit = SF.display.max_compare || 12;
+    var limit = SF.display.max_compare || 5;
 
     var message = SF.el('span', { class: 'count', role: 'status' });
 

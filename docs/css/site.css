@@ -340,7 +340,6 @@ button.pill[aria-pressed="true"] {
 
 .rail-head { padding: 1.25rem 1.25rem 0; }
 .rail-title { font-size: 1.55rem; letter-spacing: -.028em; margin: 0 0 .3rem; }
-.rail-sub { font-size: .88rem; color: var(--ink-soft); margin: 0; }
 
 /* Search, filters and the count. On a wide screen they pin to the top of
    the rail; on a phone they scroll away, and the map bar links back. */
@@ -1189,23 +1188,35 @@ code {
 
 /* ---- Comparison --------------------------------------------------- */
 
-.picked-measures { display: flex; flex-wrap: wrap; gap: .4rem; margin: .6rem 0 0; padding: 0; list-style: none; }
-.chosen { display: flex; flex-wrap: wrap; gap: .5rem; margin: .75rem 0 0; padding: 0; list-style: none; }
-/* The chosen schools read as the set filter chips on Browse: tinted, with a
-   quiet × to remove. */
-.chosen li {
-  display: flex; align-items: center; gap: .1rem;
-  background: var(--accent-soft); color: var(--accent-ink); font-weight: 600;
-  border-radius: 999px; padding: .1rem .15rem .1rem .8rem; font-size: .86rem;
+/* One bar above the table: the school search, the measures button, and the
+   ways to take the comparison away. */
+.compare-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1rem;
 }
-/* The × is small type in a 28px circle, so it is easy to hit. */
-.chosen button {
-  display: inline-grid; place-items: center; min-width: 28px; min-height: 28px;
-  border: 0; background: none; color: var(--accent-ink);
-  border-radius: 999px; padding: 0; cursor: pointer;
-  font: inherit; font-size: 1rem; line-height: 1;
+.compare-bar .search-shell { flex: 1 1 18rem; max-width: 30rem; }
+.compare-bar .search-row input[type="search"] { min-height: 2.9rem; }
+.compare-bar .search-row input[type="search"]:disabled {
+  background: var(--paper-sunken); border-color: var(--rule-strong); color: var(--ink-faint);
 }
-.chosen button:hover { color: var(--warn); }
+.compare-bar .search-row input[type="search"]:disabled::placeholder { color: var(--ink-soft); opacity: 1; }
+.tool-button {
+  display: inline-flex; align-items: center; gap: .55rem; min-height: 2.9rem;
+  font: inherit; font-size: .95rem; font-weight: 600; color: var(--ink);
+  background: var(--paper-raised); border: 1.5px solid var(--control); border-radius: 9px;
+  padding: .45rem .95rem; cursor: pointer;
+}
+.tool-button:hover { border-color: var(--accent); color: var(--accent); }
+.tool-badge {
+  min-width: 1.75rem; padding: 0 .4rem; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-ink);
+  font-size: .78rem; line-height: 1.5rem; text-align: center; font-variant-numeric: tabular-nums;
+}
+.bar-actions { display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; margin-left: auto; }
+.bar-actions .text-button { padding-block: .35rem; }
+@media (max-width: 34rem) { .bar-actions { margin-left: 0; } }
+.text-button:disabled, .text-button:disabled:hover {
+  color: var(--ink-faint); text-decoration: none; cursor: default; opacity: .7;
+}
 
 /* ---- Downloads ---------------------------------------------------- */
 
@@ -1278,12 +1289,13 @@ code {
 
 @media print {
   .masthead, .nav, .table-tools, .controls, .float-toggle, #map-panel, .locator,
-  .tabbar, .mfind, .mrow-chev, .text-button, #profile-search { display: none; }
+  .tabbar, .mfind, .mrow-chev, .text-button, #profile-search, .sheet-pin, .compare-bar { display: none; }
   [role="tabpanel"][hidden] { display: block !important; }
   .tabpanel + .tabpanel { margin-top: 2rem; }
   .own-words.clamped blockquote { max-height: none; -webkit-mask-image: none; mask-image: none; }
   body { background: #fff; color: #000; }
   .card, .table-wrap { box-shadow: none; }
+  .sheet .sheet-wrap { margin-top: 0; }
 }
 
 /* ---- Glossary ----------------------------------------------------- */
@@ -1317,84 +1329,207 @@ code {
 abbr[title] { text-decoration: underline dotted; cursor: help; }
 
 /* ---- The comparison sheet -------------------------------------------- */
-/* One sheet: schools across the top, every fact down the side in labeled
-   groups. The schools stay pinned while the sheet scrolls, because a figure
-   two hundred rows down is useless if you cannot see whose column it is in. */
+/* One sheet: a column per slot, every fact down the side in labeled groups.
+   Empty slots stay on the sheet as hollow columns, so it never changes
+   shape. It runs the length of the page, and the school row pins under the
+   masthead. */
 
-.sheet-wrap { max-height: 80vh; overflow: auto; border: 1px solid var(--rule); border-radius: 9px; }
-.spec-sheet { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .93rem; }
+.sheet {
+  --label-w: 15rem; --school-min: 8.5rem; --pin-h: 0px;
+  position: relative;
+}
+.sheet-wrap {
+  overflow-x: auto; border: 1px solid var(--rule); border-radius: 9px;
+  margin-top: calc(-1 * var(--pin-h));
+}
+.spec-sheet {
+  table-layout: fixed;
+  width: max(100%, calc(var(--label-w) + var(--slots, 5) * var(--school-min)));
+  border-collapse: separate; border-spacing: 0; font-size: .93rem;
+}
+.spec-sheet col.col-label { width: var(--label-w); }
+
+/* The pinned copy of the school row. It sits over the real row and shows
+   only once that row has scrolled under the masthead. */
+.sheet-pin {
+  position: sticky; top: 0; z-index: 4;
+  height: var(--pin-h); overflow: hidden; visibility: hidden;
+  border: 1px solid var(--rule); border-bottom: 0; border-radius: 9px 9px 0 0;
+  background: var(--paper-sunken);
+}
+.sheet.is-stuck .sheet-pin {
+  visibility: visible; border-radius: 0;
+  box-shadow: 0 6px 10px -8px rgba(0, 0, 0, .3);
+}
+@media (min-width: 60rem) and (hover: hover) {
+  .sheet-pin { top: var(--masthead-h); }
+  @media (max-height: 34rem) { .sheet-pin { top: 0; } }
+}
 
 .spec-sheet th, .spec-sheet td {
   padding: .5rem .75rem; text-align: left; vertical-align: baseline;
   border-bottom: 1px solid var(--rule);
+  overflow-wrap: anywhere;
 }
 
-/* Two sticky axes meet at the corner, which needs the highest layer of the
-   three or the school names slide underneath it. */
+/* Two sticky columns meet at the corner, which needs the higher layer or the
+   school names slide underneath it. */
 .spec-sheet thead th {
-  position: sticky; top: 0; z-index: 2;
+  position: static;
   background: var(--paper-sunken); vertical-align: bottom;
   border-bottom: 1px solid var(--rule-strong);
 }
 .spec-sheet thead th.corner {
-  left: 0; z-index: 3;
   font-size: .72rem; font-weight: 700; letter-spacing: .06em;
   text-transform: uppercase; color: var(--ink-faint);
 }
-.spec-sheet .school-head { min-width: 9rem; text-align: right; }
-/* The column a first school will land in, held open so the sheet does not
-   change shape the moment one is chosen. */
-.spec-sheet .school-head.ghost { color: var(--ink-faint); font-weight: 400; }
-.spec-sheet td.ghost { background: repeating-linear-gradient(
-  -45deg, transparent, transparent 6px, var(--paper-sunken) 6px, var(--paper-sunken) 7px); }
-.spec-sheet .school-head a { text-decoration: none; font-weight: 600; }
+.spec-sheet .school-head { white-space: normal; }
+.spec-sheet .school-head + .school-head { box-shadow: inset 1px 0 0 var(--rule); }
+
+/* A school's name, with its remove button on the same line. */
+.head-top { display: flex; align-items: flex-start; justify-content: space-between; gap: .25rem; }
+.spec-sheet .school-head a { text-decoration: none; font-weight: 600; padding-block: .1rem; }
 .spec-sheet .school-head a:hover { text-decoration: underline; }
+.head-remove {
+  flex: none; display: inline-grid; place-items: center;
+  width: 26px; height: 26px; margin: -.1rem -.4rem 0 0;
+  border: 0; border-radius: 6px; background: none; cursor: pointer;
+  color: var(--ink-faint); font: inherit; font-size: 1.05rem; line-height: 1;
+}
+.head-remove:hover { color: var(--warn); background: var(--warn-soft); }
+
+/* An open slot: a dashed button in the head and hollow cells below. */
+.spec-sheet .school-head.is-empty { vertical-align: middle; }
+.slot-add {
+  width: 100%; padding: .6rem .4rem; cursor: pointer;
+  border: 1.5px dashed var(--rule-strong); border-radius: 8px; background: transparent;
+  color: var(--accent); font: inherit; font-size: .84rem; font-weight: 600;
+}
+.slot-add:hover { border-color: var(--accent); background: var(--accent-soft); }
+.spec-sheet td.hollow {
+  background: repeating-linear-gradient(
+    -45deg, transparent 0 7px, var(--paper-sunken) 7px 8px);
+}
 
 /* The label column is the axis a reader keeps their place on, so it stays put
    while the schools scroll sideways. */
 .spec-sheet th.spec-label, .spec-sheet thead th.corner {
   position: sticky; left: 0;
-  min-width: 14rem; max-width: 20rem;
   background: var(--paper-raised); font-weight: 500; white-space: normal;
 }
 .spec-sheet th.spec-label { z-index: 1; box-shadow: 1px 0 0 var(--rule); }
-.spec-sheet thead th.corner { box-shadow: 1px 0 0 var(--rule-strong); }
+.spec-sheet thead th.corner { z-index: 3; background: var(--paper-sunken); box-shadow: 1px 0 0 var(--rule-strong); }
 
 /* A group heading spans the sheet and breaks the list into sections, the way
    a profile groups the same measures. */
 .spec-sheet tr.group th {
-  position: sticky; left: 0;
   background: var(--paper-sunken); color: var(--ink-soft);
   font-size: .72rem; font-weight: 700; letter-spacing: .06em;
   text-transform: uppercase;
   border-top: 1px solid var(--rule-strong);
   padding-top: .7rem; padding-bottom: .45rem;
 }
+/* The heading spans every column, so its text pins to the left edge to stay
+   in view while the schools scroll sideways. */
+.spec-sheet tr.group th > span { position: sticky; left: .75rem; display: inline-block; }
 
 .spec-sheet tbody tr:hover td { background: var(--paper-sunken); }
 .spec-sheet tbody tr:hover th.spec-label { background: var(--paper-sunken); }
 
-.spec-sheet td { text-align: right; font-variant-numeric: tabular-nums; }
+.spec-sheet td { font-variant-numeric: tabular-nums; white-space: normal; }
 .spec-sheet td.muted { font-variant-numeric: normal; font-size: .86rem; }
-.spec-sheet .cell-band {
-  display: inline-block; border-radius: 5px; padding: .05rem .4rem; font-weight: 600;
-}
 .spec-sheet .period { display: block; font-size: .76rem; color: var(--ink-faint); }
 .spec-sheet .th-main { display: block; }
 .spec-sheet .th-sub {
   display: block; font-size: .76rem; font-weight: 400; color: var(--ink-faint);
 }
 
-/* Below about 34rem the label column would leave no room for a single figure,
-   so it stops being sticky and simply narrows. */
+/* A row or school that just arrived flashes once, so a reader sees where it
+   landed. */
+@keyframes sheet-flash { from { background-color: var(--accent-soft); } }
+.spec-sheet tr.is-new > td, .spec-sheet tr.is-new > th,
+.spec-sheet td.is-new, .spec-sheet th.is-new { animation: sheet-flash 2.4s ease-out; }
+
+/* On a phone both widths narrow, so the labels and two schools fit. */
 @media (max-width: 34rem) {
-  .spec-sheet th.spec-label, .spec-sheet thead th.corner { position: static; min-width: 9rem; }
-  .spec-sheet th.spec-label { box-shadow: none; }
+  .sheet { --label-w: 7.25rem; --school-min: 6.5rem; }
+  .spec-sheet { font-size: .84rem; }
+  .spec-sheet th, .spec-sheet td { padding: .45rem .5rem; }
+  .spec-sheet tr.group th > span { left: .5rem; }
+  .slot-add { font-size: .78rem; }
 }
 
-/* The status line under the search doubles as the place a refused action is
-   reported, so it needs to read as a message rather than as a caption. */
-.hint.warned { color: var(--warn); font-weight: 600; }
+/* ---- The measures panel ------------------------------------------- */
+/* A sheet from the right edge. Ticking a box puts its row on the table
+   behind, which stays in view on a wide screen. */
+.measures-panel {
+  position: fixed; inset: 0 0 0 auto; margin: 0;
+  width: min(27rem, 100vw); max-width: 100vw; height: 100%; max-height: none;
+  padding: 0; border: 0; border-left: 1px solid var(--rule);
+  background: var(--paper-raised); color: var(--ink);
+  box-shadow: -16px 0 40px -24px rgba(20, 22, 28, .35);
+}
+.measures-panel[open] { display: flex; flex-direction: column; }
+.measures-panel::backdrop { background: rgba(20, 22, 28, .14); }
+
+.panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.25rem .6rem;
+}
+.panel-head h2 { font-size: 1.2rem; margin: 0; }
+.panel-close {
+  display: inline-grid; place-items: center; width: 32px; height: 32px;
+  border: 0; border-radius: 8px; background: none; cursor: pointer;
+  color: var(--ink-soft); font: inherit; font-size: 1.3rem; line-height: 1;
+}
+.panel-close:hover { background: var(--paper-sunken); color: var(--ink); }
+.panel-filter { padding: 0 1.25rem .85rem; border-bottom: 1px solid var(--rule); }
+.panel-filter input[type="search"] { width: 100%; }
+.panel-filter input[type="search"]:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: none;
+}
+.panel-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 1rem; }
+.panel-body [hidden] { display: none !important; }
+.panel-empty { padding: 1rem 1.25rem; color: var(--ink-faint); font-size: .9rem; }
+
+.topic { border-bottom: 1px solid var(--rule); }
+.topic > summary {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .75rem 1.25rem; cursor: pointer; list-style: none;
+  font-weight: 600; font-size: .93rem;
+}
+.topic > summary::-webkit-details-marker { display: none; }
+.topic > summary::before {
+  content: ""; flex: none; width: .42rem; height: .42rem; margin: 0 .2rem 0 .1rem;
+  border-right: 2px solid var(--ink-faint); border-bottom: 2px solid var(--ink-faint);
+  transform: rotate(-45deg);
+}
+.topic[open] > summary::before { transform: rotate(45deg); }
+.topic > summary:hover { background: var(--paper-sunken); }
+.topic-name { flex: 1; }
+.topic-count { font-size: .78rem; font-weight: 400; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.topic-list { list-style: none; margin: 0; padding: 0 1.25rem .8rem 2.35rem; }
+.topic-list li { margin: 0; }
+.pick {
+  display: flex; align-items: flex-start; gap: .55rem;
+  padding: .3rem 0; font-size: .9rem; line-height: 1.35; cursor: pointer;
+}
+.pick input { flex: none; width: 1rem; height: 1rem; margin: .1rem 0 0; accent-color: var(--accent); }
+.base-name { margin: .45rem 0 .1rem; font-size: .9rem; font-weight: 600; color: var(--ink-soft); }
+.subs { list-style: none; margin: 0 0 .25rem; padding: 0 0 0 1.55rem; }
+.subs .pick { font-size: .86rem; color: var(--ink-soft); padding: .2rem 0; }
+.pick-note { display: block; font-size: .78rem; color: var(--ink-faint); }
+
+.panel-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: .75rem 1.25rem; border-top: 1px solid var(--rule);
+}
+.panel-done {
+  font: inherit; font-size: .95rem; font-weight: 600; cursor: pointer;
+  color: var(--on-accent); background: var(--accent);
+  border: 0; border-radius: 9px; padding: .55rem 1.25rem;
+}
+.panel-done:hover { background: var(--accent-ink); }
 
 /* ---- Data page ------------------------------------------------------
    Downloads, the columns disclosure and the process list. The same three

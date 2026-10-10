@@ -474,7 +474,7 @@
 
   function renderTray() {
     var basket = SF.store.get('compare', []);
-    var limit = (SF.display && SF.display.max_compare) || 12;
+    var limit = (SF.display && SF.display.max_compare) || 5;
     var tray = document.getElementById('compare-tray');
     var toggle = document.getElementById('tray-toggle');
     var list = document.getElementById('tray-list');
@@ -624,7 +624,7 @@
 
   // The same basket the profile page fills, so a shortlist can start here.
   function compareButton(dbn) {
-    var limit = (SF.display && SF.display.max_compare) || 12;
+    var limit = (SF.display && SF.display.max_compare) || 5;
     var button = SF.el('button', { class: 'pill pill-check', type: 'button' });
     function paint() {
       var inBasket = SF.store.get('compare', []).indexOf(dbn) !== -1;

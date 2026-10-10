@@ -897,10 +897,10 @@ SITE = {
         "xlsx": "schools-publicworks-nyc-data.xlsx",
         "zip": "schools-publicworks-nyc-csv.zip",
     },
-    # A shortlist, not a pair. Twelve is where a family's real list tends to
-    # land, and the comparison view is built as rows of schools so it stays
-    # readable at that size.
-    "max_compare": 12,
+    # Five schools sit side by side on a laptop screen without scrolling, and
+    # usability research on comparison tables puts the useful limit near five.
+    # Compare shows every slot, hollow until filled.
+    "max_compare": 5,
     # A profile file carries values and suppression markers. A row the source
     # published blank with no group size adds nothing a reader can use, and the
     # site already knows from the metric manifest which metrics a school type
