@@ -163,7 +163,7 @@
 
   var ABSENCE_DETAIL = {
     missing: 'The source published no value for this school and year.',
-    suppressed: 'The source withheld this value because too few students are in the group. It is not a zero.',
+    suppressed: 'The source withheld this value because too few people are in the group. It is not a zero.',
     censored: 'The source published a bound rather than an exact figure, to avoid identifying students at the extremes.',
     not_applicable: 'This measure is not published for this type of school.',
     unpublished: 'Published for other schools of this type, not for this one.',

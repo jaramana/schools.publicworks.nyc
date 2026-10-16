@@ -964,7 +964,7 @@ body.map-full .map-stage { flex: 1; }
    picture sit at fixed positions, so the eye runs down two straight edges. */
 
 .mlist { list-style: none; padding: 0; margin: .5rem 0 0; border-bottom: 1px solid var(--rule); }
-.mrow, .mblock { border-top: 1px solid var(--rule); }
+.mrow { border-top: 1px solid var(--rule); }
 .mrow-btn {
   all: unset; box-sizing: border-box; cursor: pointer;
   display: grid; grid-template-columns: minmax(0, 1fr) auto 8.25rem 1rem;
@@ -1030,53 +1030,19 @@ body.map-full .map-stage { flex: 1; }
 }
 .mx .m-facts-label { margin-top: 0; }
 
-/* ---- Shares of a whole --------------------------------------------- */
+/* ---- Sets of shares ------------------------------------------------ */
+/* Race, gender and the nearby comparison: one measure row per group under
+   the set's name. The rows' labels and rules start one step in, so the set
+   ends where the next full-width rule begins. Values and peer pictures keep
+   the columns every other row uses. */
 
-.mblock { padding: 1.1rem 0 1.35rem; }
-.mblock-head {
-  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline;
-  gap: .2rem 1rem; margin-bottom: .6rem;
-}
-.mblock-head .mrow-label { margin: 0; letter-spacing: 0; }
-.mblock-head .m-meta { margin: 0; }
-/* A share row uses the measure row's columns. Values line up with values,
-   and the bar sits where the peer picture does. */
-.comp-list { list-style: none; padding: 0; margin: 0; }
-.comp-row {
-  display: grid; grid-template-columns: minmax(0, 1fr) 5.5rem 8.25rem 1rem;
-  grid-template-areas: "name value bar ."; column-gap: 1.5rem;
-  align-items: center; padding: .28rem 0; font-size: .93rem;
-}
-.comp-name { grid-area: name; color: var(--ink-soft); }
-.comp-bar { grid-area: bar; height: 8px; background: var(--paper-sunken); border-radius: 4px; overflow: hidden; }
-.comp-bar > span { display: block; height: 100%; background: var(--accent); opacity: .6; border-radius: 4px; }
-.comp-value { grid-area: value; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mset { border-top: 1px solid var(--rule); padding-top: 1.1rem; }
+.mset-label { font-size: 1rem; font-weight: 600; line-height: 1.35; margin: 0; }
+.mset > .m-def { margin: .3rem 0 0; }
+.mset-list { list-style: none; padding: 0; margin: .75rem 0 0 1.25rem; }
+.mset-list .mrow-label { font-weight: 500; }
 @media (max-width: 40rem) {
-  .comp-row {
-    grid-template-columns: minmax(0, 1fr) minmax(3rem, 6rem) 4.5rem;
-    grid-template-areas: "name bar value"; column-gap: 1rem;
-  }
-}
-.comp-value.absent { font-weight: 500; color: var(--ink-faint); font-size: .85rem; }
-
-/* Stacked bars for the nearby comparison. Each race keeps one slot and one
-   color in every bar, with a 2px paper gap between segments. The table under
-   the bars carries the numbers and doubles as the key. */
-.stack { display: grid; gap: .5rem; margin: .3rem 0 1.1rem; max-width: 42rem; }
-.stack-row { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 1rem; align-items: center; font-size: .86rem; color: var(--ink-soft); }
-.stack-bar { display: flex; gap: 2px; height: 16px; }
-.stack-bar .seg { flex-grow: 0; flex-shrink: 1; min-width: 2px; }
-.stack-bar .seg:first-child { border-radius: 4px 0 0 4px; }
-.stack-bar .seg:last-child { border-radius: 0 4px 4px 0; }
-.sw { display: inline-block; width: .65rem; height: .65rem; border-radius: 2px; margin-right: .5rem; vertical-align: -.03rem; }
-.s0 { background: #2a78d6; }
-.s1 { background: #eb6834; }
-.s2 { background: #1baf7a; }
-.s3 { background: #eda100; }
-.s4 { background: #e87ba4; }
-.s5 { background: #008300; }
-@media (forced-colors: active) {
-  .stack-bar .seg, .sw, .comp-bar > span, .peer-strip rect, .peer-chart .bar { forced-color-adjust: none; }
+  .mset-list { margin-left: .75rem; }
 }
 
 .older { margin: 1.4rem 0 0; }
@@ -1086,28 +1052,6 @@ body.map-full .map-stage { flex: 1; }
 .profile-foot { margin-top: 3.5rem; }
 .profile-foot .statusline { margin-top: 1rem; }
 
-/* Compared with nearby students. The three columns are read across a row,
-   so this one measure is a small table. */
-.pivot-wrap { overflow-x: auto; margin: .45rem 0 .2rem; }
-.pivot { border-collapse: collapse; width: 100%; max-width: 40rem; font-size: .9rem; }
-.pivot th, .pivot td {
-  padding: .3rem .5rem; border-top: 1px dotted var(--rule);
-  text-align: right; white-space: nowrap;
-}
-.pivot th:first-child { text-align: left; padding-left: 0; white-space: normal; }
-.pivot thead th {
-  font-size: .72rem; font-weight: 700; letter-spacing: .05em;
-  text-transform: uppercase; color: var(--ink-faint); border-top: 0;
-  white-space: normal; vertical-align: bottom;
-}
-@media (max-width: 26rem) {
-  .pivot th, .pivot td { padding: .3rem .3rem; }
-  .pivot { font-size: .85rem; }
-}
-.pivot tbody th { font-weight: 500; }
-.pivot td { font-weight: 700; font-variant-numeric: tabular-nums; }
-.pivot td.absent { font-weight: 500; color: var(--ink-faint); font-size: .85rem; }
-.card-note { font-size: .84rem; color: var(--ink-faint); margin: .35rem 0 0; max-width: 46rem; }
 
 /* Impact and Performance. Every school of the same type in grey, this one in
    the accent with a ring of paper so it stays visible inside the cloud. Text
