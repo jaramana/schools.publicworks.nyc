@@ -544,7 +544,7 @@ DEMOGRAPHIC_METRICS = [
 DEMOGRAPHIC_THEMES = [
     ("enrollment", "Enrollment"),
     ("race", "Race and ethnicity"),
-    ("nearby", "Compared with nearby students"),
+    ("nearby", "Compared with students living nearby"),
     ("gender", "Gender"),
     ("economic", "Economic need"),
     ("housing", "Temporary housing and public assistance"),
@@ -698,7 +698,8 @@ for _key, _what, _title in [
 QR_COMPOSITION_UNIT = "share of the students in the courses, 0 to 1"
 QR_COMPOSITION_NOTE = (
     "Each row is one group's share of the students taking these courses, so the rows "
-    "add to about 100%. The school's own shares are under Compared with nearby students."
+    "add to about 100%. The school's own shares are under Compared with students living "
+    "nearby."
 )
 
 for _key, _race in QR_RACES:

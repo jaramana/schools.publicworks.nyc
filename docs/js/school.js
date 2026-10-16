@@ -775,6 +775,9 @@
       row('City’s score', standing);
     }
     row('City’s name', metric.source_label || metric.label);
+    if (GROUP_NAMES[metric.source_id] && namesRaceGroups(entry, base, primary)) {
+      row('Group names', GROUP_NAMES[metric.source_id]);
+    }
     row('Published for', reportCoverage(metric));
     if (metric.first_year || metric.last_year) {
       row('Years', (metric.first_year || '') + ' to ' + (metric.last_year || ''));
@@ -824,6 +827,24 @@
       box.appendChild(groups);
     }
     return box;
+  }
+
+  // Each source words and groups race and ethnicity its own way, and the
+  // site keeps that wording. An opened row says which source it follows.
+  var GROUP_NAMES = {
+    demographics: 'As written in the Demographic Snapshot, which counts Asian and ' +
+      'Pacific Islander as one group.',
+    sqr_results: 'As written in the School Quality Report results, which count Asian ' +
+      'and Native Hawaiian or Pacific Islander as separate groups.',
+    sqr: 'As written in the School Quality Reports, where the wording can differ from ' +
+      'one measure to another.'
+  };
+
+  function namesRaceGroups(entry, base, primary) {
+    var theme = entry.metric.theme;
+    if (theme === 'race') return true;
+    if (theme === 'nearby') return entry.metric.pivot !== 'distance';
+    return !!primary && base.groups.some(function (g) { return g.metric.theme === 'race'; });
   }
 
   function reportCoverage(metric) {
