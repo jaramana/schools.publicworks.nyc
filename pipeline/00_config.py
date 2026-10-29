@@ -256,6 +256,14 @@ REPORT_TYPES = {
     "YABC": "Young Adult Borough Centers",
 }
 
+# Which report speaks for a school or a measure when it has more than one in
+# its newest school year. A school with middle and high school grades files EMS
+# and HS reports, and takes its name and type from HS, as the directories put
+# high school first. A measure the City words one way for high schools and
+# another for transfer schools takes the high school wording. The rest follow
+# by how many schools file them. An unlisted type sorts last.
+REPORT_TYPE_PRECEDENCE = ["HS", "EMS", "EC", "HST", "D75", "YABC"]
+
 # Districts that are citywide rather than geographic.
 SPECIAL_DISTRICTS = {
     "75": "District 75, citywide special education",
@@ -441,10 +449,12 @@ SUBGROUP_THEMES = [
     ("groups", "Student groups", [
         "English Language Learners", "Students with Disabilities",
         "Students with Disabilites",     # the source's own spelling in some labels
+        "Students with IEPs",            # the City's wording from 2021-22
     ]),
     ("setting", "Service setting", [
         "Integrated Co-Teaching", "Integrated Co-Teaching and SETSS",
         "Self-Contained", "SETSS",
+        "Special Class",                 # the City's wording from 2021-22
     ]),
     ("achievement", "Prior achievement", [
         "Black or Hispanic Males in Lowest Third Citywide",

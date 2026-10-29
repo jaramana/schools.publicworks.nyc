@@ -87,6 +87,22 @@ def borough_of(dbn):
     return cfg.BOROUGH_BY_CODE.get(dbn[2], None)
 
 
+def newest_report(sqr, key, values):
+    """One quality report row per key: its newest school year, and within that
+    year the report that REPORT_TYPE_PRECEDENCE puts first.
+
+    The download comes back in a different row order from one fetch to the
+    next, so row position never decides the pick. Sorting on the values too
+    settles any rows still level.
+    """
+    order = {rt: i for i, rt in enumerate(cfg.REPORT_TYPE_PRECEDENCE)}
+    rows = sqr[[key, "school_year_start", "report_type", *values]].copy()
+    rows["rank"] = rows["report_type"].map(order).fillna(len(order))
+    rows = rows.sort_values(["school_year_start", "rank", "report_type", *values],
+                            ascending=[False, True, True, *[True] * len(values)])
+    return rows.drop_duplicates(key).set_index(key)[["report_type", *values]]
+
+
 # ---- Schools ---------------------------------------------------------------
 
 def read_sqr():
@@ -180,14 +196,12 @@ def build_schools(sqr, demo, directories):
     universe = sorted(set(sqr["dbn"]) | set(demo["dbn"]))
     schools = pd.DataFrame({"dbn": universe})
 
-    # Identity from the quality reports: the most recent name and report type.
-    latest_sqr = (sqr.sort_values("school_year_start")
-                     .groupby("dbn")
-                     .agg(sqr_name=("school_name", "last"),
-                          report_type=("report_type", "last"),
-                          school_type=("school_type", "last"),
-                          sqr_first_year=("school_year", "min"),
-                          sqr_last_year=("school_year", "max")))
+    # Identity from the quality reports: the name, report type and school type
+    # on the school's newest report, and the years it reported.
+    latest_sqr = (newest_report(sqr, "dbn", ["school_name", "school_type"])
+                  .rename(columns={"school_name": "sqr_name"})
+                  .join(sqr.groupby("dbn")["school_year"]
+                           .agg(sqr_first_year="min", sqr_last_year="max")))
     # Every report type a school has ever filed under, which is how a K-8 that
     # became a middle school stays legible.
     latest_sqr["report_types"] = (sqr.groupby("dbn")["report_type"]
@@ -516,7 +530,6 @@ def build_metrics(sqr):
     log("building the metric manifest")
     grouped = sqr.groupby("metric_id")
     metrics = grouped.agg(
-        label=("metric_label", "first"),
         rows=("value", "size"),
         reported=("value", "count"),
         low=("value", "min"),
@@ -524,6 +537,13 @@ def build_metrics(sqr):
         schools=("dbn", "nunique"),
         with_comparison=("comparison", "count"),
     ).reset_index()
+
+    # The City rewords some measures between years, and words a few differently
+    # for high schools and transfer schools. The label is the newest year's
+    # wording, from the report REPORT_TYPE_PRECEDENCE puts first, so a measure
+    # and its student groups read in one year's terms.
+    labels = newest_report(sqr, "metric_id", ["metric_label"])["metric_label"]
+    metrics.insert(1, "label", metrics["metric_id"].map(labels))
 
     metrics["applies_to"] = grouped["report_type"].apply(
         lambda s: "|".join(sorted(set(s)))).values
