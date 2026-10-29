@@ -27,7 +27,7 @@
       {
         href: 'downloads/' + status.downloads.xlsx,
         title: 'Excel workbook',
-        text: 'Schools, headline measures, programs, columns and sources, in five sheets.'
+        text: 'Schools, headline measures, programs, zones, columns and sources, in six sheets.'
       }
     ].forEach(function (f) {
       var a = SF.el('a', { class: 'download', href: f.href, download: '' });

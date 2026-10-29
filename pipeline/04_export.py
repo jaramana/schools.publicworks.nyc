@@ -342,7 +342,74 @@ def build_peer_files(observations, types, staging):
     log(f"peer histograms: {files} school types, {total / 1024:.0f} KB total")
 
 
-def build_school_files(schools, observations, programs, priorities, staging, points, types):
+# ---- School zones ----------------------------------------------------------
+
+def load_zones():
+    return json.loads((cfg.BUILD / "zones.json").read_text())
+
+
+def build_zone_files(zones, staging):
+    """One file per district, or per borough for areas no district holds, and an index.
+
+    A browser reads the index once, finds the point's grid cell, and loads
+    the one to six files the cell lists. A shared link carries zone numbers,
+    and the index says which file holds each.
+    """
+    year = zones["year"]
+    out_dir = staging / "zones" / year
+    out_dir.mkdir(parents=True, exist_ok=True)
+    files = {f: {"year": year, "file": f, **{level: [] for level in cfg.ZONE_LEVELS}}
+             for f in zones["files"]}
+    where = {level: {} for level in cfg.ZONE_LEVELS}
+    for zone in zones["zones"]:
+        files[zone["file"]][zone["level"]].append(
+            {k: zone[k] for k in ("id", "dbns", "kind", "rule", "remark", "dist", "b", "g")
+             if zone.get(k) not in (None, "")})
+        where[zone["level"]][str(zone["id"])] = zone["file"]
+    total = 0
+    for name, payload in files.items():
+        path = out_dir / f"{name}.json"
+        write_json(path, payload)
+        total += path.stat().st_size
+
+    index = {key: zones[key] for key in ("year", "datasets", "approved", "changes", "k8",
+                                         "files", "grid")}
+    index["changes"] = [{k: v for k, v in c.items() if k != "missing"} for c in zones["changes"]]
+    index["zone_files"] = where
+    index["inside"] = {level: {k: v[k] for k in ("inside", "of")}
+                       for level, v in zones["inside"].items()}
+    # The year's own copy keeps an older year readable after the next one is current.
+    write_json(out_dir / "index.json", index)
+    served = cfg.SITE_DATA / "zones"
+    years = {p.name for p in served.iterdir() if p.is_dir()} if served.exists() else set()
+    write_json(staging / "zones" / "index.json",
+               {"years": sorted(years | {year}), "current": year, "next": zones["next"], **index})
+    log(f"zones: {len(files)} files for {year}, {total / 1024:.0f} KB raw, index "
+        f"{(staging / 'zones' / 'index.json').stat().st_size / 1024:.0f} KB")
+
+
+def zone_table(zones_csv, zones):
+    """The downloads' zone table: one row per zone and school it names.
+
+    A zone that names no school has one row with no DBN. Zones an approved
+    rezoning changed carry that rezoning's school year.
+    """
+    changed = {(c["level"], i): c["year"] for c in zones["changes"] for i in c["ids"]}
+    words = {level: spec["name"] for level, spec in cfg.ZONE_LEVELS.items()}
+    rows = []
+    for zone in zones_csv.itertuples():
+        for dbn in (zone.dbns.split("|") if isinstance(zone.dbns, str) and zone.dbns else [None]):
+            rows.append({
+                "zone_year": zone.zone_year, "level": words[zone.level],
+                "zone_id": int(zone.zone_id), "dbn": dbn, "district": zone.district,
+                "borough": zone.borough, "rule": zone.rule, "remark": zone.remark,
+                "rezoned_for": changed.get((zone.level, int(zone.zone_id))),
+            })
+    return pd.DataFrame(rows)
+
+
+def build_school_files(schools, observations, programs, priorities, staging, points, types,
+                       zones):
     """One file per school, holding only what that profile shows."""
     published = observations[observations["status"].isin(cfg.SITE["site_statuses"])]
     by_school = dict(tuple(published.groupby("dbn")))
@@ -371,6 +438,9 @@ def build_school_files(schools, observations, programs, priorities, staging, poi
         # Which peer file each of this school's readings is drawn against.
         if dbn in types:
             payload["peer_types"] = {k: peer_slug(v) for k, v in types[dbn].items()}
+        # The zones that name this school, drawn as its profile shows them.
+        if dbn in zones["schools"]:
+            payload["zones"] = zones["schools"][dbn]
 
         subset = by_school.get(dbn)
         if subset is not None:
@@ -466,6 +536,8 @@ def build_status_json(tables, sources_payload, staging, validation):
         periods[source_id] = str(subset["school_year"].max())
     for key in ("directory_es", "directory_ms", "directory_hs"):
         periods[key] = "Fall 2025"
+    for level in cfg.ZONE_LEVELS:
+        periods[f"zones_{level}"] = cfg.ZONE_YEAR
 
     stale = []
     for source in sources_payload:
@@ -568,6 +640,22 @@ def data_dictionary(tables):
                      "unit": unit, "applies_to": "All observations",
                      "missing_means": "Empty means the value was not published. It does not mean zero."})
 
+    zone_fields = [
+        ("zone_year", "The school year the City drew the zone for, such as 2024-25.", "text"),
+        ("level", "Elementary, Middle or High: which of the City's three zone files the zone is in.", "text"),
+        ("zone_id", "The City's zone number within its level and year.", "number"),
+        ("dbn", "A school the zone names. A zone naming several schools has a row for each. Empty when the zone names none.", "text"),
+        ("district", "The community school district the City's file places the zone in. Empty for high school choice areas that no district holds.", "text"),
+        ("borough", "Borough letter, as in a DBN: M, X, K, Q or R.", "text"),
+        ("rule", "The kind of remark, as this project classifies it: shared, grade_split, by_address, extra_priority, cross_district, grades_only, choice, district_only or land. Empty when the zone has no remark.", "text"),
+        ("remark", "The City's remark on the zone, as published.", "text"),
+        ("rezoned_for", "The school year of a rezoning NYC Public Schools approved after the file was published that changes this zone. Empty for zones no approved rezoning changes.", "text"),
+    ]
+    for field, description, unit in zone_fields:
+        rows.append({"table": "zones", "field": field, "description": description,
+                     "unit": unit, "applies_to": "All zones",
+                     "missing_means": "The City's file gives no value for this zone."})
+
     for _, metric in tables["metrics"].iterrows():
         note = metric.get("comparability_note")
         description = metric.get("description") or metric.get("label")
@@ -589,7 +677,7 @@ def data_dictionary(tables):
 
 
 def write_workbook(tables, dictionary, staging):
-    """The public workbook: five sheets, no ranks, no personal fields."""
+    """The public workbook: six sheets, no ranks, no personal fields."""
     path = staging / cfg.SITE["downloads"]["xlsx"]
     schools = tables["schools"]
     observations = tables["observations"]
@@ -611,6 +699,7 @@ def write_workbook(tables, dictionary, staging):
         schools.to_excel(writer, sheet_name="Schools", index=False)
         headline.to_excel(writer, sheet_name="Historical Metrics", index=False)
         programs.to_excel(writer, sheet_name="Programs and Admissions", index=False)
+        tables["zones"].to_excel(writer, sheet_name="School Zones", index=False)
         dictionary.to_excel(writer, sheet_name="Data Dictionary", index=False)
         tables["sources"].to_excel(writer, sheet_name="Sources and Coverage", index=False)
 
@@ -619,6 +708,7 @@ def write_workbook(tables, dictionary, staging):
                                   "text_wrap": True, "valign": "top"})
         for name, frame in [("Schools", schools), ("Historical Metrics", headline),
                             ("Programs and Admissions", programs),
+                            ("School Zones", tables["zones"]),
                             ("Data Dictionary", dictionary),
                             ("Sources and Coverage", tables["sources"])]:
             sheet = writer.sheets[name]
@@ -649,6 +739,7 @@ observations.csv         One row per DBN, school year, and metric. Every publish
 metrics.csv              One row per metric. Definitions, units, and which schools they apply to.
 programs.csv             One row per DBN and program, where a directory publishes one.
 program_priorities.csv   One row per DBN, program, and priority rank.
+zones.csv                One row per school zone and the school it names. No geometry.
 sources.csv              Every source, with its period, coverage, and limitations.
 data-dictionary.csv      Every field in every file above.
 
@@ -692,7 +783,7 @@ def write_csv_archive(tables, dictionary, staging, generated):
     path = staging / cfg.SITE["downloads"]["zip"]
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for name in ["schools", "observations", "metrics", "programs",
-                     "program_priorities", "sources"]:
+                     "program_priorities", "zones", "sources"]:
             archive.writestr(f"{name}.csv", tables[name].to_csv(index=False))
         archive.writestr("data-dictionary.csv", dictionary.to_csv(index=False))
         archive.writestr("README.txt", CSV_README.format(generated=generated))
@@ -720,6 +811,18 @@ def publish(staging):
         source = staging / name
         if source.exists():
             shutil.move(str(source), str(cfg.SITE_DATA / name))
+
+    # Zones replace only the year just built. Earlier years stay, so a link
+    # made while one was current still finds its files.
+    staged = staging / "zones"
+    if staged.exists():
+        served = cfg.SITE_DATA / "zones"
+        served.mkdir(exist_ok=True)
+        for year in (p for p in staged.iterdir() if p.is_dir()):
+            if (served / year.name).exists():
+                shutil.rmtree(served / year.name)
+            shutil.move(str(year), str(served / year.name))
+        shutil.move(str(staged / "index.json"), str(served / "index.json"))
 
     # Same rule as the profiles above: a download that is no longer produced
     # should not linger. A renamed file in SITE["downloads"] left its old name
@@ -752,6 +855,8 @@ def main():
     staging.mkdir(parents=True, exist_ok=True)
 
     tables = load_tables()
+    zones = load_zones()
+    tables["zones"] = zone_table(pd.read_csv(cfg.BUILD / "zones.csv", dtype=str), zones)
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     build_search_index(tables["schools"], staging)
@@ -759,7 +864,8 @@ def main():
     points = impact_points(tables["observations"], tables["report_types"])
     types = peer_types(tables["schools"], tables["report_types"])
     build_school_files(tables["schools"], tables["observations"], tables["programs"],
-                       tables["program_priorities"], staging, points, types)
+                       tables["program_priorities"], staging, points, types, zones)
+    build_zone_files(zones, staging)
     build_impact_json(points, staging)
     build_peer_files(tables["observations"], types, staging)
     sources_payload = build_sources_json(tables["sources"], staging)

@@ -234,6 +234,174 @@ HTTP_TIMEOUT = 300
 HTTP_RETRIES = 3
 
 
+# ---- School zones ----------------------------------------------------------
+# Open Data publishes each school year's zones as three new datasets with new
+# IDs. A year is built only once it is listed here, after its remarks are
+# classified and its overrides set. `01_fetch.py` searches the catalog for
+# newer years and records them, so a new year raises a warning and an issue
+# instead of reaching the site unread.
+
+ZONE_YEARS = {
+    "2024-25": {"es": "cmjf-yawu", "ms": "t26j-jbq7", "hs": "ruu9-egea"},
+}
+ZONE_YEAR = max(ZONE_YEARS)
+
+# Per level: the zone number field, the borough letter field, and the word the
+# dataset title uses. The three files name their fields differently.
+ZONE_LEVELS = {
+    "es": {"id": "esid_no", "boro": "boro", "name": "Elementary"},
+    "ms": {"id": "msid_no", "boro": "boro_text", "name": "Middle"},
+    "hs": {"id": "hsid_no", "boro": "boro_text", "name": "High"},
+}
+
+ZONE_CATALOG = "https://api.us.socrata.com/api/catalog/v1"
+ZONE_CATALOG_PARAMS = {"domains": SOCRATA_DOMAIN, "q": "School Zones", "only": "dataset",
+                       "limit": 100}
+ZONE_TITLE = r"^School Zones (\d{4})-(\d{4}) \((Elementary|Middle|High) School\)$"
+ZONE_META = f"https://{SOCRATA_DOMAIN}/api/views/{{id}}.json"
+ZONE_EXPORT = f"https://{SOCRATA_DOMAIN}/api/geospatial/{{id}}?method=export&format=GeoJSON"
+
+# Every remark falls under one of these, matched in order. A remark none of
+# them covers fails validation, so a new kind of zone is read before it is
+# published. The middle value says whether the rule is for zones that name a
+# school (True) or zones that name none (False).
+ZONE_RULES = [
+    ("shared", True, r"^Shared Zone:"),
+    ("grade_split", True, r"^For \d{4}-\d{4}: Grades? "),
+    ("by_address", True, r"^Zoned by address"),
+    ("extra_priority", True, r"also (have|receive) priority|priority admissions to"),
+    # The City writes "Disrict" once.
+    ("cross_district", True, r"^Zoned to .+, located in Dist?rict \d+\.?$"),
+    ("grades_only", True, r"^Zoned for grades \S+ only\."),
+    ("choice", False, r"\bchoice\b"),
+    ("district_only", False, r"^Zoned to District \d+\. No zoned school\."),
+    ("land", False, r"\b(park|cemetery|cemeteries|graveyard|airport|island|golf course)\b"
+                    r"|^ConEdison$"),
+]
+
+# Areas that name no school because the City says so. The site shows their
+# remark. Land, such as a park, names no school and its remark is not shown.
+ZONE_UNZONED_RULES = {"choice", "district_only"}
+
+# Rezonings NYC Public Schools approved after a zone file was published, keyed
+# by the zone year they amend. Each names the zones it changes by the schools
+# in them. Kinds:
+#   shared   several zones became one, shared by `schools`
+#   split    a closed school's zone was divided among `schools`
+#   redrawn  lines moved, and the new lines are only in the presentation map
+ZONE_APPROVED = ("https://www.schools.nyc.gov/school-life/space-and-facilities/district-planning/"
+                 "district-planning-document-library/approved-rezonings")
+_REZONING_DOCS = ("https://pwsblobprd.schools.nyc/prd-pws/docs/default-source/"
+                  "default-document-library/")
+ZONE_CHANGES = {
+    "2024-25": [
+        {"district": "03", "level": "es", "year": "2025-26", "kind": "shared",
+         "zones_of": ["03M076", "03M180", "03M241", "03M242", "03M149", "03M185"],
+         "schools": ["03M180", "03M241", "03M242", "03M149", "03M185"],
+         "doc": _REZONING_DOCS + "d3-es-rezoning-presentation-2025-2026.pdf"},
+        {"district": "16", "level": "es", "year": "2025-26", "kind": "split",
+         "zones_of": ["16K025"],
+         "schools": ["16K026", "16K081", "16K308", "16K627"],
+         "doc": _REZONING_DOCS + "d16-es-rezoning-presentation-2025-2026.pdf"},
+        {"district": "31", "level": "es", "year": "2025-26", "kind": "redrawn",
+         "zones_of": ["31R005", "31R003", "31R036"],
+         "schools": ["31R005"],
+         "doc": _REZONING_DOCS + "d31-es-rezoning-presentation-2025-2026.pdf"},
+    ],
+}
+
+# Zoned schools the site lists as closed, keyed by zone year, with the reason.
+# Validation fails on a closed zoned school missing from here.
+_UNEXPLAINED = ("Not in the 2025-26 snapshot or the Fall 2025 directories, and no approved "
+                "rezoning names it. Check Find a School before launch.")
+ZONE_FORMER = {
+    "2024-25": {
+        "03M076": "Stopped serving grades K-5. The District 3 rezoning for 2025-26 made its "
+                  "zone part of one shared by five schools.",
+        "16K025": "Closed. The District 16 rezoning for 2025-26 divided its zone among four "
+                  "schools.",
+        "10X382": _UNEXPLAINED,
+        "11X287": _UNEXPLAINED,
+        "19K364": _UNEXPLAINED,
+    },
+}
+
+# Directory priority wording that means "lives in this school's zone". The
+# schools using it should be the schools the zone file names.
+ZONE_DIRECTORY = {
+    "es": ("directory_es", r"\bin the zone\b"),
+    "hs": ("directory_hs", r"\bzoned area\b"),
+}
+
+# Middle-grade programs whose priority goes to residents of an elementary
+# zone. At such a K-8 school, the elementary zone carries into grade 6.
+ZONE_K8 = ("directory_ms", r"elementary school zone")
+
+# Published coordinates keep six decimals, about 10 cm.
+ZONE_PLACES = 6
+# A point's grid cell lists the zone files it needs. 0.01 degrees is about a
+# kilometre, so most cells need one file.
+ZONE_GRID_STEP = 0.01
+
+ZONE_CHECKS = {
+    "min_features": {"es": 700, "ms": 250, "hs": 70},
+    "max_overlap_sq_mi": 0.05,
+    "min_coverage": {"es": 0.98},
+    # Share of zoned schools whose own building sits in their zone.
+    "max_inside_drop": 0.02,
+    "lookup_points": 10_000,
+    "lookup_seed": 2024,
+    # About a metre. Rounding can move a point this close to a line to the
+    # other side, which is reported but does not fail.
+    "edge_degrees": 1e-5,
+}
+
+
+def zone_title(year, level):
+    """The Open Data title for one year and level, as in "School Zones 2024-2025 (Elementary School)"."""
+    start = int(year[:4])
+    return f"School Zones {start}-{start + 1} ({ZONE_LEVELS[level]['name']} School)"
+
+
+def _district_list(codes):
+    names = [str(int(c)) for c in sorted(codes)]
+    if len(names) == 1:
+        return f"District {names[0]}"
+    return f"Districts {', '.join(names[:-1])} and {names[-1]}"
+
+
+ZONE_NOTES = {
+    "es": "A zone can be shared by several schools or split by grade, as its remark says.",
+    "ms": "Some zones name a district and no school.",
+    "hs": "Most areas read Citywide High School Choice and have no zoned high school.",
+}
+
+for _level in ZONE_LEVELS:
+    _id = ZONE_YEARS[ZONE_YEAR][_level]
+    _limits = [f"Lines for the {ZONE_YEAR} school year."]
+    for _year in sorted({c["year"] for c in ZONE_CHANGES.get(ZONE_YEAR, []) if c["level"] == _level}):
+        _codes = {c["district"] for c in ZONE_CHANGES[ZONE_YEAR]
+                  if c["level"] == _level and c["year"] == _year}
+        _limits.append(f"Rezonings approved for {_year} in {_district_list(_codes)} came "
+                       f"after the file was published.")
+    _limits.append(ZONE_NOTES[_level])
+    SOURCES[f"zones_{_level}"] = {
+        "source_id": f"zones_{_level}",
+        "agency": "NYC Public Schools",
+        # Replaced by the dataset's own title once fetched.
+        "title": zone_title(ZONE_YEAR, _level),
+        "dataset_id": _id,
+        "url": ZONE_EXPORT.format(id=_id),
+        "page": f"https://{SOCRATA_DOMAIN}/d/{_id}",
+        "retrieval": "NYC Open Data GeoJSON export",
+        "cadence": "Annual, as a new dataset each school year",
+        "grain": "One area per zone, keyed by zone number. A zone can name several schools.",
+        "cache": f"zones/{ZONE_YEAR}/{_level}.geojson",
+        "zone_level": _level,
+        "limitations": " ".join(_limits),
+    }
+
+
 # ---- Reference data --------------------------------------------------------
 
 # The third character of a DBN is the borough. This is a property of the

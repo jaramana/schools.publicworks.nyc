@@ -8,11 +8,16 @@ release failures, so both are checked here rather than noticed later.
 
 import importlib
 import json
+import math
+import random
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+import shapely
+import shapely.geometry
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 cfg = importlib.import_module("00_config")
@@ -364,6 +369,332 @@ def check_against_published(tables, report):
                         f"for example {sorted(lost)[:5]}")
 
 
+# ---- School zones ----------------------------------------------------------
+
+# Square miles per square degree at New York's latitude. Within the city's
+# span this is good to about half a percent, which is enough for thresholds.
+SQ_MI_PER_SQ_DEG = 111.05 * 84.51 / 2.589988
+
+
+def in_ring(x, y, ring):
+    """The browser's even-odd test, on numpy arrays, with the same arithmetic."""
+    xi, yi = ring[:, 0], ring[:, 1]
+    xj, yj = np.roll(xi, 1), np.roll(yi, 1)
+    crosses = (yi > y) != (yj > y)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        hits = crosses & (x < (xj - xi) * (y - yi) / (yj - yi) + xi)
+    return bool(np.count_nonzero(hits) % 2)
+
+
+def browser_contains(zone, x, y):
+    b = zone["b"]
+    if x < b[0] or x > b[2] or y < b[1] or y > b[3]:
+        return False
+    for polygon in zone["rings"]:
+        if in_ring(x, y, polygon[0]) and not any(in_ring(x, y, hole) for hole in polygon[1:]):
+            return True
+    return False
+
+
+def browser_lookup(published, by_file, level, x, y):
+    """The zone a browser finds at a point, through the grid, or None."""
+    grid = published["grid"]
+    col = math.floor((x - grid["x0"]) / grid["step"])
+    row = math.floor((y - grid["y0"]) / grid["step"])
+    if not (0 <= col < grid["cols"] and 0 <= row < grid["rows"]):
+        return None
+    for file_index in grid["sets"][grid["cells"][row * grid["cols"] + col]]:
+        for zone in by_file[published["files"][file_index]][level]:
+            if browser_contains(zone, x, y):
+                return zone["id"]
+    return None
+
+
+def load_source_zones(manifest):
+    """The source polygons, repaired only, by level: (zone ids, kinds, shapes)."""
+    out = {}
+    for record in manifest["sources"]:
+        if not record["source_id"].startswith("zones_"):
+            continue
+        level = record["level"]
+        key = cfg.ZONE_LEVELS[level]["id"]
+        features = json.loads((cfg.ROOT / record["path"]).read_text())["features"]
+        out[level] = (
+            [int(float(f["properties"][key])) for f in features],
+            [shapely.make_valid(shapely.geometry.shape(f["geometry"])) for f in features],
+        )
+    return out
+
+
+def check_lookup(published, table, source, schools, report):
+    """Published files and grid give the zone the source gives, point by point.
+
+    Points are seeded at random across the grid, plus every open school. The
+    published side uses the browser's own test. A disagreement within about a
+    metre of a line is rounding and is counted, not failed.
+    """
+    rng = random.Random(cfg.ZONE_CHECKS["lookup_seed"])
+    grid = published["grid"]
+    span_x, span_y = grid["cols"] * grid["step"], grid["rows"] * grid["step"]
+    points = [(grid["x0"] + rng.random() * span_x, grid["y0"] + rng.random() * span_y)
+              for _ in range(cfg.ZONE_CHECKS["lookup_points"])]
+    located = schools[(schools["status"] == "open") & schools["latitude"].notna()]
+    points += list(zip(located["longitude"].astype(float), located["latitude"].astype(float)))
+
+    by_file = {f: {level: [] for level in cfg.ZONE_LEVELS} for f in published["files"]}
+    for zone in published["zones"]:
+        zone["rings"] = [[np.array(ring) for ring in polygon] for polygon in zone["g"]]
+        by_file[zone["file"]][zone["level"]].append(zone)
+
+    land = set(zip(table.loc[table["kind"] == "land", "level"],
+                   table.loc[table["kind"] == "land", "zone_id"].astype(int)))
+    xs, ys = np.array([p[0] for p in points]), np.array([p[1] for p in points])
+    edge, wrong, found = 0, [], 0
+    for level, (ids, shapes) in source.items():
+        tree = shapely.STRtree(shapes)
+        pairs = tree.query(shapely.points(xs, ys), predicate="intersects")
+        expected = {}
+        for p, g in zip(*pairs):
+            if (level, ids[g]) not in land:
+                expected.setdefault(int(p), set()).add(int(g))
+        for p, (x, y) in enumerate(points):
+            got = browser_lookup(published, by_file, level, x, y)
+            want = {ids[g] for g in expected.get(p, ())}
+            if got is not None:
+                found += 1
+            if (got is None and not want) or got in want:
+                continue
+            near = [shapes[g] for g in expected.get(p, ())]
+            if got is not None:
+                near += [shapes[ids.index(got)]]
+            point = shapely.Point(x, y)
+            if near and min(s.boundary.distance(point) for s in near) < cfg.ZONE_CHECKS["edge_degrees"]:
+                edge += 1
+            else:
+                wrong.append({"level": level, "point": [round(x, 6), round(y, 6)],
+                              "published": got, "source": sorted(want)})
+    report.fact("zones_lookup_points", len(points))
+    report.fact("zones_lookup_found", found)
+    report.fact("zones_lookup_edge", edge)
+    if wrong:
+        report.fail("zones.lookup",
+                    f"{len(wrong):,} points find a different zone in the published files than "
+                    f"in the source, for example {wrong[:3]}")
+
+
+def check_geometry(published, table, source, report):
+    """Each published zone covers the area its source polygon covers.
+
+    Random points miss a small zone, so every zone is also compared whole.
+    Rounding to six decimals moves a line by about 10 cm, so the area that
+    differs should stay under 20 cm times the zone's perimeter.
+    """
+    metres = math.sqrt(SQ_MI_PER_SQ_DEG * 2.589988e6)
+    expected = set(zip(table.loc[table["kind"] != "land", "level"],
+                       table.loc[table["kind"] != "land", "zone_id"].astype(int)))
+    shown = {(z["level"], z["id"]): z for z in published["zones"]}
+    if expected != set(shown):
+        report.fail("zones.published_set", f"zones missing from the site files "
+                                           f"{sorted(expected - set(shown))[:5]}, or extra "
+                                           f"{sorted(set(shown) - expected)[:5]}")
+    invalid, drifted, worst = 0, [], 0.0
+    for level, (ids, shapes) in source.items():
+        for zone_id, original in zip(ids, shapes):
+            zone = shown.get((level, zone_id))
+            if not zone:
+                continue
+            shape = shapely.geometry.shape({"type": "MultiPolygon", "coordinates": zone["g"]})
+            if not shape.is_valid:
+                invalid += 1
+                continue
+            differs = shape.symmetric_difference(original).area * metres ** 2
+            allowed = original.length * metres * 0.2
+            worst = max(worst, differs / allowed if allowed else 0)
+            if differs > allowed:
+                drifted.append(f"{level} {zone_id}: {differs:,.0f} sq m")
+    report.fact("zones_geometry_worst_share_of_allowance", round(worst, 3))
+    if invalid:
+        report.fail("zones.geometry", f"{invalid} published zones are not valid polygons")
+    if drifted:
+        report.fail("zones.geometry_drift", f"{len(drifted)} published zones differ from the "
+                                            f"source by more than rounding: {drifted[:5]}")
+
+
+def zone_diff(published, report):
+    """What this build changes against the published zones, by district.
+
+    Written to build/zones-diff.json for the new-zone runbook. Zones are
+    matched by level and number, which held for 765 of 770 elementary zones
+    from 2023-24 to 2024-25.
+    """
+    served = cfg.SITE_DATA / "zones"
+    index_path = served / "index.json"
+    if not index_path.exists():
+        diff = {"against": None, "note": "first publish"}
+    else:
+        index = json.loads(index_path.read_text())
+        before = {}
+        for name in index["files"]:
+            path = served / index["current"] / f"{name}.json"
+            if path.exists():
+                payload = json.loads(path.read_text())
+                for level in cfg.ZONE_LEVELS:
+                    for zone in payload.get(level, []):
+                        before[(level, zone["id"])] = zone
+        after = {(z["level"], z["id"]): z for z in published["zones"]}
+        changes = {}
+
+        def note(kind, key, zone):
+            district = zone.get("dist") or "no district"
+            changes.setdefault(district, {}).setdefault(kind, []).append(f"{key[0]} {key[1]}")
+
+        for key in sorted(set(after) - set(before)):
+            note("added", key, after[key])
+        for key in sorted(set(before) - set(after)):
+            note("removed", key, before[key])
+        for key in sorted(set(after) & set(before)):
+            old, new = before[key], after[key]
+            if old["g"] != new["g"]:
+                note("reshaped", key, new)
+            if old.get("dbns") != new["dbns"]:
+                note("schools", key, new)
+            if old.get("remark") != new.get("remark"):
+                note("remark", key, new)
+        diff = {"against": index["current"], "year": published["year"],
+                "districts": dict(sorted(changes.items()))}
+    (cfg.BUILD / "zones-diff.json").write_text(json.dumps(diff, indent=2))
+    counts = {}
+    for kinds in diff.get("districts", {}).values():
+        for kind, keys in kinds.items():
+            counts[kind] = counts.get(kind, 0) + len(keys)
+    report.fact("zones_diff", {"against": diff["against"], **counts})
+
+
+def check_zones(tables, report):
+    """The checks in "Data integrity checks" of ZONES-PLAN.md."""
+    manifest = json.loads((cfg.BUILD / "fetch-manifest.json").read_text())
+    table = pd.read_csv(cfg.BUILD / "zones.csv", dtype=str, keep_default_na=False)
+    published = json.loads((cfg.BUILD / "zones.json").read_text())
+    year = published["year"]
+    schools = tables["schools"]
+    status = dict(zip(schools["dbn"], schools["status"]))
+    report.fact("zones_year", year)
+
+    for level, floor in cfg.ZONE_CHECKS["min_features"].items():
+        count = int((table["level"] == level).sum())
+        report.fact(f"zones_{level}_features", count)
+        if count < floor:
+            report.fail("zones.features", f"{level} has {count:,} zones, below the floor of {floor:,}")
+
+    duplicated = table[table.duplicated(["zone_year", "level", "zone_id"], keep=False)]
+    if len(duplicated):
+        report.fail("zones.key", f"zone numbers repeat: "
+                                 f"{duplicated[['level', 'zone_id']].head(5).to_dict('records')}")
+
+    named = {(level, d) for level, v in zip(table["level"], table["dbns"]) if v
+             for d in v.split("|")}
+    unknown = sorted({d for _, d in named} - set(status))
+    if unknown:
+        report.fail("zones.dbn_join", f"{len(unknown)} zone DBNs are not schools on the site: "
+                                      f"{unknown[:10]}")
+
+    overrides = cfg.ZONE_FORMER.get(year, {})
+    closed = sorted({d for _, d in named if status.get(d) == "former"})
+    unlisted = [d for d in closed if d not in overrides]
+    if unlisted:
+        report.fail("zones.former", f"zoned schools listed as closed with no entry in "
+                                    f"ZONE_FORMER: {unlisted}")
+    stale = sorted(set(overrides) - set(closed))
+    if stale:
+        report.warn("zones.former_stale", f"ZONE_FORMER lists schools that are open or no "
+                                          f"longer zoned: {stale}")
+    report.fact("zones_closed_schools", closed)
+
+    # A rule is blank only for a zone that names a school and has no remark.
+    unclassified = table[(table["rule"] == "") & ((table["remark"] != "") | (table["dbns"] == ""))]
+    if len(unclassified):
+        report.fail("zones.remarks", f"{len(unclassified)} remarks fit no rule in ZONE_RULES: "
+                                     f"{sorted(set(unclassified['remark']))[:5]}")
+    report.fact("zones_rules", {f"{level} {rule or 'no remark'}": int(n) for (level, rule), n
+                                in table.groupby(["level", "rule"]).size().items()})
+
+    for change in published["changes"]:
+        if change["missing"]:
+            report.fail("zones.changes", f"the District {change['district']} change names "
+                                         f"schools no zone holds: {change['missing']}")
+        gone = [d for d in change["schools"] if d not in status]
+        if gone:
+            report.fail("zones.changes", f"the District {change['district']} change names "
+                                         f"schools not on the site: {gone}")
+
+    source = load_source_zones(manifest)
+    check_geometry(published, table, source, report)
+
+    city =shapely.union_all([shapely.make_valid(shapely.geometry.shape(f["geometry"]))
+                              for f in json.loads((cfg.SITE_DATA / "districts.json").read_text())
+                              ["features"]])
+    for level, (ids, shapes) in source.items():
+        tree = shapely.STRtree(shapes)
+        left, right = tree.query(shapes, predicate="intersects")
+        overlap = sum(shapes[a].intersection(shapes[b]).area
+                      for a, b in zip(left, right) if a < b) * SQ_MI_PER_SQ_DEG
+        report.fact(f"zones_{level}_overlap_sq_mi", round(overlap, 4))
+        if overlap > cfg.ZONE_CHECKS["max_overlap_sq_mi"]:
+            report.fail("zones.overlap", f"{level} zones overlap by {overlap:.3f} sq mi, past "
+                                         f"{cfg.ZONE_CHECKS['max_overlap_sq_mi']}")
+        covered = shapely.union_all(shapes).intersection(city).area / city.area
+        report.fact(f"zones_{level}_coverage", round(covered, 4))
+        floor = cfg.ZONE_CHECKS["min_coverage"].get(level)
+        if floor and covered < floor:
+            report.fail("zones.coverage", f"{level} zones cover {covered:.1%} of the district "
+                                          f"outlines, under {floor:.0%}")
+
+    priorities = tables["program_priorities"]
+    for level, (source_id, pattern) in cfg.ZONE_DIRECTORY.items():
+        directory = set(priorities.loc[(priorities["source_id"] == source_id)
+                                       & priorities["priority"].str.contains(pattern, case=False,
+                                                                             regex=True), "dbn"])
+        zoned = {d for lvl, d in named if lvl == level}
+        report.fact(f"zones_{level}_directory_agreement", f"{len(directory & zoned)} of {len(zoned)}")
+        if directory != zoned:
+            report.warn("zones.directory",
+                        f"{level}: directory zone priority without a zone {sorted(directory - zoned)}; "
+                        f"a zone without directory zone priority {sorted(zoned - directory)}")
+
+    previous_path = cfg.SITE_DATA / "zones" / "index.json"
+    previous = json.loads(previous_path.read_text()) if previous_path.exists() else {}
+    for level, now in published["inside"].items():
+        report.fact(f"zones_{level}_inside_own_zone", f"{now['inside']} of {now['of']}")
+        was = previous.get("inside", {}).get(level)
+        if was and was["of"] and now["of"]:
+            drop = was["inside"] / was["of"] - now["inside"] / now["of"]
+            if drop > cfg.ZONE_CHECKS["max_inside_drop"]:
+                report.warn("zones.inside", f"{level}: schools inside their own zone fell "
+                                            f"{drop:.1%} from the published year")
+    if previous.get("current") and year < previous["current"]:
+        report.fail("zones.year", f"the zone year {year} is older than the published "
+                                  f"{previous['current']}")
+
+    summary = manifest.get("zones", {})
+    if summary.get("next"):
+        report.warn("zones.newer_year", f"Open Data lists School Zones {summary['next']}, which "
+                                        f"is not in ZONE_YEARS. Review it before building it.")
+    if summary.get("listed") is None:
+        report.warn("zones.catalog", "the Open Data catalog could not be read, so newer zone "
+                                     "years were not looked for")
+    elif year in summary["listed"] and summary["listed"][year] != cfg.ZONE_YEARS[year]:
+        report.warn("zones.dataset_ids", f"the catalog lists {summary['listed'][year]} for "
+                                         f"{year}, not {cfg.ZONE_YEARS[year]}")
+    now = datetime.now(timezone.utc)
+    current = now.year if now.month >= 9 else now.year - 1
+    if int(year[:4]) < current:
+        report.warn("zones.freshness", f"the newest zones are for {year}; the current school "
+                                       f"year is {current}-{str(current + 1)[-2:]}")
+
+    check_lookup(published, table, source, schools, report)
+    zone_diff(published, report)
+
+
 def main():
     report = Report()
     tables = load_tables()
@@ -375,6 +706,7 @@ def main():
     check_sqr_results(tables, report)
     check_freshness(tables, report)
     check_against_published(tables, report)
+    check_zones(tables, report)
 
     result = {
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),

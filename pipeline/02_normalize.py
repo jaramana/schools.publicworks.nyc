@@ -8,6 +8,9 @@ The output is five tables with declared grains:
     programs             one row per DBN and program
     program_priorities   one row per DBN, program, and priority rank
 
+plus the school zones: build/zones.csv, one row per zone as the City
+published it, and build/zones.json, the zones as the site will serve them.
+
 Two rules run through the whole stage. Join on the DBN and never on a school
 name. Keep missing, suppressed, and not applicable as three different things,
 and never let any of them become a zero.
@@ -15,6 +18,7 @@ and never let any of them become a zero.
 
 import importlib
 import json
+import math
 import re
 import struct
 import sys
@@ -25,6 +29,8 @@ from pathlib import Path
 
 import pandas as pd
 import requests
+import shapely
+import shapely.geometry
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 cfg = importlib.import_module("00_config")
@@ -1049,9 +1055,279 @@ def build_programs(directories):
     return programs, priorities
 
 
+# ---- School zones ----------------------------------------------------------
+# Zones are published as the City drew them. The rules table names each
+# remark's kind, and approved rezonings travel beside the zones rather than
+# redrawing them. Validation judges what this section describes.
+
+ZONE_RULES = [(rule, named, re.compile(pattern, re.IGNORECASE))
+              for rule, named, pattern in cfg.ZONE_RULES]
+
+
+def zone_dbns(text):
+    """"20K331, 20K112" and "20K413,20K102" both become a sorted list."""
+    return sorted({t.strip().upper() for t in re.split(r"[,/;]", text or "") if t.strip()})
+
+
+def zone_rule(remark, named):
+    """The rule a remark falls under. "" means no remark, None means no rule covers it."""
+    if not remark:
+        return "" if named else None
+    for rule, for_named, pattern in ZONE_RULES:
+        if for_named == named and pattern.search(remark):
+            return rule
+    return None
+
+
+def zone_district(value):
+    """"20.0", "20" and 20 become "20". Zero, blank and lists such as "29,26" are None."""
+    try:
+        number = int(float(str(value).strip()))
+    except (TypeError, ValueError):
+        return None
+    return f"{number:02d}" if 1 <= number <= 32 else None
+
+
+def zone_shape(geometry):
+    """A zone's area as valid polygons on the published grid.
+
+    Four source polygons cross themselves. make_valid keeps their area, and
+    set_precision snaps to six decimals while keeping the result valid, so
+    the published lines are the ones that were checked.
+    """
+    shape = shapely.make_valid(shapely.geometry.shape(geometry))
+    shape = shapely.set_precision(shape, 10 ** -cfg.ZONE_PLACES)
+    parts = [g for g in getattr(shape, "geoms", [shape]) if g.geom_type == "Polygon"]
+    parts += [p for g in getattr(shape, "geoms", []) if g.geom_type == "MultiPolygon"
+              for p in g.geoms]
+    return shapely.MultiPolygon(parts)
+
+
+def zone_coordinates(shape):
+    places = cfg.ZONE_PLACES
+    return [[[[round(x, places), round(y, places)] for x, y in ring.coords]
+             for ring in [polygon.exterior, *polygon.interiors]]
+            for polygon in shape.geoms]
+
+
+def read_zone_files(fetch_manifest):
+    """Every zone feature, one row each, with its kind and the file it goes in."""
+    records = {r["level"]: r for r in fetch_manifest["sources"]
+               if r["source_id"].startswith("zones_")}
+    if set(records) != set(cfg.ZONE_LEVELS):
+        raise RuntimeError("the fetch manifest lists no zone files for "
+                           f"{sorted(set(cfg.ZONE_LEVELS) - set(records))}. Run stage 1.")
+    rows, shapes = [], {}
+    for level, spec in cfg.ZONE_LEVELS.items():
+        record = records[level]
+        features = json.loads((cfg.ROOT / record["path"]).read_text())["features"]
+        for feature in features:
+            p = feature["properties"]
+            zone_id = int(float(p[spec["id"]]))
+            dbns = zone_dbns(p.get("dbn"))
+            remark = " ".join(str(p.get("remarks") or "").split())
+            rule = zone_rule(remark, bool(dbns))
+            kind = ("zoned" if dbns else "land" if rule == "land" else "unzoned")
+            district = zone_district(p.get("schooldist")) or zone_district(p.get("zoned_dist"))
+            borough = str(p.get(spec["boro"]) or "").strip().upper() or None
+            rows.append({
+                "zone_year": record["year"], "level": level, "zone_id": zone_id,
+                "dbn_published": p.get("dbn"), "dbns": "|".join(dbns),
+                "district": district, "schooldist": p.get("schooldist"),
+                "zoned_dist": p.get("zoned_dist"), "borough": borough,
+                "remark": remark or None, "rule": rule, "kind": kind,
+                # Land is left out of the site files: a point there has no zone.
+                "file": None if kind == "land" else district or borough,
+                "dataset_id": record["dataset_id"],
+            })
+            shapes[(level, zone_id)] = zone_shape(feature["geometry"])
+    return pd.DataFrame(rows), shapes, records
+
+
+def zone_grid(zones, shapes, files):
+    """For each 0.01 degree cell, the files a point in it needs.
+
+    A point's cell is floor((lon - x0) / step) across and floor((lat - y0) /
+    step) up, the same sum the browser does. Cells are padded a hair so a
+    point on a cell edge still finds a zone that touches it.
+    """
+    step, pad = cfg.ZONE_GRID_STEP, 1e-7
+    bounds = shapely.total_bounds(list(shapes.values()))
+    x0 = round(math.floor(bounds[0] / step) * step, 2)
+    y0 = round(math.floor(bounds[1] / step) * step, 2)
+    cols = math.floor((bounds[2] - x0) / step) + 1
+    rows = math.floor((bounds[3] - y0) / step) + 1
+    cells = {}
+    for zone in zones:
+        shape = shapes[(zone["level"], zone["id"])]
+        shapely.prepare(shape)
+        minx, miny, maxx, maxy = shape.bounds
+        for c in range(max(0, math.floor((minx - x0) / step) - 1),
+                       min(cols, math.floor((maxx - x0) / step) + 2)):
+            for r in range(max(0, math.floor((miny - y0) / step) - 1),
+                           min(rows, math.floor((maxy - y0) / step) + 2)):
+                box = shapely.box(x0 + c * step - pad, y0 + r * step - pad,
+                                  x0 + (c + 1) * step + pad, y0 + (r + 1) * step + pad)
+                if shape.intersects(box):
+                    cells.setdefault(r * cols + c, set()).add(files.index(zone["file"]))
+    # Each distinct set of files is listed once. Set 0 is the empty set.
+    sets = [[]] + sorted({tuple(sorted(s)) for s in cells.values()}, key=lambda s: (len(s), s))
+    index = {tuple(s): i for i, s in enumerate(sets)}
+    flat = [index[tuple(sorted(cells[i]))] if i in cells else 0 for i in range(cols * rows)]
+    return {"x0": x0, "y0": y0, "step": step, "cols": cols, "rows": rows,
+            "sets": [list(s) for s in sets], "cells": flat}
+
+
+def zone_changes(zones, year):
+    """Approved rezonings with the zone numbers each one changes."""
+    out = []
+    for change in cfg.ZONE_CHANGES.get(year, []):
+        level = [z for z in zones if z["level"] == change["level"]]
+        ids = sorted(z["id"] for z in level if set(z["dbns"]) & set(change["zones_of"]))
+        named = {d for z in level if z["id"] in ids for d in z["dbns"]}
+        entry = {k: change[k] for k in ("district", "level", "year", "kind", "schools", "doc")}
+        entry["ids"] = ids
+        # Schools the change names that no zone in the file holds. Validation fails on any.
+        entry["missing"] = sorted(set(change["zones_of"]) - named)
+        out.append(entry)
+    return out
+
+
+def school_zones(zones, shapes, changes, names, year):
+    """Each school's own zones, by level, with how an approved change touches it.
+
+    A role says what a change did to the school:
+      shared   it now shares one zone made from several old ones
+      left     its old zone was folded into others or divided among them
+      gained   its zone took in area whose new lines are only in the plan
+      redrawn  its zone's lines moved
+    A zone the school no longer serves carries no geometry, since drawing it
+    would say the opposite.
+    """
+    def named(dbns):
+        return [{"dbn": d, "name": names.get(d)} for d in dbns]
+
+    by_key = {(z["level"], z["id"]): z for z in zones}
+    out = {}
+    for dbn in sorted({d for z in zones for d in z["dbns"]}):
+        levels = []
+        for level in cfg.ZONE_LEVELS:
+            found = [z for z in zones if z["level"] == level and dbn in z["dbns"]]
+            if not found:
+                continue
+            change, role = None, None
+            for c in changes:
+                if c["level"] != level:
+                    continue
+                touches = any(z["id"] in c["ids"] for z in found)
+                listed = dbn in c["schools"]
+                if not touches and not listed:
+                    continue
+                change = c
+                role = ("redrawn" if c["kind"] == "redrawn"
+                        else ("shared" if c["kind"] == "shared" else "gained") if listed
+                        else "left")
+            partners = sorted({d for z in found for d in z["dbns"]} - {dbn})
+            remarks = list(dict.fromkeys(z["remark"] for z in found if z.get("remark")))
+            drawn = found
+            if role == "shared":
+                drawn = [by_key[(level, i)] for i in change["ids"]]
+                partners = [d for d in change["schools"] if d != dbn]
+            entry = {"level": level, "ids": [z["id"] for z in found], "role": role,
+                     "partners": named(partners), "remarks": remarks}
+            if change:
+                entry["change"] = {k: change[k] for k in ("district", "year", "kind", "doc")}
+                entry["change"]["schools"] = named(change["schools"])
+            if role != "left":
+                union = shapely.union_all([shapes[(level, z["id"])] for z in drawn])
+                entry["g"] = zone_coordinates(zone_shape(shapely.geometry.mapping(union)))
+            levels.append(entry)
+        out[dbn] = {"year": year, "levels": levels}
+    return out
+
+
+def inside_own_zone(zones, shapes, schools):
+    """How many zoned schools stand inside a zone that names them, by level."""
+    points = {r.dbn: (r.longitude, r.latitude) for r in schools.itertuples()
+              if pd.notna(r.latitude) and pd.notna(r.longitude)}
+    out = {}
+    for level in cfg.ZONE_LEVELS:
+        mine = {}
+        for z in zones:
+            if z["level"] == level:
+                for d in z["dbns"]:
+                    mine.setdefault(d, []).append(shapes[(level, z["id"])])
+        located = [d for d in mine if d in points]
+        outside = sorted(d for d in located
+                         if not any(s.covers(shapely.Point(points[d])) for s in mine[d]))
+        out[level] = {"inside": len(located) - len(outside), "of": len(located),
+                      "outside": outside}
+    return out
+
+
+def present(value):
+    """A table cell as text, or None when blank. pandas holds a blank as NaN, which is truthy."""
+    return value if isinstance(value, str) and value else None
+
+
+def build_zones(schools, priorities, fetch_manifest):
+    """build/zones.csv, one row per zone as published, and build/zones.json for the site."""
+    log("reading the school zones")
+    table, shapes, records = read_zone_files(fetch_manifest)
+    year = cfg.ZONE_YEAR
+    published = table[table["file"].notna()]
+    files = (sorted(f for f in published["file"].unique() if f.isdigit())
+             + sorted(f for f in published["file"].unique() if not f.isdigit()))
+    zones = []
+    for row in published.sort_values(["level", "zone_id"]).itertuples():
+        shape = shapes[(row.level, row.zone_id)]
+        zone = {"level": row.level, "id": int(row.zone_id),
+                "dbns": row.dbns.split("|") if present(row.dbns) else [],
+                "kind": row.kind, "rule": present(row.rule), "dist": present(row.district),
+                "file": row.file, "b": [round(v, cfg.ZONE_PLACES) for v in shape.bounds],
+                "g": zone_coordinates(shape)}
+        # The remark is the City's word on a zone. Land's remark only names
+        # the land, and the site does not show it.
+        if present(row.remark) and row.kind != "land":
+            zone["remark"] = row.remark
+        zones.append(zone)
+
+    changes = zone_changes(zones, year)
+    names = dict(zip(schools["dbn"], schools["name"]))
+    k8_source, k8_pattern = cfg.ZONE_K8
+    k8 = sorted(set(priorities.loc[
+        (priorities["source_id"] == k8_source)
+        & priorities["priority"].str.contains(k8_pattern, case=False, regex=True), "dbn"]))
+
+    payload = {
+        "year": year,
+        "next": fetch_manifest.get("zones", {}).get("next"),
+        "datasets": {level: {"id": r["dataset_id"], "title": r["title"],
+                             "page": cfg.SOURCES[r["source_id"]]["page"],
+                             "updated": r["updated"]}
+                     for level, r in records.items()},
+        "approved": cfg.ZONE_APPROVED,
+        "changes": changes,
+        "k8": k8,
+        "files": files,
+        "grid": zone_grid(zones, shapes, files),
+        "inside": inside_own_zone(zones, shapes, schools),
+        "zones": zones,
+        "schools": school_zones(zones, shapes, changes, names, year),
+    }
+    # NaN is not JSON a browser can read, so a stray one stops the build here.
+    (cfg.BUILD / "zones.json").write_text(json.dumps(payload, separators=(",", ":"),
+                                                     allow_nan=False))
+    table.to_csv(cfg.BUILD / "zones.csv", index=False)
+    counts = table.groupby(["level", "kind"]).size().to_dict()
+    log(f"  {len(table):,} zones in {len(files)} files: " +
+        ", ".join(f"{level} {kind} {n}" for (level, kind), n in sorted(counts.items())))
+    return table
+
+
 # ---- Sources ---------------------------------------------------------------
 
-def build_sources(observations, schools, programs, fetch_manifest):
+def build_sources(observations, schools, programs, fetch_manifest, zones):
     """The Sources and Coverage table, with counts measured from the data."""
     fetched = {}
     for record in fetch_manifest["sources"]:
@@ -1062,7 +1338,8 @@ def build_sources(observations, schools, programs, fetch_manifest):
         record = {
             "source_id": source["source_id"],
             "agency": source["agency"],
-            "title": source["title"],
+            # A dataset whose title the fetch read is named by that title.
+            "title": next((f["title"] for f in files if f.get("title")), source["title"]),
             "dataset_id": source["dataset_id"],
             "url": source["page"],
             # A source read from several workbooks lists each address it used.
@@ -1101,6 +1378,12 @@ def build_sources(observations, schools, programs, fetch_manifest):
             record["schools"] = record["rows"]
             record["latest_period"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             record["earliest_period"] = record["latest_period"]
+        elif source.get("zone_level"):
+            subset = zones[zones["level"] == source["zone_level"]]
+            record["rows"] = int(len(subset))
+            record["schools"] = len({d for v in subset["dbns"] if v for d in v.split("|")})
+            record["latest_period"] = cfg.ZONE_YEAR
+            record["earliest_period"] = cfg.ZONE_YEAR
         rows.append(record)
     return pd.DataFrame(rows)
 
@@ -1133,7 +1416,8 @@ def main():
                     .sort_values(["dbn", "school_year", "metric_id", "report_type"])
                     .reset_index(drop=True))
     programs, priorities = build_programs(directories)
-    sources = build_sources(observations, schools, programs, fetch_manifest)
+    zones = build_zones(schools, priorities, fetch_manifest)
+    sources = build_sources(observations, schools, programs, fetch_manifest, zones)
 
     for name, frame in [("schools", schools), ("metrics", metrics),
                         ("observations", observations), ("programs", programs),

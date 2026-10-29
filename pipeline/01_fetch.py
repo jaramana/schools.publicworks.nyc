@@ -203,6 +203,11 @@ def check_shape(source, record):
             f"{source['source_id']}: expected an Excel workbook but got something else. "
             f"The InfoHub file name probably changed. Check {source['page']}")
 
+    if path.suffix == ".geojson" and b"FeatureCollection" not in head:
+        raise RuntimeError(
+            f"{source['source_id']}: expected GeoJSON but got something else. "
+            f"Check {source['page']}")
+
     if path.suffix == ".csv":
         # The Socrata CSV export carries display names such as "School Year" and
         # "District, Borough and School Number (DBN)", not the API field names.
@@ -215,6 +220,79 @@ def check_shape(source, record):
             raise RuntimeError(
                 f"{source['source_id']}: the export is missing required columns "
                 f"{missing}. The dataset schema changed.")
+
+
+# ---- School zones ----------------------------------------------------------
+
+def list_zone_years():
+    """Every School Zones year the Open Data catalog lists.
+
+    Returns {"2024-25": {"es": dataset id, ...}}, or None when the catalog
+    cannot be read. The catalog only finds years. What is built is set by
+    ZONE_YEARS in 00_config.py.
+    """
+    try:
+        response = requests.get(cfg.ZONE_CATALOG, params=cfg.ZONE_CATALOG_PARAMS,
+                                timeout=cfg.HTTP_TIMEOUT)
+        response.raise_for_status()
+        results = response.json()["results"]
+    except Exception as error:
+        log(f"zones: could not read the Open Data catalog: {error}")
+        return None
+    levels = {spec["name"]: level for level, spec in cfg.ZONE_LEVELS.items()}
+    found = {}
+    for result in results:
+        resource = result.get("resource", {})
+        match = re.match(cfg.ZONE_TITLE, (resource.get("name") or "").strip())
+        if not match or int(match.group(2)) != int(match.group(1)) + 1:
+            continue
+        year = f"{match.group(1)}-{match.group(2)[-2:]}"
+        found.setdefault(year, {})[levels[match.group(3)]] = resource["id"]
+    return found
+
+
+def fetch_zones(force=False):
+    """Fetch the built year's three zone files. Returns manifest records and a summary.
+
+    A file is downloaded again when its dataset's rowsUpdatedAt changes, so a
+    correction published under the same year is picked up.
+    """
+    records = []
+    for level in cfg.ZONE_LEVELS:
+        source = cfg.SOURCES[f"zones_{level}"]
+        meta = requests.get(cfg.ZONE_META.format(id=source["dataset_id"]),
+                            timeout=cfg.HTTP_TIMEOUT).json()
+        name = (meta.get("name") or "").strip()
+        match = re.match(cfg.ZONE_TITLE, name)
+        expected = re.match(cfg.ZONE_TITLE, source["title"])
+        if not match or match.groups() != expected.groups():
+            raise RuntimeError(
+                f"{source['source_id']}: dataset {source['dataset_id']} is titled {name!r}, "
+                f"not {source['title']!r}. Check {source['page']}")
+        updated = str(meta.get("rowsUpdatedAt"))
+        target = cfg.RAW / source["cache"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        stamp = target.with_suffix(".updated")
+        stale = not stamp.exists() or stamp.read_text() != updated
+        record = download(source, force=force or stale)
+        stamp.write_text(updated)
+        record.update({
+            "title": name, "dataset_id": source["dataset_id"], "year": cfg.ZONE_YEAR,
+            "level": level,
+            "updated": datetime.fromtimestamp(int(updated), timezone.utc).strftime("%Y-%m-%d"),
+        })
+        check_shape(source, record)
+        records.append(record)
+
+    listed = list_zone_years()
+    newer = sorted(y for y in (listed or {}) if y > cfg.ZONE_YEAR)
+    summary = {"built": cfg.ZONE_YEAR, "reviewed": sorted(cfg.ZONE_YEARS), "listed": listed,
+               "next": newer[-1] if newer else None}
+    log(f"zones: building {cfg.ZONE_YEAR}; the catalog lists "
+        f"{', '.join(sorted(listed)) if listed is not None else 'nothing readable'}")
+    if newer:
+        log(f"zones: {', '.join(newer)} listed but not reviewed. See ZONE_YEARS in 00_config.py")
+    return records, summary
 
 
 def main(force=False):
@@ -240,9 +318,13 @@ def main(force=False):
     for key in INFOHUB_SOURCES:
         records.extend(fetch_infohub(cfg.SOURCES[key], force=force))
 
+    zone_records, zones = fetch_zones(force=force)
+    records.extend(zone_records)
+
     manifest = {
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "sources": records,
+        "zones": zones,
     }
     MANIFEST.write_text(json.dumps(manifest, indent=2))
     log(f"wrote {MANIFEST.relative_to(cfg.ROOT)}")

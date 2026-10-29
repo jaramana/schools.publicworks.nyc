@@ -14,8 +14,10 @@ concurrency:
   group: refresh
   cancel-in-progress: false
 
+# Issues are opened when Open Data lists a newer school zone year.
 permissions:
   contents: write
+  issues: write
 
 jobs:
   refresh:
@@ -55,7 +57,31 @@ jobs:
           path: |
             build/validation.json
             build/fetch-manifest.json
+            build/zones-diff.json
           retention-days: 30
+
+      # A newer zone year is built only after it is reviewed and added to
+      # ZONE_YEARS, so the workflow says so once, in an issue, and leaves it
+      # open until then.
+      - name: Open an issue for a newer zone year
+        if: always()
+        # A failure here must not stop the publish step below.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          next=$(python -c "import json; print((json.load(open('build/fetch-manifest.json')).get('zones') or {}).get('next') or '')" 2>/dev/null || true)
+          if [ -z "$next" ]; then
+            echo "No unreviewed zone year is listed."
+            exit 0
+          fi
+          title="School Zones $next is on NYC Open Data"
+          open=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq 'length')
+          if [ "$open" != "0" ]; then
+            echo "An issue is already open for $next."
+            exit 0
+          fi
+          gh issue create --title "$title" --body "NYC Open Data lists School Zones $next. The site keeps building the newest reviewed year until $next is checked and added to ZONE_YEARS in pipeline/00_config.py. The catalog search: https://data.cityofnewyork.us/browse?q=School%20Zones"
 
       - name: Publish if the public files changed
         run: |
