@@ -221,7 +221,7 @@
             '</abbr>' + (rest ? ' · ' + SF.escapeHtml(rest) : '')
     }));
 
-    document.title = (school.name || school.dbn) + ' — Schools Finder';
+    document.title = (school.name || school.dbn) + ' · Schools Finder';
 
     if (school.status === 'former') {
       host.appendChild(SF.el('div', {
