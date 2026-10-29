@@ -78,9 +78,10 @@ python -m venv .venv
 ```
 
 The first run downloads about 245 MB and takes about five minutes; later runs
-use the caches in `data-raw/`. Source URLs, thresholds and display rules are set
-in `pipeline/00_config.py`. To preview the site, run `python3 tools/serve.py`
-and open http://localhost:8787.
+use the caches in `data-raw/`. `requirements.txt` pins the library versions the
+daily workflow uses, so a local build writes the same files. Source URLs,
+thresholds and display rules are set in `pipeline/00_config.py`. To preview the
+site, run `python3 tools/serve.py` and open http://localhost:8787.
 
 District outlines change rarely, so the daily run does not fetch them. Run
 `python tools/fetch_districts.py` when NYC Open Data publishes new ones.

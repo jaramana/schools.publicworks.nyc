@@ -1,6 +1,14 @@
-pandas>=3.0
-requests>=2.34
-openpyxl>=3.1
-XlsxWriter>=3.2
+# Exact versions, matching the daily refresh. A new release can change a value
+# in its last digit and move a school between histogram bars, so an upgrade is
+# a commit of its own, and the next refresh shows what it moved. The network
+# libraries under requests stay open so certificates stay current.
+pandas==3.1.0
+numpy==2.5.4
+python-dateutil==3.0.0
+tzdata==2026.6
+openpyxl==3.1.5
+et-xmlfile==2.0.0
+XlsxWriter==3.3.1
+requests==2.34.2
 
 # tools/fetch_districts.py, which is run by hand, also needs shapely.
