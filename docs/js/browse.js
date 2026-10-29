@@ -2,10 +2,31 @@
    ------------------------------------------------------------------
    Filter state lives in the URL, so a narrowed list is a link someone can
    send. Nothing here ranks: the list is alphabetical, always. The map shows
-   the same filtered list, and every point is drawn alike. */
+   the same filtered list, and every point is drawn alike.
+
+   The zone is the level under the district. An address in the search box
+   (finder.js) or a spot on the map sets it, and the address bar keeps only
+   the zone numbers. A zone lists its zoned schools in a shaded panel, then
+   the rest of the district, and a pin marks the address. */
 
 (function () {
   'use strict';
+
+  var LEVELS = ['es', 'ms', 'hs'];
+  var LEVEL_HEAD = { es: 'Zoned elementary school', ms: 'Zoned middle school', hs: 'Zoned high school' };
+
+  // The Grade filter picks which levels a zone lists.
+  var GRADE_LEVELS = { '3K': ['es'], 'PK': ['es'], 'K': ['es'], 'Elementary': ['es'],
+                       'Middle': ['ms'], 'High': ['hs'] };
+
+  var ZONE_LINE = {
+    es: { color: SFMap.colors.point, width: 2.5 },
+    ms: { color: SFMap.colors.place, width: 2, dash: [3, 2] },
+    hs: { color: SFMap.colors.place, width: 1.8, dash: [1, 2] }
+  };
+
+  // The spot's zones, resolved from the `zone` value in the address bar.
+  var zone = { key: '', result: null };
 
   var PAGE_SIZE = 60;
   var shown = PAGE_SIZE;
@@ -28,6 +49,7 @@
   var FILTERS = [
     { key: 'boro',     label: 'Borough',  all: 'Every borough' },
     { key: 'district', label: 'District', all: 'Every district' },
+    { key: 'zone',     label: 'Zone',     all: 'No zone' },
     { key: 'type',     label: 'Type',     all: 'Every type' },
     { key: 'grade',    label: 'Grade',    all: 'Any grade' },
     { key: 'status',   label: 'Open schools' }
@@ -108,6 +130,115 @@
     });
   }
 
+  // ---- Search: a school or an address -------------------------------------
+
+  // The search box finds a school or an address (finder.js). A school is
+  // selected here, on the list and the map, rather than opened. An address
+  // sets the zone and drops a pin.
+  var finder = { clearAddress: function () {} };
+
+  function pickAddress(a) {
+    SFZones.answer(a.lon, a.lat).then(function (result) {
+      SFFinder.pin.set(SFZones.keyString(result.keys), a, 'address');
+      setZone(result);
+    }).catch(function (err) { SF.fail(document.getElementById('school-list'), err); });
+  }
+
+  // Emptying the address box takes its zone away with it.
+  function clearZone() {
+    if (!currentFilters().zone) return;
+    SF.setParam('zone', '', true);
+    onFilter();
+  }
+
+  // A school the filters leave out brings its own district into view, with
+  // the other filters cleared, so the rail can show it among its neighbors.
+  function focusSchool(r) {
+    if (!current.some(function (x) { return x.dbn === r.dbn; })) {
+      FILTERS.forEach(function (f) { SF.setParam(f.key, '', true); });
+      if (r.district) SF.setParam('district', r.district, true);
+      if (r.status === 'former') SF.setParam('status', 'all', true);
+      finder.clearAddress();
+      shown = PAGE_SIZE;
+      zoomTo = r.dbn;
+      SF.setParam('focus', r.dbn, true);
+      draw(true);
+      return;
+    }
+    select(r.dbn, 'search');
+  }
+
+  // A school picked in the search box is zoomed to, even when it is already
+  // in view, since the reader asked for that one school.
+  var zoomTo = null;
+
+  function mountFinder() {
+    finder = SFFinder.mount('#browse-search', {
+      schoolPlaceholder: 'Name or DBN',
+      onSchool: focusSchool, onAddress: pickAddress, onClear: clearZone
+    });
+  }
+
+  // ---- Zones ------------------------------------------------------------
+
+  // The answer for the zone in the address bar, or null while it loads. A
+  // new value starts the load and draws again when it arrives.
+  function zoneAnswer(state) {
+    if (!state.zone) { zone = { key: '', result: null }; return null; }
+    if (zone.key === state.zone) return zone.result;
+    var key = zone.key = state.zone;
+    zone.result = null;
+    var keys = SFZones.parseKey(key);
+    keys.d = state.district;
+    SFZones.fromKeys(keys).then(function (result) {
+      if (zone.key !== key) return;
+      zone.result = result;
+      draw(true);
+    }).catch(function (err) { SF.fail(document.getElementById('school-list'), err); });
+    return null;
+  }
+
+  // Sets the zone from an answer, with its district, and redraws.
+  function setZone(result) {
+    var key = SFZones.keyString(result.keys);
+    zone = { key: key, result: result };
+    SF.setParam('boro', '', true);
+    SF.setParam('district', result.district || '', true);
+    SF.setParam('zone', key, true);
+    closeMenu(false);
+    onFilter();
+  }
+
+  function levelsFor(state) {
+    return state.grade && GRADE_LEVELS[state.grade] ? GRADE_LEVELS[state.grade] : LEVELS;
+  }
+
+  // The zone's groups, in level order. Each school is listed once; a school
+  // zoned at two levels is named again under the second. The zone is a fact
+  // about the place, so Type and Status do not narrow it.
+  function zoneGroups(result, state) {
+    var listed = {};
+    var groups = [];
+    levelsFor(state).forEach(function (l) {
+      var level = result.levels[l];
+      var group = { level: l, data: level, rows: [], again: [] };
+      level.dbns.forEach(function (d) {
+        var row = rowOf(d);
+        if (listed[d]) group.again.push(row);
+        else { listed[d] = true; group.rows.push(row); }
+      });
+      groups.push(group);
+    });
+    return groups;
+  }
+
+  // A school the zone names, as the list holds it.
+  function rowOf(dbn) { return byDbn[dbn] || { dbn: dbn, name: dbn }; }
+
+  function zonedRows(groups) {
+    return [].concat.apply([], groups.map(function (g) { return g.rows; }));
+  }
+
   function optionsFor(key) {
     var seen = {};
     rows.forEach(function (r) {
@@ -143,6 +274,7 @@
   function chipText(f, state) {
     var v = state[f.key];
     if (!v) return f.label;
+    if (f.key === 'zone') return zone.result ? SFZones.label(zone.result, rowOf) : 'Zone…';
     if (f.key === 'district') return 'District ' + parseInt(v, 10);
     if (f.key === 'grade') return (GRADE_NAMES[v] || [v])[0];
     if (f.key === 'status') return STATUS.filter(function (p) { return p[0] === v; })[0][1];
@@ -203,9 +335,14 @@
     if (refocus) chip.querySelector('.chip-main').focus();
   }
 
+  // A new borough or district is a new place, so the zone under it clears.
   function pick(key, value, onChange) {
     closeMenu(false);
     SF.setParam(key, value, true);
+    if (key === 'boro' || key === 'district') {
+      SF.setParam('zone', '', true);
+      finder.clearAddress();
+    }
     onChange();
     var again = document.getElementById('chip-' + key);
     if (again) again.focus();
@@ -269,6 +406,9 @@
     host.innerHTML = '';
     FILTERS.forEach(function (f) {
       var set = isSet(f.key, state);
+      // The zone has no chip. The panel and the map show it, and emptying
+      // the address box or Clear filters takes it away.
+      if (f.key === 'zone') return;
       var chip = SF.el('div', { class: 'chip' + (set ? ' is-set' : '') });
       var button = SF.el('button', {
         type: 'button', class: 'chip-main', id: 'chip-' + f.key,
@@ -363,7 +503,8 @@
     return { map: mapView(), list: !mapView() };
   }
 
-  function countText(list) {
+  function countText(list, state) {
+    if (state && state.zone) return zoneCount(list, state);
     if (list.length === 0) return 'No schools match these filters.';
     var total = list.length.toLocaleString('en-US');
     var text = shown < list.length
@@ -374,11 +515,24 @@
     return text;
   }
 
+  // "2 zoned schools", then the rest of the district when that list shows.
+  function zoneCount(list, state) {
+    if (!zone.result) return 'Finding the zone…';
+    var text = lead ? lead + (lead === 1 ? ' zoned school' : ' zoned schools') : 'No zoned school';
+    var rest = list.length - lead;
+    if (rest > 0 && state.district) {
+      text += ' · ' + (shown < rest ? 'showing ' + shown + ' of ' : '') +
+              rest.toLocaleString('en-US') + ' more in ' + districtLabel(state.district);
+    }
+    return text;
+  }
+
   // "54 schools · District 15 · Middle", for the bar over a full-screen map.
   function summary(state, list) {
     var bits = [list.length.toLocaleString('en-US') + (list.length === 1 ? ' school' : ' schools')];
     if (state.boro) bits.push(state.boro);
     if (state.district) bits.push(districtLabel(state.district));
+    if (state.zone && zone.result) bits.push(SFZones.label(zone.result, rowOf));
     if (state.type) bits.push(state.type);
     if (state.grade) bits.push(GRADE_NAMES[state.grade] ? GRADE_NAMES[state.grade][0] : state.grade);
     return bits.join(' · ');
@@ -386,17 +540,37 @@
 
   // `animate` is set when a filter changes, so the list fades between
   // results. Paging with "Show more" and switching views do not animate.
+  // With a zone set, the list starts with its zoned schools. `lead` counts
+  // them; paging applies only to the rows after them.
+  var groups = null;
+  var lead = 0;
+
+  function listFor(state) {
+    groups = null;
+    lead = 0;
+    if (!state.zone) return apply(state);
+    var result = zoneAnswer(state);
+    if (!result) return [];
+    groups = zoneGroups(result, state);
+    var zoned = zonedRows(groups);
+    lead = zoned.length;
+    if (!state.district) return zoned;
+    var seen = {};
+    zoned.forEach(function (r) { seen[r.dbn] = true; });
+    return zoned.concat(apply(state).filter(function (r) { return !seen[r.dbn]; }));
+  }
+
   function draw(animate) {
     var state = currentFilters();
-    var list = apply(state);
+    var list = listFor(state);
     var p = panes();
 
     // A selection outside the filtered list is dropped. One inside it past
     // the first page brings in enough rows to show it.
     selected = SF.param('focus') || null;
     var at = selected ? list.map(function (r) { return r.dbn; }).indexOf(selected) : -1;
-    if (selected && at === -1) { selected = null; SF.setParam('focus', '', true); }
-    if (at >= shown) shown = Math.ceil((at + 1) / PAGE_SIZE) * PAGE_SIZE;
+    if (selected && at === -1 && !(state.zone && !zone.result)) { selected = null; SF.setParam('focus', '', true); }
+    if (at - lead >= shown) shown = Math.ceil((at - lead + 1) / PAGE_SIZE) * PAGE_SIZE;
     current = list;
 
     var float = document.getElementById('float-toggle');
@@ -412,7 +586,7 @@
 
     document.getElementById('list-panel').hidden = !p.list;
     document.getElementById('map-panel').hidden = !p.map;
-    document.getElementById('school-count').textContent = countText(list);
+    document.getElementById('school-count').textContent = countText(list, state);
     buildChips(document.getElementById('filters'), state, onFilter);
 
     // A row scrolled into view clears the pinned tools above the list.
@@ -441,7 +615,59 @@
     }
   }
 
+  // The zone's list. Its zoned schools sit in a panel shaded and outlined
+  // like the zone on the map: a heading per level, the zoned school or the
+  // City's word that there is none, the City's remark, then the source. The
+  // rest of the district follows outside the panel.
+  function drawZoneList(list, animate) {
+    var state = currentFilters();
+    var grid = document.getElementById('school-list');
+    var more = document.getElementById('show-more');
+    grid.innerHTML = '';
+    more.hidden = true;
+    if (!groups) return;
+
+    var i = 0;
+    var into = grid;
+    function add(node, cls) {
+      var item = SF.el('li', { class: [cls, animate ? 'enter' : ''].filter(Boolean).join(' ') }, [node]);
+      if (animate) item.style.setProperty('--i', Math.min(i++, 12));
+      into.appendChild(item);
+    }
+    function head(text) { add(SF.el('h2', { class: 'list-group', text: text }), 'is-head'); }
+    function note(text) { add(SF.el('p', { class: 'zone-line', text: text }), 'zone-note'); }
+
+    var panel = SF.el('ul', { class: 'school-rows zone-rows', 'aria-label': 'Zoned schools' });
+    add(panel, 'zone-panel');
+    into = panel;
+    groups.forEach(function (g) {
+      var level = g.data;
+      head(LEVEL_HEAD[g.level] + (g.rows.length > 1 ? 's' : ''));
+      g.rows.forEach(function (r) { add(row(r)); });
+      g.again.forEach(function (r) { note((r.name || r.dbn) + ', listed above.'); });
+      if (!g.rows.length && !g.again.length) {
+        note(level.state === 'unzoned' ? 'No zoned school' : 'No zone at this spot');
+      }
+      (level.k8 || []).forEach(function (d) {
+        var r = rowOf(d);
+        note('Middle grades at ' + (r.name || r.dbn) + ' give priority to its elementary zone.');
+      });
+      if (level.state === 'changed') add(SFZones.changeNote(level), 'zone-note');
+      if (level.remark) add(SFZones.quote(level.remark), 'zone-note');
+    });
+    add(SFZones.sourceLine(zone.result), 'zone-source');
+    into = grid;
+
+    var rest = list.slice(lead);
+    if (!rest.length) return;
+    head('Other schools in ' + districtLabel(state.district));
+    rest.slice(0, shown).forEach(function (r) { add(row(r)); });
+    more.hidden = shown >= rest.length;
+    more.textContent = 'Show ' + Math.min(PAGE_SIZE, rest.length - shown) + ' more';
+  }
+
   function drawList(list, animate) {
+    if (currentFilters().zone) return drawZoneList(list, animate);
     var grid = document.getElementById('school-list');
     var more = document.getElementById('show-more');
     var from = animate ? 0 : grid.children.length;
@@ -535,17 +761,20 @@
     try { sessionStorage.setItem('sf-results', location.pathname + location.search); } catch (e) {}
 
     var at = selected ? current.map(function (r) { return r.dbn; }).indexOf(selected) : -1;
-    if (at >= shown) {
-      shown = Math.ceil((at + 1) / PAGE_SIZE) * PAGE_SIZE;
+    if (at - lead >= shown) {
+      shown = Math.ceil((at - lead + 1) / PAGE_SIZE) * PAGE_SIZE;
       drawList(current, false);
-      document.getElementById('school-count').textContent = countText(current);
+      document.getElementById('school-count').textContent = countText(current, currentFilters());
     }
     paintSelection(from === 'list' ? 'nearest' : 'glide');
 
     // The marker always follows the selection. The camera moves only for a
-    // pick in the list, since a pick on the map is already in view.
+    // pick in the list or the search box, since a pick on the map is already
+    // in view. A search zooms in on the school.
     if (mapReady) {
-      mapReady.then(function (map) { if (map) showOnMap(map, selected, from === 'list'); });
+      mapReady.then(function (map) {
+        if (map) showOnMap(map, selected, from === 'list' || from === 'search', from === 'search');
+      });
     }
   }
 
@@ -607,7 +836,7 @@
   // Marks the selected school, and moves the camera when asked. A school
   // already in view is left where it is; one off screen or too small to
   // pick out is brought to the middle.
-  function showOnMap(map, dbn, move) {
+  function showOnMap(map, dbn, move, zoom) {
     var r = dbn && byDbn[dbn];
     var at = r && r.lat != null ? [r.lon, r.lat] : null;
     SFMap.focus(map, at, 'select');
@@ -615,7 +844,9 @@
     hovered = null;
     if (!at || !move) return;
     var inView = map.getBounds().contains(at);
-    if (map.getZoom() < 12.5) {
+    if (zoom) {
+      map.flyTo({ center: at, zoom: Math.max(map.getZoom(), 15), duration: SFMap.reduced ? 0 : 700, essential: false });
+    } else if (map.getZoom() < 12.5) {
       map.flyTo({ center: at, zoom: 14, duration: SFMap.reduced ? 0 : 700, essential: false });
     } else if (!inView) {
       map.easeTo({ center: at, duration: SFMap.reduced ? 0 : 450 });
@@ -685,6 +916,7 @@
           var features = map.queryRenderedFeatures(ev.point, { layers: ['schools'] });
           if (!features.length) {
             if (wide.matches && selected) select(null, 'map');
+            showSpot(map, ev.lngLat);
             return;
           }
           var hits = features.map(function (f) { return byDbn[f.properties.dbn]; })
@@ -732,13 +964,144 @@
 
       var target = selected && placed.filter(function (r) { return r.dbn === selected; })[0];
       showOnMap(map, selected, false);
-      if (target) {
+      var zoneLines = drawZones(map, state);
+      if (target && zoomTo === target.dbn) {
+        zoomTo = null;
+        map.flyTo({ center: [target.lon, target.lat], zoom: 15, duration: SFMap.reduced ? 0 : 700, essential: false });
+      } else if (target) {
         map.jumpTo({ center: [target.lon, target.lat], zoom: Math.max(map.getZoom(), 14) });
+      } else if (state.zone) {
+        // A zone frames itself, since its schools can sit at its edge.
+        zoneLines.then(function (spot) {
+          var b = SFZones.bounds(spot);
+          var p = SFFinder.pin.get(state.zone);
+          if (b && p) {
+            b = [[Math.min(b[0][0], p.lon), Math.min(b[0][1], p.lat)],
+                 [Math.max(b[1][0], p.lon), Math.max(b[1][1], p.lat)]];
+          }
+          if (b) SFMap.frame(map, b, Object.assign({ padding: 40, maxZoom: 15 }, animate ? {} : { duration: 0 }));
+        });
       } else if (placed.length) {
         var bounds = new maplibregl.LngLatBounds();
         placed.forEach(function (r) { bounds.extend([r.lon, r.lat]); });
         SFMap.frame(map, bounds, animate ? {} : { duration: 0 });
       }
+    });
+  }
+
+  // ---- Zones on the map -----------------------------------------------
+
+  var EMPTY = { type: 'FeatureCollection', features: [] };
+
+  // Zone lines sit under the school points: the chosen district's
+  // elementary zones, thin, and the spot's zones over them.
+  function zoneLayers(map) {
+    if (map.getSource('zone-spot')) return;
+    map.addSource('zone-district', { type: 'geojson', data: EMPTY });
+    map.addSource('zone-spot', { type: 'geojson', data: EMPTY });
+    map.addLayer({ id: 'zone-district', type: 'line', source: 'zone-district',
+      filter: ['!=', ['get', 'part'], true],
+      paint: { 'line-color': ZONE_LINE.es.color, 'line-width': 1, 'line-opacity': 0.45 } }, 'schools');
+    map.addLayer({ id: 'zone-spot-fill', type: 'fill', source: 'zone-spot',
+      filter: ['==', ['get', 'level'], 'es'],
+      paint: { 'fill-color': ZONE_LINE.es.color, 'fill-opacity': 0.09 } }, 'schools');
+    ['hs', 'ms', 'es'].forEach(function (l) {
+      var paint = { 'line-color': ZONE_LINE[l].color, 'line-width': ZONE_LINE[l].width };
+      if (ZONE_LINE[l].dash) paint['line-dasharray'] = ZONE_LINE[l].dash;
+      map.addLayer({ id: 'zone-spot-' + l, type: 'line', source: 'zone-spot',
+        filter: ['all', ['==', ['get', 'level'], l], ['!=', ['get', 'part'], true]],
+        paint: paint }, 'schools');
+    });
+  }
+
+  // Resolves with the spot's shapes, empty when no zone is set.
+  function drawZones(map, state) {
+    var district = state.district && parseInt(state.district, 10) < 75 ? state.district : '';
+    var result = state.zone ? zone.result : null;
+    return Promise.all([
+      district ? SFZones.districtShapes(district) : EMPTY,
+      result ? SFZones.shapes(result) : EMPTY
+    ]).then(function (got) {
+      zoneLayers(map);
+      map.getSource('zone-district').setData(got[0]);
+      map.getSource('zone-spot').setData(got[1]);
+      var placed = drawPin(map, state);
+      var drawn = {};
+      got[1].features.forEach(function (f) { drawn[f.properties.level] = true; });
+      var key = [placed && (placed.kind === 'spot' ? 'Pin: chosen spot' : 'Pin: address'),
+                 drawn.es && 'Shaded: elementary zone', drawn.ms && 'Dashed: middle',
+                 drawn.hs && 'Dotted: high'].filter(Boolean).join(' · ');
+      mapNote(key || (got[0].features.length ? 'Thin green lines are elementary zones'
+                                             : 'Lines are districts, not zones'));
+      return got[1];
+    });
+  }
+
+  // The address or spot that set the zone. The pin wears the site's ink and
+  // the white halo of the school points, so it belongs to the same map but
+  // never reads as a school. It shows only for the zone it set.
+  var PIN_SVG = '<svg viewBox="0 0 28 38" width="28" height="38" aria-hidden="true">' +
+    '<path d="M14 36.5c-1.2-4.6-12.5-13.2-12.5-22.3a12.5 12.5 0 0 1 25 0c0 9.1-11.3 17.7-12.5 22.3z" ' +
+    'fill="#15181b" stroke="#fff" stroke-width="2"/>' +
+    '<circle cx="14" cy="14.2" r="4.6" fill="#fff"/></svg>';
+  var pinMarker = null;
+
+  function drawPin(map, state) {
+    var p = state.zone ? SFFinder.pin.get(state.zone) : null;
+    if (!state.zone) SFFinder.pin.clear();
+    if (!p) {
+      if (pinMarker) { pinMarker.remove(); pinMarker = null; }
+      return null;
+    }
+    if (!pinMarker) {
+      var el = SF.el('div', { class: 'map-pin', html: PIN_SVG });
+      pinMarker = new maplibregl.Marker({ element: el, anchor: 'bottom' });
+    }
+    pinMarker.setLngLat([p.lon, p.lat]).addTo(map);
+    return p;
+  }
+
+  // The few words before the credits in the map's corner. The credits open
+  // with "© ", so everything before it is the note.
+  function mapNote(text) {
+    var box = document.querySelector('#school-map .map-attrib');
+    var first = box && box.firstChild;
+    if (first && first.nodeType === 3) first.textContent = text + ' · © ';
+  }
+
+  // A spot on the map names its zones, and one button sets them as the
+  // filter.
+  function showSpot(map, lngLat) {
+    var box = SF.el('div', { class: 'map-popup zone-spot' }, [
+      SF.el('p', { class: 'map-popup-head', text: 'Finding the zones here…' })
+    ]);
+    popup.setLngLat(lngLat).setDOMContent(box).addTo(map);
+    SFZones.answer(lngLat.lng, lngLat.lat).then(function (result) {
+      var none = LEVELS.every(function (l) { return result.levels[l].state === 'none'; });
+      if (none && !result.district) { popup.remove(); return; }
+      box.innerHTML = '';
+      box.appendChild(SF.el('p', { class: 'map-popup-head',
+        text: 'Zones here, ' + SFZones.yearText(result.year) }));
+      var dl = SF.el('dl', { class: 'zone-spot-levels' });
+      LEVELS.forEach(function (l) {
+        var level = result.levels[l];
+        dl.appendChild(SF.el('dt', { text: { es: 'Elementary', ms: 'Middle', hs: 'High' }[l] }));
+        dl.appendChild(SF.el('dd', { text: level.dbns.length
+          ? level.dbns.map(function (d) { return SFZones.shortName(rowOf(d)); }).join(', ')
+          : level.state === 'unzoned' ? 'No zoned school' : 'No zone' }));
+      });
+      box.appendChild(dl);
+      var go = SF.el('button', { type: 'button', class: 'pill', text: 'Show these schools' });
+      go.addEventListener('click', function () {
+        popup.remove();
+        SFFinder.pin.set(SFZones.keyString(result.keys), { lon: lngLat.lng, lat: lngLat.lat }, 'spot');
+        finder.clearAddress();
+        setZone(result);
+      });
+      box.appendChild(go);
+    }).catch(function () {
+      box.innerHTML = '';
+      box.appendChild(SF.el('p', { class: 'map-popup-head', text: 'The zones did not load.' }));
     });
   }
 
@@ -761,7 +1124,10 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    SFSearch.mount('#browse-search', {});
+    mountFinder();
+    // An address picked on the home page comes back into the box.
+    var arrived = SFFinder.pin.get(SF.param('zone') || '');
+    if (arrived && arrived.label) finder.showAddress(arrived.label);
 
     var listHost = document.getElementById('school-list');
     SFSearch.data().then(function (data) {
@@ -771,6 +1137,7 @@
 
       document.getElementById('clear-filters').addEventListener('click', function () {
         FILTERS.forEach(function (f) { SF.setParam(f.key, '', true); });
+        finder.clearAddress();
         onFilter();
       });
       document.getElementById('tray-toggle').addEventListener('click', function () {

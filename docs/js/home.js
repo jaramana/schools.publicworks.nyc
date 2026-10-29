@@ -6,7 +6,11 @@
    school attached to it.
 
    The borough links carry a school count, which is a fact about the directory
-   rather than a statistic about education. */
+   rather than a statistic about education.
+
+   The search box finds a school or an address (finder.js). A school opens
+   its profile. An address opens Browse on its zone, with the pin waiting
+   there. */
 
 (function () {
   'use strict';
@@ -49,8 +53,25 @@
     host.appendChild(all);
   }
 
+  function openAddress(a) {
+    SFZones.answer(a.lon, a.lat).then(function (result) {
+      var key = SFZones.keyString(result.keys);
+      SFFinder.pin.set(key, a, 'address');
+      location.href = 'browse.html?district=' + encodeURIComponent(result.district || '') +
+        '&zone=' + key;
+    }).catch(function (err) { SF.fail(document.getElementById('finder-search'), err); });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
-    SFSearch.mount('#finder-search', { autofocus: true });
+    // Beside the School/Address switch, a phone has room for short words only.
+    var narrow = window.matchMedia('(max-width: 40rem)').matches;
+    SFFinder.mount('#finder-search', {
+      autofocus: true,
+      schoolPlaceholder: narrow ? 'Name or DBN' : null,
+      addressPlaceholder: narrow ? 'House number and street' : 'House number and street, such as 619 72 St',
+      onSchool: function (r) { location.href = 'school.html?dbn=' + encodeURIComponent(r.dbn); },
+      onAddress: openAddress
+    });
     SFSearch.data()
       .then(render)
       .catch(function (err) { SF.fail(document.getElementById('boroughs'), err); });

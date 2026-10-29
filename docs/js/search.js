@@ -201,7 +201,9 @@
       input.value = '';
       render([]);
       o.onPick(row);
-      input.focus();
+      // Without preventScroll, focus would scroll Browse's rail back to the
+      // box and away from the school just selected.
+      input.focus({ preventScroll: true });
     }
 
     function run() {

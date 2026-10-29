@@ -307,6 +307,120 @@
     geocoded: 'Location matched from the address by this site.'
   };
 
+  // ---- Zones -----------------------------------------------------------
+
+  var ZONE_WORD = { es: 'elementary', ms: 'middle school', hs: 'high school' };
+  var ZONE_LINE = {
+    es: { width: 2.5 },
+    ms: { width: 2, dash: [3, 2] },
+    hs: { width: 1.8, dash: [1, 2] }
+  };
+
+  // The zones that name the school, as its file carries them. `role` says
+  // how an approved rezoning touches a level:
+  //   shared   it now shares one zone made from several old ones
+  //   left     its old zone was folded into others or divided among them
+  //   gained   its zone took in area whose new lines are only in the plan
+  //   redrawn  its zone's lines moved
+  // A level the school no longer serves has no geometry.
+  function ownZones() {
+    return state.payload.zones || { year: state.periods.zones_es || '', levels: [] };
+  }
+
+  // Every zone that names the school, shaded alike, with a line per level.
+  // The map moves out to show the whole zone.
+  function drawZones(map, own) {
+    var shapes = { type: 'FeatureCollection', features: own.levels.filter(function (l) {
+      return l.g;
+    }).map(function (l) {
+      return { type: 'Feature', properties: { level: l.level },
+               geometry: { type: 'MultiPolygon', coordinates: l.g } };
+    }) };
+    if (!shapes.features.length) return;
+    map.addSource('zones', { type: 'geojson', data: shapes });
+    map.addLayer({ id: 'zone-fill', type: 'fill', source: 'zones',
+      paint: { 'fill-color': SFMap.colors.point, 'fill-opacity': 0.09 } }, 'schools');
+    ['hs', 'ms', 'es'].forEach(function (l) {
+      var paint = { 'line-color': SFMap.colors.point, 'line-width': ZONE_LINE[l].width };
+      if (ZONE_LINE[l].dash) paint['line-dasharray'] = ZONE_LINE[l].dash;
+      map.addLayer({ id: 'zone-' + l, type: 'line', source: 'zones',
+        filter: ['==', ['get', 'level'], l], paint: paint }, 'schools');
+    });
+    var b = SFZones.bounds(shapes);
+    if (b) SFMap.frame(map, b, { padding: 28, maxZoom: 15, duration: 0 });
+  }
+
+  // The zone's rows in Admissions: one per level the City's zone files name
+  // the school in, or one saying they name it in none.
+  function zoneBlock(own, school) {
+    var box = SF.el('section', { class: 'zone-block', 'aria-labelledby': 'zone-title' });
+    box.appendChild(SF.el('h4', { class: 'mset-label', id: 'zone-title', text: 'Zone' }));
+    var dl = SF.el('dl', { class: 'fact-list' });
+    var year = SFZones.yearText(own.year);
+
+    if (!own.levels.length) {
+      dl.appendChild(SF.el('div', { class: 'fact' }, [
+        SF.el('dt', { text: 'Every level' }),
+        SF.el('dd', { text: 'None in the City’s ' + year + ' zone files' })
+      ]));
+    }
+    own.levels.forEach(function (l) {
+      var dd = SF.el('dd', null, zoneText(l, school));
+      dd.appendChild(SF.el('span', { class: 'note', text: l.change ? SFZones.yearText(l.change.year) : year }));
+      if (l.change) {
+        var c = l.change;
+        dd.appendChild(SF.el('p', { class: 'zone-change' }, [
+          SF.el('a', { href: c.doc, text: districtLabel(c.district) + ' rezoning plan, ' + SFZones.yearText(c.year) })
+        ]));
+      }
+      l.remarks.forEach(function (r) { dd.appendChild(SFZones.quote(r)); });
+      dl.appendChild(SF.el('div', { class: 'fact' }, [SF.el('dt', { text: cap(ZONE_WORD[l.level]) + ' zone' }), dd]));
+    });
+    box.appendChild(dl);
+
+    var levels = own.levels.length ? own.levels.map(function (l) { return l.level; }) : SFZones.LEVELS;
+    var cited = sourceLine(levels.map(function (l) { return 'zones_' + l; }));
+    if (cited) {
+      cited.appendChild(document.createTextNode('. Confirm on '));
+      cited.appendChild(SF.el('a', { href: SFZones.FIND_A_SCHOOL, text: 'Find a School' }));
+      cited.appendChild(document.createTextNode('.'));
+      box.appendChild(cited);
+    }
+    return box;
+  }
+
+  function cap(text) { return text.charAt(0).toUpperCase() + text.slice(1); }
+
+  // Other schools named in a sentence, each a link to its profile.
+  function names(rows) {
+    var out = [];
+    rows.forEach(function (r, i) {
+      if (i) out.push(i === rows.length - 1 ? ' and ' : ', ');
+      out.push(SF.el('a', { href: 'school.html?dbn=' + encodeURIComponent(r.dbn),
+                            text: SFZones.shortName(r) }));
+    });
+    return out;
+  }
+
+  // The zone row's sentence, as nodes so school names can be links.
+  function zoneText(l, school) {
+    var name = SFZones.shortName(school);
+    var parts;
+    switch (l.role) {
+      case 'shared': parts = ['Shares one zone with '].concat(names(l.partners)); break;
+      case 'left':
+        parts = [l.change.kind === 'split' ? 'Its zone was divided among ' : 'Its zone became part of one shared by ']
+          .concat(names(l.change.schools));
+        break;
+      case 'gained':
+      case 'redrawn': parts = [name + ' is the zoned school. The rezoning plan moved its zone lines']; break;
+      default:
+        parts = l.partners.length ? ['Shares the zone with '].concat(names(l.partners))
+                                  : [name + ' is the zoned school'];
+    }
+    return parts.map(function (x) { return typeof x === 'string' ? document.createTextNode(x) : x; });
+  }
+
   // A small map under the facts. The map library loads only when the map
   // scrolls near the screen, so a reader who stays at the top never pays for it.
   function renderLocator(school) {
@@ -320,10 +434,25 @@
     host.appendChild(frame);
     var plain = parseInt(school.district, 10);
     var citywide = plain === 75 || plain === 79 || plain === 84;
-    host.appendChild(SF.el('p', { class: 'map-note', text:
+    var note = SF.el('p', { class: 'map-note', text:
       (COORDINATE_ORIGIN[school.coordinate_source] || '') +
       (citywide ? ' This school’s district is citywide, so no area is outlined.'
-                : ' The outlined area is ' + districtLabel(school.district) + '.') }));
+                : ' The outlined area is ' + districtLabel(school.district) + '.') });
+    host.appendChild(note);
+    // The school's zones join the district on the map, and the note names them.
+    var own = ownZones();
+    var drawnZones = own.levels.filter(function (l) { return l.g; });
+    if (drawnZones.length) {
+      var name = SFZones.shortName(school);
+      var kinds = drawnZones.map(function (l) { return ZONE_WORD[l.level]; }).join(' and ');
+      var shared = drawnZones.filter(function (l) { return l.role === 'shared'; })[0];
+      var moved = drawnZones.filter(function (l) { return l.role === 'gained' || l.role === 'redrawn'; })[0];
+      note.appendChild(document.createTextNode(shared
+        ? ' The shaded area is the ' + kinds + ' zone ' + name + ' shares from ' +
+          SFZones.yearText(shared.change.year) + '.'
+        : ' The shaded area is ' + name + '’s ' + SFZones.yearText(own.year) + ' ' + kinds + ' zone' +
+          (moved ? ', whose lines changed for ' + SFZones.yearText(moved.change.year) + '.' : '.')));
+    }
     host.appendChild(SF.el('p', { class: 'map-note' }, [SF.el('a', {
       href: 'browse.html?view=map' +
             (citywide ? '' : '&district=' + encodeURIComponent(school.district)) +
@@ -346,6 +475,7 @@
               type: 'Feature', properties: { dbn: school.dbn },
               geometry: { type: 'Point', coordinates: point } }] });
             SFMap.focus(map, point);
+            drawZones(map, own);
           });
         });
     }
@@ -416,7 +546,10 @@
     demographics: 'Demographic Snapshot',
     directory_es: 'School directory',
     directory_ms: 'School directory',
-    directory_hs: 'School directory'
+    directory_hs: 'School directory',
+    zones_es: 'Elementary school zones',
+    zones_ms: 'Middle school zones',
+    zones_hs: 'High school zones'
   };
 
   function sourceIdsOf(entries) {
@@ -2216,6 +2349,9 @@
             'applicants describe the ' + (state.periods.directory_es || 'current') +
             ' admissions season only. A numbered list is the order applicants were ranked in.'
     }));
+
+    // The zone sits above the programs that admit by it.
+    host.appendChild(zoneBlock(ownZones(), payload.school));
 
     var list = SF.el('ul', { class: 'program-list' });
     programs.forEach(function (p) { list.appendChild(programCard(p)); });

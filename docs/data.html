@@ -76,12 +76,12 @@
     <div id="source-table"></div>
 
     <h2 id="process">Process</h2>
-    <p>Each update runs six steps.</p>
+    <p>Each update runs eight steps.</p>
     <ol class="process">
       <li>
         <h3>Collect</h3>
         <p>
-          Every morning the site downloads eight public sources from New York
+          Every morning the site downloads eleven public sources from New York
           City Public Schools, NYC Open Data and the City's geocoder. The
           reporting period is read from inside each file.
         </p>
@@ -125,6 +125,16 @@
           Each school gets a point from the City's school point file, then the
           high school directory, then the geocoder. A school none of them has
           stays off the map.
+        </p>
+      </li>
+      <li>
+        <h3>Zone</h3>
+        <p>
+          The City's zone files give each zone its schools and a remark, kept
+          in the City's words. The build checks that the zones cover the
+          districts without overlap, and that a point lands in the same zone in
+          the published files as in the City's. A zone that a rezoning approved
+          since then changes is marked, with the plan linked.
         </p>
       </li>
       <li>
@@ -197,7 +207,15 @@
     <h2 id="limits">Limits</h2>
     <ul>
       <li>The site has no overall scores, ranks or recommendations.</li>
-      <li>It has no address search, school zones or commute times.</li>
+      <li>It has no commute times.</li>
+      <li>School zones are the City's lines for 2024-25, the newest on NYC
+        Open Data. Rezonings approved for 2025-26 in Districts 3, 16 and 31
+        are marked where they change a zone. Find a School gives the current
+        zone for an address.</li>
+      <li>A zone gives priority at its zoned school. It does not guarantee a
+        seat.</li>
+      <li>Some zones in the 2024-25 files name a school that has since
+        closed. The list marks it Closed.</li>
       <li>SHSAT figures, specialized high school admissions, suspensions and
         school budgets are not included.</li>
       <li>Ratings, Impact and Performance cover 2023-24 and 2024-25. District 75

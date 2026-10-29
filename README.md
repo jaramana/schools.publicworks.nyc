@@ -15,7 +15,9 @@ period for each figure and definitions in the measure details.
 | [Demographic Snapshot](https://infohub.nyced.org/reports/school-quality/information-and-data-overview) | Enrollment and demographics | Through 2025–26 |
 | [NYC Public Schools directory data](https://infohub.nyced.org/reports/admissions-and-enrollment/directory-data) | Addresses, grades, programs and admissions information | Fall 2025 |
 | [School Point Locations](https://data.cityofnewyork.us/d/jfju-ynrr), `jfju-ynrr` | School coordinates | August 2024 snapshot |
-| [GeoSearch](https://geosearch.planninglabs.nyc/) | Coordinates for schools missing from the point file | Address lookup |
+| [GeoSearch](https://geosearch.planninglabs.nyc/) | Coordinates for schools missing from the point file, and the address search | Address lookup |
+| School Zones 2024–2025: [elementary](https://data.cityofnewyork.us/d/cmjf-yawu), `cmjf-yawu`; [middle](https://data.cityofnewyork.us/d/t26j-jbq7), `t26j-jbq7`; [high](https://data.cityofnewyork.us/d/ruu9-egea), `ruu9-egea` | Zoned schools for an address, and each school's zone | 2024–25 |
+| [Approved rezonings](https://www.schools.nyc.gov/school-life/space-and-facilities/district-planning/district-planning-document-library/approved-rezonings) | Zone changes since the 2024–25 files, in Districts 3, 16 and 31 | 2025–26 |
 | [School Districts](https://data.cityofnewyork.us/d/8ugf-3d8u), `8ugf-3d8u` | District outlines on the map | Updated May 2026 |
 
 The current periods are in `docs/data/status.json`.
@@ -51,8 +53,11 @@ The current periods are in `docs/data/status.json`.
 - Open or former status is inferred from recent source appearances. No source
   publishes it.
 - Coordinates come from the school point file first, then the high school
-  directory, then the geocoder. The map draws every school alike and shows
-  district lines, not school zones.
+  directory, then the geocoder. The map draws every school alike.
+- Zones are the City's 2024–25 lines, the newest on NYC Open Data. The
+  2025–26 rezonings are marked where they change a zone. An address goes only
+  to GeoSearch, the browser finds its zone, and a link carries zone numbers,
+  never the address.
 - SHSAT figures, specialized admissions measures, suspensions and budgets are
   not included. About 400 open schools have no address in the directories.
 
@@ -87,13 +92,19 @@ site, run `python3 tools/serve.py` and open http://localhost:8787.
 District outlines change rarely, so the daily run does not fetch them. Run
 `python tools/fetch_districts.py` when NYC Open Data publishes new ones.
 
+Each school year's zones arrive as new datasets. When NYC Open Data lists a
+newer year, the workflow opens an issue. The build keeps the newest reviewed
+year until the new one is checked and added to `ZONE_YEARS` in
+`pipeline/00_config.py`.
+
 ## Tools
 
-Data pipeline: Python, `pandas`, `requests`, `openpyxl` and `XlsxWriter`
-prepare and validate the data. Website: static HTML, CSS and JavaScript,
-served from GitHub Pages. MapLibre GL is included with the site for maps, over
-the OpenFreeMap Positron basemap, restyled in the browser. Claude was used in
-development.
+Data pipeline: Python, `pandas`, `requests`, `openpyxl`, `XlsxWriter` and
+`shapely` prepare and validate the data. Website: static HTML, CSS and
+JavaScript, served from GitHub Pages. MapLibre GL is included with the site for
+maps, over the OpenFreeMap Positron basemap, restyled in the browser. The
+address search uses the Department of City Planning's GeoSearch, and the
+browser finds the zone at the address. Claude was used in development.
 
 ## License and reuse
 

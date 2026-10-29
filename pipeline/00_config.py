@@ -313,15 +313,17 @@ ZONE_CHANGES = {
 # Zoned schools the site lists as closed, keyed by zone year, with the reason.
 # Validation fails on a closed zoned school missing from here.
 _UNEXPLAINED = ("Not in the 2025-26 snapshot or the Fall 2025 directories, and no approved "
-                "rezoning names it. Check Find a School before launch.")
+                "rezoning names it. Find a School blocked automated checks on 29 October 2026.")
 ZONE_FORMER = {
     "2024-25": {
         "03M076": "Stopped serving grades K-5. The District 3 rezoning for 2025-26 made its "
                   "zone part of one shared by five schools.",
         "16K025": "Closed. The District 16 rezoning for 2025-26 divided its zone among four "
                   "schools.",
-        "10X382": _UNEXPLAINED,
-        "11X287": _UNEXPLAINED,
+        "10X382": "Closed. It shared its zone with 10X386, whose Fall 2025 programs still "
+                  "give zone priority.",
+        "11X287": "Closed. It shared its zone with 11X370, whose Fall 2025 programs still "
+                  "give middle school zone priority.",
         "19K364": _UNEXPLAINED,
     },
 }

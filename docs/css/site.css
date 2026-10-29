@@ -645,6 +645,108 @@ body.map-full .map-stage { flex: 1; }
   .row-actions, .tray, .tray-toggle b.bump { animation: none; }
 }
 
+/* ---- School zones ------------------------------------------------- */
+
+/* The School/Address switch sits at the search box's left edge and shares
+   its border, so the two read as one control. Suggestions span both. */
+.search-shell.search-mode { display: flex; align-items: stretch; position: relative; }
+.search-mode .mode-box { flex: 1; min-width: 0; }
+.search-mode .mode-box.search-shell { position: static; }
+.search-mode .results { left: 0; right: 0; width: auto; }
+.search-mode .mode-box input[type="search"] { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.mode-switch {
+  display: flex; gap: 2px; padding: 3px;
+  background: var(--paper-sunken);
+  border: 1.5px solid var(--control); border-right: 0; border-radius: 9px 0 0 9px;
+}
+.mode-switch button {
+  font: inherit; font-size: .84rem; color: var(--ink-soft);
+  background: none; border: 0; border-radius: 6px; padding: 0 .65rem; cursor: pointer;
+}
+.mode-switch button:hover { color: var(--ink); }
+.mode-switch button[aria-checked="true"] {
+  background: var(--paper-raised); color: var(--ink); font-weight: 600;
+  box-shadow: 0 1px 2px rgba(20, 22, 28, .12);
+}
+.mode-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* An address suggestion puts the street over its neighborhood. */
+.address-box .results button { flex-direction: column; align-items: flex-start; gap: .1rem; }
+.address-status { font-size: .84rem; color: var(--ink-faint); margin: 0; }
+.address-status:empty { display: none; }
+.search-mode .address-status { position: absolute; left: 0; top: 100%; margin-top: .45rem; }
+
+/* The pin for an address or a chosen spot. It drops in from just above
+   its point; MapLibre owns the marker's own transform, so the svg moves. */
+.map-pin { pointer-events: none; }
+.map-pin svg {
+  display: block; transform-origin: 50% 100%;
+  filter: drop-shadow(0 2px 3px rgba(20, 22, 28, .3));
+  animation: pin-in .35s cubic-bezier(.2, .9, .3, 1.2) both;
+}
+@keyframes pin-in {
+  from { opacity: 0; transform: translateY(-10px) scale(.7); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-pin svg { animation: none; }
+}
+
+/* The zoned schools sit in a panel shaded and outlined like the zone on the
+   map. The rest of the district follows outside it. */
+.school-rows > li.zone-panel { border-top: 0; padding: .35rem 0 .2rem; }
+.zone-rows {
+  margin: 0; padding: .1rem .35rem .2rem;
+  background: rgba(20, 99, 74, .06);
+  border: 1.5px solid rgba(20, 99, 74, .55); border-radius: 10px;
+}
+.zone-rows .school-row:hover, .zone-rows .school-row.is-hover { background: rgba(255, 255, 255, .6); }
+.zone-panel + li { border-top: 0; }
+.zone-panel + li .list-group { padding-top: 1.4rem; }
+.list-group {
+  margin: 0; padding: 1.1rem .6rem .3rem;
+  font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.zone-rows .list-group { padding-top: .8rem; color: var(--accent-ink); }
+.zone-rows > li:first-child .list-group { padding-top: .45rem; }
+.school-rows li.is-head + li,
+.school-rows li.zone-note,
+.school-rows li.zone-source { border-top: 0; }
+.school-rows li.zone-note { padding: .1rem .6rem .55rem; }
+.school-rows li.zone-source { padding: .3rem .6rem .5rem; }
+.school-rows li.zone-source .source-line { margin: 0; }
+.zone-line { margin: 0; font-size: .88rem; color: var(--ink-soft); }
+
+/* The City's remark, in its own words, and an approved rezoning. */
+.zone-quote { margin: .55rem 0 0; padding-left: .75rem; border-left: 2px solid var(--rule-strong); }
+.zone-quote p {
+  margin: 0; max-width: 38rem; font-family: var(--serif); font-size: .95rem;
+  font-weight: 400; line-height: 1.5; color: var(--ink-soft);
+}
+.zone-change { margin: .55rem 0 0; font-size: .86rem; font-weight: 400; color: var(--ink-soft); max-width: 40rem; }
+.zone-change a { color: var(--ink-soft); }
+.school-rows .zone-quote, .school-rows .zone-change { margin: 0; }
+
+/* A spot on the map names its zones. */
+.zone-spot-levels {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .2rem .7rem;
+  margin: 0 .3rem; font-size: .84rem;
+}
+.zone-spot-levels dt { color: var(--ink-faint); }
+.zone-spot-levels dd { margin: 0; font-weight: 600; }
+.zone-spot .pill { justify-self: start; margin: .15rem .3rem 0; }
+
+/* The profile's Zone set, above the programs in Admissions. */
+.zone-block { margin: 0 0 1.9rem; }
+.zone-block .mset-label { margin: 0 0 .55rem; }
+.zone-block .fact-list .fact { grid-template-columns: 9.5rem minmax(0, 1fr); }
+.zone-block .zone-quote, .zone-block .zone-change { margin: .45rem 0 0; }
+.zone-block .source-line { margin: .65rem 0 0; }
+@media (max-width: 34rem) {
+  .zone-block .fact-list .fact { grid-template-columns: minmax(0, 1fr); gap: .3rem; }
+}
+
 /* ---- Profile ----------------------------------------------------- */
 
 /* The head: where the school is, then what it is, with room around both. */
@@ -1523,15 +1625,15 @@ body:not(.app-page) main { min-height: calc(100vh - var(--masthead-h)); }
 #filters:empty { min-height: 71px; }
 #school-list:empty { min-height: 100vh; }
 #boroughs:empty { min-height: 72px; }
-#download-list:empty { min-height: 83px; }
-#source-table:empty { min-height: 1206px; }
+#download-list:empty { min-height: 106px; }
+#source-table:empty { min-height: 1532px; }
 #comparison:empty { min-height: 60vh; }
 .statusline[data-status]:empty { min-height: 1.6em; }
 @media (max-width: 40rem) {
   .statusline[data-status]:empty { min-height: 4.8em; }
   #boroughs:empty { min-height: 235px; }
   #download-list:empty { min-height: 228px; }
-  #source-table:empty { min-height: 1411px; }
+  #source-table:empty { min-height: 1779px; }
 }
 /* The masthead is drawn by script. Until it is, its slot holds the height
    it will have at that width: one row, or the nav wrapping to two or three. */
