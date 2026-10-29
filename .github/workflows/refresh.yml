@@ -63,11 +63,11 @@ jobs:
           git config user.email "actions@github.com"
           git add docs/data docs/downloads
 
-          # status.json carries the build date, which changes on every run even
-          # when no figure did. Committing on that alone would add a commit a day
-          # to a dataset that moves once a year, so it does not count as a change
-          # on its own.
-          changed=$(git diff --cached --name-only | grep -v '^docs/data/status.json$' || true)
+          # Retrieval dates, the build date and the download timestamps change on
+          # every run even when no figure did. Committing on those alone would add
+          # a commit a day to a dataset that moves once a year, so tools/changed.py
+          # sets them aside and lists only the files with a real change.
+          changed=$(python tools/changed.py)
           if [ -z "$changed" ]; then
             echo "No change to the published data. Nothing to commit."
             git reset

@@ -64,10 +64,11 @@ site.
 ## Updates
 
 A [daily GitHub workflow](.github/workflows/refresh.yml) checks the sources and
-publishes changed data only after validation passes. The site shows source periods
-and the date of the last published build. That date does not advance when a run
-finds no data changes; check the Actions history to confirm that refreshes are
-still running. A stopped workflow cannot update the site's stale-source warning.
+publishes changed data only after validation passes. The site shows source
+periods, retrieval dates and the date of the last published build. Those dates do
+not advance when a run finds no data changes; check the Actions history to confirm
+that refreshes are still running. A stopped workflow cannot update the site's
+stale-source warning.
 
 To build locally:
 
