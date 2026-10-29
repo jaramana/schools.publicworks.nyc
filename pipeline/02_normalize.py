@@ -1127,7 +1127,11 @@ def main():
         lambda c: cfg.CATEGORY_ORDER.index(c) if c in cfg.CATEGORY_ORDER else 99)
     metrics = metrics.sort_values(["category_rank", "metric_id"]).reset_index(drop=True)
 
-    observations = pd.concat([build_observations(sqr, demo), results], ignore_index=True)
+    # Sorted by the grain, so the downloads keep one row order however the
+    # quality reports download happens to arrive.
+    observations = (pd.concat([build_observations(sqr, demo), results], ignore_index=True)
+                    .sort_values(["dbn", "school_year", "metric_id", "report_type"])
+                    .reset_index(drop=True))
     programs, priorities = build_programs(directories)
     sources = build_sources(observations, schools, programs, fetch_manifest)
 
