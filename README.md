@@ -111,3 +111,11 @@ browser finds the zone at the address. Claude was used in development.
 Code is [BSD 3-Clause licensed](LICENSE). Compiled data can be reused with
 attribution; NYC Public Schools and NYC Open Data retain their own source terms.
 Carry the reporting period when republishing a figure.
+
+The landing-page photos in `docs/img/hero/` come from Wikimedia Commons and keep
+their own licenses. The site's copies are cropped and resized.
+
+- [Jamaica High School campus](https://commons.wikimedia.org/wiki/File:Jamaica_HS_east_wide_jeh.jpg), Jim Henderson, CC0
+- [New York Harbor School](https://commons.wikimedia.org/wiki/File:New_York_Harbor_School_GI_td_(2019-07-07)_006_-_Basketball_Court.jpg), Tdorante10, CC BY-SA 4.0
+- [John Adams High School](https://commons.wikimedia.org/wiki/File:John_Adams_Front_Shot.jpg), Xbxg32000, CC BY-SA 3.0
+- [Leon M. Goldstein High School](https://commons.wikimedia.org/wiki/File:LMGHS_jeh.jpg), Jim Henderson, public domain

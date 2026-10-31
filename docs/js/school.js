@@ -215,7 +215,7 @@
     // The DBN carries its expansion, since it is the first piece of jargon
     // anyone meets here and it is never explained on the page otherwise.
     host.appendChild(SF.el('p', {
-      class: 'where mono',
+      class: 'where',
       html: '<abbr title="District, borough, and school number: the identifier ' +
             'New York City uses for this school">' + SF.escapeHtml(school.dbn) +
             '</abbr>' + (rest ? ' · ' + SF.escapeHtml(rest) : '')

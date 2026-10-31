@@ -18,40 +18,87 @@
 <script src="js/finder.js" defer></script>
 <script src="js/home.js" defer></script>
 </head>
-<body>
+<body class="home">
 <a class="skip" href="#main">Skip to content</a>
 <header data-chrome="masthead"></header>
 
 <main id="main">
-  <section class="wrap console">
-    <h1 class="console-h1">New York City public school statistics</h1>
-    <p class="console-sub">
-      The figures the City publishes about its schools are spread across a
-      quality report, an enrollment snapshot and three admissions directories.
-      Search those sources together on each school's profile. Figures include
-      definitions, reporting periods, and source links.
-    </p>
+  <section class="hero">
+    <figure class="hero-photo">
+      <img id="hero-img" alt="" sizes="100vw"
+        src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==">
+      <noscript><img alt="" sizes="100vw" src="img/hero/jamaica-1200.webp"
+        srcset="img/hero/jamaica-800.webp 800w, img/hero/jamaica-1200.webp 1200w, img/hero/jamaica-1800.webp 1800w"></noscript>
+      <figcaption id="hero-credit">Jamaica High School campus, Queens ·
+        <a href="https://commons.wikimedia.org/wiki/File:Jamaica_HS_east_wide_jeh.jpg">Jim Henderson</a>,
+        <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0</a></figcaption>
+    </figure>
+    <!-- Picks one of four photos on each visit, avoiding the last one shown.
+         Inline so the image request starts before first paint and the credit
+         never shows the wrong photo. -->
+    <script>
+    (function () {
+      var C = 'https://commons.wikimedia.org/wiki/File:';
+      var photos = [
+        { id: 'jamaica', pos: '60% 50%', place: 'Jamaica High School campus, Queens',
+          author: 'Jim Henderson', page: C + 'Jamaica_HS_east_wide_jeh.jpg',
+          license: 'CC0', deed: 'https://creativecommons.org/publicdomain/zero/1.0/' },
+        { id: 'harbor', pos: '50% 55%', place: 'New York Harbor School, Governors Island',
+          author: 'Tdorante10', page: C + 'New_York_Harbor_School_GI_td_(2019-07-07)_006_-_Basketball_Court.jpg',
+          license: 'CC BY-SA 4.0', deed: 'https://creativecommons.org/licenses/by-sa/4.0/' },
+        { id: 'goldstein', pos: '40% 45%', place: 'Leon M. Goldstein High School, Brooklyn',
+          author: 'Jim Henderson', page: C + 'LMGHS_jeh.jpg',
+          license: 'Public domain', deed: 'https://creativecommons.org/publicdomain/mark/1.0/' },
+        { id: 'adams', pos: '50% 25%', place: 'John Adams High School, Queens',
+          author: 'Xbxg32000', page: C + 'John_Adams_Front_Shot.jpg',
+          license: 'CC BY-SA 3.0', deed: 'https://creativecommons.org/licenses/by-sa/3.0/' }
+      ];
+      var last = null;
+      try { last = localStorage.getItem('sf-hero'); } catch (e) {}
+      var pool = photos.filter(function (p) { return p.id !== last; });
+      var p = pool[Math.floor(Math.random() * pool.length)];
+      try { localStorage.setItem('sf-hero', p.id); } catch (e) {}
 
-    <div class="search-shell" id="finder-search"></div>
-    <p class="statusline mono" data-status></p>
+      var img = document.getElementById('hero-img');
+      var base = 'img/hero/' + p.id + '-';
+      img.srcset = base + '800.webp 800w, ' + base + '1200.webp 1200w, ' + base + '1800.webp 1800w';
+      img.src = base + '1200.webp';
+      img.style.objectPosition = p.pos;
+      document.getElementById('hero-credit').innerHTML = p.place + ' · ' +
+        '<a href="' + p.page + '">' + p.author + '</a>, ' +
+        '<a href="' + p.deed + '">' + p.license + '</a>';
+    })();
+    </script>
+
+    <div class="wrap">
+      <div class="hero-card">
+        <h1>Find a New York City public school</h1>
+        <p class="hero-sub">Every school's published figures, from the City's own reports, on one page.</p>
+        <div class="search-shell" id="finder-search"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap home-boroughs">
+    <h2>Start from a borough</h2>
+    <ul class="entry-grid" id="boroughs"></ul>
+  </section>
+
+  <section class="wrap home-foot">
+    <p class="statusline" data-status></p>
 
     <!-- The suite's announcement banner. The wording is shared across every
          publicworks.nyc project and only two things change: the body that did
          not check it, and the official source to check a figure against. Keep
          it that way, so a new project can carry the same notice by editing two
          phrases. -->
-    <div class="note-box">
-      <p>
-        <strong>This is not an official product.</strong> It is an independent
-        initiative, not affiliated with, endorsed by, or produced by
-        <a href="https://www.schools.nyc.gov/">New York City Public Schools</a>
-        or the City of New York. Please refer to them for authoritative
-        information.
-      </p>
-    </div>
-
-    <h2 class="section-label">Or start from a borough</h2>
-    <ul class="entry-grid" id="boroughs"></ul>
+    <p class="home-notice">
+      <strong>This is not an official product.</strong> It is an independent
+      initiative, not affiliated with, endorsed by, or produced by
+      <a href="https://www.schools.nyc.gov/">New York City Public Schools</a>
+      or the City of New York. Please refer to them for authoritative
+      information.
+    </p>
   </section>
 </main>
 
